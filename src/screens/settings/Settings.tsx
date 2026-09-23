@@ -36,6 +36,20 @@ import {clearAppCache} from '../../lib/clearAppCache';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Settings'>;
 
+const AnimatedSection = ({
+  delay,
+  children,
+}: {
+  delay: number;
+  children: React.ReactNode;
+}) => (
+  <Animated.View
+    entering={FadeInDown.delay(delay).springify()}
+    layout={Layout.springify()}>
+    {children}
+  </Animated.View>
+);
+
 const Settings = ({navigation}: Props) => {
   const tabNavigation =
     useNavigation<NativeStackNavigationProp<TabStackParamList>>();
@@ -156,20 +170,6 @@ const Settings = ({navigation}: Props) => {
     });
   }, [eraseAllLocalData]);
 
-  const AnimatedSection = ({
-    delay,
-    children,
-  }: {
-    delay: number;
-    children: React.ReactNode;
-  }) => (
-    <Animated.View
-      entering={FadeInDown.delay(delay).springify()}
-      layout={Layout.springify()}>
-      {children}
-    </Animated.View>
-  );
-
   return (
     <Animated.ScrollView
       className="h-full w-full bg-m3-background"
@@ -179,7 +179,6 @@ const Settings = ({navigation}: Props) => {
       bounces={true}
       overScrollMode="always"
       entering={FadeInUp.springify()}
-      layout={Layout.springify()}
       contentContainerStyle={{
         paddingTop: 15,
         paddingBottom: 24,

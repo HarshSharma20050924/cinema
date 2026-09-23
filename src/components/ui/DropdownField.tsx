@@ -46,11 +46,12 @@ const DropdownField = <T,>({
   const selectedLabel = selectedOption ? getLabel(selectedOption) : placeholder;
 
   return (
-    <Host
-      matchContents={{vertical: true}}
-      style={[{width: '100%', opacity: disabled ? 0.45 : 1}, style]}
-      pointerEvents={disabled ? 'none' : 'auto'}
-      {...hostTheme}>
+    <View style={[{width: '100%', minHeight: 56}, style]}>
+      <Host
+        matchContents={{vertical: true}}
+        style={{width: '100%', minHeight: 56, opacity: disabled ? 0.45 : 1}}
+        pointerEvents={disabled ? 'none' : 'auto'}
+        {...hostTheme}>
       <ExposedDropdownMenuBox
         expanded={disabled ? false : expanded}
         onExpandedChange={next => !disabled && setExpanded(next)}>
@@ -137,6 +138,7 @@ const DropdownField = <T,>({
         </ExposedDropdownMenu>
       </ExposedDropdownMenuBox>
     </Host>
+    </View>
   );
 };
 

@@ -356,48 +356,50 @@ const DnsPreference = () => {
                 })}
               </View>
 
-              <Host
-                matchContents={{ vertical: true }}
-                style={{ width: '100%' }}
-                {...hostTheme}>
-                <TextField
-                  value={byeDpiArgsValue}
-                  singleLine
-                  onValueChange={setByeDpiArgs}
-                  keyboardOptions={{
-                    autoCorrectEnabled: false,
-                    capitalization: 'none',
-                    imeAction: 'done',
-                  }}
-                  keyboardActions={{ onDone: saveByeDpiArgs }}
-                  modifiers={[fillMaxWidth()]}
-                  shape={Shape.RoundedCorner({
-                    cornerRadii: {
-                      topStart: 12,
-                      topEnd: 12,
-                      bottomStart: 12,
-                      bottomEnd: 12,
-                    },
-                  })}
-                  textStyle={{ fontSize: 13, color: colors.onSurface }}
-                  colors={{
-                    focusedContainerColor: colors.surfaceContainerHigh,
-                    unfocusedContainerColor: colors.surfaceContainerHigh,
-                    focusedTextColor: colors.onSurface,
-                    unfocusedTextColor: colors.onSurface,
-                    cursorColor: colors.primary,
-                    focusedIndicatorColor: 'transparent',
-                    unfocusedIndicatorColor: 'transparent',
-                    focusedPlaceholderColor: colors.onSurfaceVariant,
-                    unfocusedPlaceholderColor: colors.onSurfaceVariant,
-                  }}>
-                  <TextField.Placeholder>
-                    <Text color={colors.onSurfaceVariant}>
-                      {DEFAULT_BYEDPI_ARGS}
-                    </Text>
-                  </TextField.Placeholder>
-                </TextField>
-              </Host>
+              <View style={{ width: '100%', minHeight: 48 }}>
+                <Host
+                  matchContents={{ vertical: true }}
+                  style={{ width: '100%', minHeight: 48 }}
+                  {...hostTheme}>
+                  <TextField
+                    value={byeDpiArgsValue}
+                    singleLine
+                    onValueChange={setByeDpiArgs}
+                    keyboardOptions={{
+                      autoCorrectEnabled: false,
+                      capitalization: 'none',
+                      imeAction: 'done',
+                    }}
+                    keyboardActions={{ onDone: saveByeDpiArgs }}
+                    modifiers={[fillMaxWidth()]}
+                    shape={Shape.RoundedCorner({
+                      cornerRadii: {
+                        topStart: 12,
+                        topEnd: 12,
+                        bottomStart: 12,
+                        bottomEnd: 12,
+                      },
+                    })}
+                    textStyle={{ fontSize: 13, color: colors.onSurface }}
+                    colors={{
+                      focusedContainerColor: colors.surfaceContainerHigh,
+                      unfocusedContainerColor: colors.surfaceContainerHigh,
+                      focusedTextColor: colors.onSurface,
+                      unfocusedTextColor: colors.onSurface,
+                      cursorColor: colors.primary,
+                      focusedIndicatorColor: 'transparent',
+                      unfocusedIndicatorColor: 'transparent',
+                      focusedPlaceholderColor: colors.onSurfaceVariant,
+                      unfocusedPlaceholderColor: colors.onSurfaceVariant,
+                    }}>
+                    <TextField.Placeholder>
+                      <Text color={colors.onSurfaceVariant}>
+                        {DEFAULT_BYEDPI_ARGS}
+                      </Text>
+                    </TextField.Placeholder>
+                  </TextField>
+                </Host>
+              </View>
             </View>
           ) : null}
         </View>
@@ -440,14 +442,16 @@ const DnsPreference = () => {
           </View>
         </View>
 
-        <DropdownField
-          disabled={warpEnabled}
-          options={DOH_PROVIDERS}
-          value={DOH_PROVIDERS.find(option => option.value === provider)}
-          getKey={option => option.value}
-          getLabel={option => option.label}
-          onChange={option => selectProvider(option.value)}
-        />
+        <View style={{ width: '100%', minHeight: 56 }}>
+          <DropdownField
+            disabled={warpEnabled}
+            options={DOH_PROVIDERS}
+            value={DOH_PROVIDERS.find(option => option.value === provider)}
+            getKey={option => option.value}
+            getLabel={option => option.label}
+            onChange={option => selectProvider(option.value)}
+          />
+        </View>
 
         {provider === 'custom' && !warpEnabled ? (
           <View
@@ -462,49 +466,51 @@ const DnsPreference = () => {
               style={{ color: colors.onSurfaceVariant, marginBottom: 8 }}>
               Custom DoH URL
             </AppText>
-            <Host
-              matchContents={{ vertical: true }}
-              style={{ width: '100%' }}
-              {...hostTheme}>
-              <TextField
-                value={customUrlValue}
-                singleLine
-                onValueChange={setCustomUrl}
-                keyboardOptions={{
-                  autoCorrectEnabled: false,
-                  capitalization: 'none',
-                  imeAction: 'done',
-                  keyboardType: 'uri',
-                }}
-                keyboardActions={{ onDone: saveCustomUrl }}
-                modifiers={[fillMaxWidth()]}
-                shape={Shape.RoundedCorner({
-                  cornerRadii: {
-                    topStart: 16,
-                    topEnd: 16,
-                    bottomStart: 16,
-                    bottomEnd: 16,
-                  },
-                })}
-                textStyle={{ fontSize: 14, color: colors.onSurface }}
-                colors={{
-                  focusedContainerColor: colors.surfaceContainerHigh,
-                  unfocusedContainerColor: colors.surfaceContainerHigh,
-                  focusedTextColor: colors.onSurface,
-                  unfocusedTextColor: colors.onSurface,
-                  cursorColor: colors.primary,
-                  focusedIndicatorColor: 'transparent',
-                  unfocusedIndicatorColor: 'transparent',
-                  focusedPlaceholderColor: colors.onSurfaceVariant,
-                  unfocusedPlaceholderColor: colors.onSurfaceVariant,
-                }}>
-                <TextField.Placeholder>
-                  <Text color={colors.onSurfaceVariant}>
-                    https://dns.example.com/dns-query
-                  </Text>
-                </TextField.Placeholder>
-              </TextField>
-            </Host>
+            <View style={{ width: '100%', minHeight: 56 }}>
+              <Host
+                matchContents={{ vertical: true }}
+                style={{ width: '100%', minHeight: 56 }}
+                {...hostTheme}>
+                <TextField
+                  value={customUrlValue}
+                  singleLine
+                  onValueChange={setCustomUrl}
+                  keyboardOptions={{
+                    autoCorrectEnabled: false,
+                    capitalization: 'none',
+                    imeAction: 'done',
+                    keyboardType: 'uri',
+                  }}
+                  keyboardActions={{ onDone: saveCustomUrl }}
+                  modifiers={[fillMaxWidth()]}
+                  shape={Shape.RoundedCorner({
+                    cornerRadii: {
+                      topStart: 16,
+                      topEnd: 16,
+                      bottomStart: 16,
+                      bottomEnd: 16,
+                    },
+                  })}
+                  textStyle={{ fontSize: 14, color: colors.onSurface }}
+                  colors={{
+                    focusedContainerColor: colors.surfaceContainerHigh,
+                    unfocusedContainerColor: colors.surfaceContainerHigh,
+                    focusedTextColor: colors.onSurface,
+                    unfocusedTextColor: colors.onSurface,
+                    cursorColor: colors.primary,
+                    focusedIndicatorColor: 'transparent',
+                    unfocusedIndicatorColor: 'transparent',
+                    focusedPlaceholderColor: colors.onSurfaceVariant,
+                    unfocusedPlaceholderColor: colors.onSurfaceVariant,
+                  }}>
+                  <TextField.Placeholder>
+                    <Text color={colors.onSurfaceVariant}>
+                      https://dns.example.com/dns-query
+                    </Text>
+                  </TextField.Placeholder>
+                </TextField>
+              </Host>
+            </View>
           </View>
         ) : null}
       </View>
