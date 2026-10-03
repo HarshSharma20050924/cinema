@@ -93,3 +93,4 @@ google-services.json
 #env
 .env
 .env.*
+.wrangler/

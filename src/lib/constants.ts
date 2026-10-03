@@ -7,8 +7,8 @@ export const FLAGS = {
 
 export const themes: {name: string; color: string}[] = [
   {
-    name: 'Vega',
-    color: '#FF6347',
+    name: 'Cinema',
+    color: '#E50914',
   },
   {
     name: 'Hayasaka',
@@ -45,7 +45,7 @@ export const themes: {name: string; color: string}[] = [
 ];
 
 export const socialLinks = {
-  github: 'https://github.com/Zenda-Cross/vega-app',
-  discord: 'https://discord.gg/cr42m6maWy',
-  sponsor: 'https://github.com/sponsors/Zenda-Cross',
+  github: 'https://github.com/HarshSharma20050924',
+  discord: 'https://github.com/HarshSharma20050924',
+  sponsor: 'https://github.com/HarshSharma20050924',
 };

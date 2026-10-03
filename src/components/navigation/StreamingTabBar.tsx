@@ -32,13 +32,15 @@ const StreamingTabBar = ({
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const isNavigationRail = Math.min(windowWidth, windowHeight) >= 600;
   const showLabels = settingsStorage.showTabBarLabels();
-  const bottomBarPadding = Math.max(insets.bottom, 8);
+  const bottomBarPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 14 : 8);
 
   return (
     <View
       style={{
-        backgroundColor: colors.surfaceContainerHigh,
-        borderRightColor: isNavigationRail ? colors.outlineVariant : undefined,
+        backgroundColor: '#0D0D11',
+        borderTopColor: 'rgba(255,255,255,0.08)',
+        borderTopWidth: isNavigationRail ? 0 : StyleSheet.hairlineWidth,
+        borderRightColor: isNavigationRail ? 'rgba(255,255,255,0.08)' : undefined,
         borderRightWidth: isNavigationRail ? StyleSheet.hairlineWidth : 0,
         height: isNavigationRail ? '100%' : undefined,
         paddingBottom: isNavigationRail
@@ -110,42 +112,43 @@ const StreamingTabBar = ({
                 minWidth: 48,
                 width: isNavigationRail ? 88 : undefined,
               }}>
-              <View
-                pointerEvents="none"
-                style={{
-                  alignItems: 'center',
-                  backgroundColor: focused
-                    ? colors.secondaryContainer
-                    : 'transparent',
-                  borderRadius: 16,
-                  height: 32,
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  width: 56,
-                }}>
-                <AnimatedTabIcon
-                  name={icon}
-                  active={focused}
-                  color={
-                    focused
-                      ? colors.onSecondaryContainer
-                      : colors.onSurfaceVariant
-                  }
-                  size={24}
-                />
-              </View>
-              {showLabels ? (
-                <AppText
-                  role={focused ? 'labelMediumEmphasized' : 'labelMedium'}
-                  numberOfLines={1}
+                <View
+                  pointerEvents="none"
                   style={{
-                    color: focused ? colors.onSurface : colors.onSurfaceVariant,
-                    marginTop: 4,
-                    textAlign: 'center',
+                    alignItems: 'center',
+                    backgroundColor: focused
+                      ? colors.primary || '#E50914'
+                      : 'transparent',
+                    borderRadius: 16,
+                    height: 32,
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    width: 56,
                   }}>
-                  {label}
-                </AppText>
-              ) : null}
+                  <AnimatedTabIcon
+                    name={icon}
+                    active={focused}
+                    color={
+                      focused
+                        ? '#FFFFFF'
+                        : '#8E8E98'
+                    }
+                    size={24}
+                  />
+                </View>
+                {showLabels ? (
+                  <AppText
+                    role={focused ? 'labelMediumEmphasized' : 'labelMedium'}
+                    numberOfLines={1}
+                    style={{
+                      color: focused ? (colors.primary || '#E50914') : '#8E8E98',
+                      marginTop: 4,
+                      textAlign: 'center',
+                      fontWeight: focused ? '700' : '500',
+                    }}>
+                    {label}
+                  </AppText>
+                ) : null}
             </TouchableOpacity>
           );
         })}

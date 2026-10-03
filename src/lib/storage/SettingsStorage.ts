@@ -84,7 +84,7 @@ export enum SettingsKeys {
 export class SettingsStorage {
   // Theme settings
   getPrimaryColor(): string {
-    return mainStorage.getString(SettingsKeys.PRIMARY_COLOR) || '#FFFFFF';
+    return mainStorage.getString(SettingsKeys.PRIMARY_COLOR) || '#E50914';
   }
 
   setPrimaryColor(color: string): void {
@@ -122,7 +122,7 @@ export class SettingsStorage {
   }
 
   isDynamicInfoAccentEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.DYNAMIC_INFO_ACCENT, true);
+    return false;
   }
 
   setDynamicInfoAccentEnabled(enabled: boolean): void {

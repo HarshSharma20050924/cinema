@@ -91,7 +91,7 @@ export const checkForUpdate = async (
   setUpdateLoading(true);
   try {
     const res = await fetch(
-      'https://api.github.com/repos/Zenda-Cross/vega-app/releases/latest',
+      'https://api.github.com/repos/HarshSharma20050924/cinema/releases/latest',
     );
     if (res.status === 403 || res.status === 429) {
       ToastAndroid.show(
@@ -101,12 +101,23 @@ export const checkForUpdate = async (
       setUpdateLoading(false);
       return;
     }
+    if (res.status === 404) {
+      if (showToast) {
+        ToastAndroid.show('App is up to date', ToastAndroid.SHORT);
+      }
+      setUpdateLoading(false);
+      return;
+    }
     if (!res.ok) {
       throw new Error(`GitHub release check failed with status ${res.status}`);
     }
     const data = await res.json();
     if (!data?.tag_name) {
-      throw new Error('Invalid release data received from GitHub');
+      if (showToast) {
+        ToastAndroid.show('App is up to date', ToastAndroid.SHORT);
+      }
+      setUpdateLoading(false);
+      return;
     }
     const localVersion = Application.nativeApplicationVersion;
     const remoteVersion = Number(
@@ -125,6 +136,11 @@ export const checkForUpdate = async (
             variant: 'primary',
             onPress: () => {
               const apkAsset =
+                data?.assets?.find(
+                  (asset: any) =>
+                    asset.name?.endsWith('.apk') &&
+                    asset.name?.toLowerCase().includes('arm64'),
+                ) ||
                 data?.assets?.find(
                   (asset: any) =>
                     asset.name?.endsWith('.apk') &&
@@ -156,14 +172,16 @@ export const checkForUpdate = async (
       );
     }
   } catch (error) {
-    const isRateLimit =
-      error instanceof Error &&
-      error.message.toLowerCase().includes('rate limit');
-    const msg = isRateLimit
-      ? 'GitHub API rate limit exceeded. Please wait a few minutes before trying again.'
-      : 'Failed to check for update';
-    ToastAndroid.show(msg, ToastAndroid.SHORT);
-    console.log('Update error', error);
+    if (showToast) {
+      const isRateLimit =
+        error instanceof Error &&
+        error.message.toLowerCase().includes('rate limit');
+      const msg = isRateLimit
+        ? 'GitHub API rate limit exceeded. Please wait a few minutes before trying again.'
+        : 'App is up to date';
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    }
+    console.log('Update check:', error);
   }
   setUpdateLoading(false);
 };
@@ -183,7 +201,7 @@ const About = () => {
         <AppText
           role="headlineLargeEmphasized"
           className="text-m3-on-background">
-          About Vega
+          About Cinema
         </AppText>
         <AppText role="bodyLarge" className="mt-1 text-m3-on-surface-variant">
           App information and updates
@@ -193,7 +211,7 @@ const About = () => {
       <SettingsSection title="App">
         <SettingsRow
           title="Version"
-          description={`Vega ${Application.nativeApplicationVersion || ''}`}
+          description={`Cinema ${Application.nativeApplicationVersion || ''}`}
           icon="information-outline"
           divider={Constants.expoConfig?.extra?.isPlayStore}
         />
@@ -211,7 +229,7 @@ const About = () => {
             />
             <SettingsSwitchRow
               title="Check on startup"
-              description="Look for a new release when Vega opens"
+              description="Look for a new release when Cinema opens"
               value={autoCheckUpdate}
               onValueChange={next => {
                 setAutoCheckUpdate(next);

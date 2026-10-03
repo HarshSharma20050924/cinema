@@ -3,8 +3,10 @@ import React from 'react';
 import useContentStore from '../lib/zustand/contentStore';
 import {MaterialIcons} from '@expo/vector-icons';
 import {useM3Colors} from '../theme/M3PaletteContext';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const ProviderDrawer = ({onClose}: {onClose: () => void}) => {
+  const insets = useSafeAreaInsets();
   const {provider, setProvider, installedProviders} = useContentStore(
     state => state,
   );
@@ -12,7 +14,9 @@ const ProviderDrawer = ({onClose}: {onClose: () => void}) => {
 
   return (
     <View className="flex-1" style={{backgroundColor: 'rgba(0,0,0,0.8)'}}>
-      <View className="mt-10 px-4 pb-4 border-b border-white/10">
+      <View
+        className="px-4 pb-4 border-b border-white/10"
+        style={{paddingTop: Math.max(insets.top, 24)}}>
         <Text className="text-white text-2xl font-bold">Select Provider</Text>
         <Text className="text-gray-400 mt-1 text-sm">Content source</Text>
       </View>
@@ -48,7 +52,7 @@ const ProviderDrawer = ({onClose}: {onClose: () => void}) => {
             )}
           </TouchableOpacity>
         ))}
-        <View className="h-16" />
+        <View style={{height: Math.max(insets.bottom, 24) + 40}} />
       </ScrollView>
     </View>
   );

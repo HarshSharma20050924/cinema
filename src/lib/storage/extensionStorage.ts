@@ -1,4 +1,5 @@
 import {mainStorage} from './StorageService';
+import {PREBUNDLED_PROVIDERS, PREBUNDLED_MODULES} from '../providers/prebundled';
 
 /**
  * Provider Source
@@ -142,7 +143,11 @@ export class ExtensionStorage {
       mainStorage.getArray<ProviderSource>(ExtensionKeys.PROVIDER_SOURCES) ||
       [];
     if (sources.length === 0) {
-      return undefined;
+      return {
+        author: 'harsh-cinema',
+        url: 'https://raw.githubusercontent.com/Zenda-Cross/vega-providers/refs/heads/main',
+        isDefault: true,
+      };
     }
     return getDefault
       ? sources.find(s => s.isDefault) || sources[0]
@@ -203,11 +208,14 @@ export class ExtensionStorage {
    * Get installed providers
    */
   getInstalledProviders(): ProviderExtension[] {
-    return (
+    const installed =
       mainStorage.getArray<ProviderExtension>(
         ExtensionKeys.INSTALLED_PROVIDERS,
-      ) || []
-    );
+      ) || [];
+    if (installed.length === 0) {
+      return PREBUNDLED_PROVIDERS;
+    }
+    return installed;
   }
 
   /**
@@ -221,11 +229,14 @@ export class ExtensionStorage {
    * Get available providers
    */
   getAvailableProviders(author = ''): ProviderExtension[] {
-    return (
+    const available =
       mainStorage.getArray<ProviderExtension>(
         this.scopedKey(ExtensionKeys.AVAILABLE_PROVIDERS, author),
-      ) || []
-    );
+      ) || [];
+    if (available.length === 0) {
+      return PREBUNDLED_PROVIDERS;
+    }
+    return available;
   }
 
   /**
@@ -308,6 +319,10 @@ export class ExtensionStorage {
     const providerMatches = allModules.filter(m => m.value === providerValue);
 
     if (providerMatches.length === 0) {
+      const prebundled = PREBUNDLED_MODULES.find(m => m.value === providerValue);
+      if (prebundled) {
+        return prebundled;
+      }
       return undefined;
     }
 

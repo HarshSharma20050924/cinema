@@ -1,27 +1,38 @@
-import {View, Text, StatusBar, TouchableOpacity} from 'react-native';
-import React from 'react';
-import {useState} from 'react';
+import {
+  View,
+  Text,
+  StatusBar,
+  TouchableOpacity,
+  ActivityIndicator,
+  ToastAndroid,
+} from 'react-native';
+import React, { useState } from 'react';
 import useContentStore from '../lib/zustand/contentStore';
-import Animated, {FadeInRight} from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   NavigationProp,
   useFocusEffect,
   useNavigation,
 } from '@react-navigation/native';
-import {MaterialCommunityIcons} from '@expo/vector-icons';
-import {settingsStorage} from '../lib/storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { settingsStorage } from '../lib/storage';
+import { extensionStorage } from '../lib/storage/extensionStorage';
+import { extensionManager } from '../lib/services/ExtensionManager';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import {RootStackParamList} from '../App';
-import {useM3Colors} from '../theme/M3PaletteContext';
+import { RootStackParamList } from '../App';
+import { useM3Colors } from '../theme/M3PaletteContext';
 import * as DocumentPicker from 'expo-document-picker';
+import { PREBUNDLED_PROVIDERS, PREBUNDLED_MODULES } from '../lib/providers/prebundled';
 
 const Tutorial = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const colors = useM3Colors();
-  const {provider: currentProvider, installedProviders} = useContentStore(
+  const { provider: currentProvider, installedProviders } = useContentStore(
     state => state,
   );
   const [showTutorial, setShowTutorial] = useState<boolean>(!currentProvider);
+  const [installingAll, setInstallingAll] = useState<boolean>(false);
+  const [installProgress, setInstallProgress] = useState<string>('');
 
   // Handle default provider setup
   React.useEffect(() => {
@@ -40,18 +51,45 @@ const Tutorial = () => {
   // Handle status bar color
   useFocusEffect(
     React.useCallback(() => {
-      StatusBar.setBackgroundColor('#121212');
+      StatusBar.setBackgroundColor('#0B0B0E');
       StatusBar.setBarStyle('light-content');
 
       return () => {
-        StatusBar.setBackgroundColor('#121212');
+        StatusBar.setBackgroundColor('#0B0B0E');
         StatusBar.setBarStyle('light-content');
       };
     }, []),
   );
 
+  const handleQuickInstallAll = async () => {
+    if (settingsStorage.isHapticFeedbackEnabled()) {
+      ReactNativeHapticFeedback.trigger('impactHeavy');
+    }
+
+    try {
+      setInstallingAll(true);
+      setInstallProgress('Fetching extension catalog...');
+      // Immediately seed prebundled providers
+      extensionStorage.setInstalledProviders(PREBUNDLED_PROVIDERS);
+      for (const m of PREBUNDLED_MODULES) {
+        extensionStorage.cacheProviderModules(m);
+      }
+      useContentStore.getState().setInstalledProviders(PREBUNDLED_PROVIDERS);
+      useContentStore.getState().setProvider(PREBUNDLED_PROVIDERS[0]);
+      setShowTutorial(false);
+      ToastAndroid.show('Cinema is ready! All extensions installed.', ToastAndroid.LONG);
+    } catch (e: any) {
+      console.warn('Quick install failed:', e);
+      extensionStorage.setInstalledProviders(PREBUNDLED_PROVIDERS);
+      useContentStore.getState().setInstalledProviders(PREBUNDLED_PROVIDERS);
+      useContentStore.getState().setProvider(PREBUNDLED_PROVIDERS[0]);
+      setShowTutorial(false);
+    } finally {
+      setInstallingAll(false);
+    }
+  };
+
   const handleGoToExtensions = () => {
-    // Add haptic feedback
     if (settingsStorage.isHapticFeedbackEnabled()) {
       ReactNativeHapticFeedback.trigger('effectClick', {
         enableVibrateFallback: true,
@@ -97,78 +135,136 @@ const Tutorial = () => {
 
   return showTutorial ? (
     <View
-      style={{backgroundColor: colors.background}}
-      className="absolute inset-0 z-50 justify-center items-center w-full h-full">
+      style={{ backgroundColor: '#0B0B0E' }}
+      className="absolute inset-0 z-50 justify-center items-center w-full h-full px-6">
       <Animated.View
-        entering={FadeInRight.duration(500)}
-        className="rounded-2xl p-6 w-full max-w-sm items-center">
-        <MaterialCommunityIcons
-          name="package-variant-closed"
-          size={64}
-          color={colors.onSurfaceVariant}
-          style={{marginBottom: 16}}
-        />
+        entering={FadeInDown.duration(400)}
+        className="rounded-3xl p-6 w-full max-w-sm items-center border border-white/10"
+        style={{ backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+        
+        {/* Cinema Logo Icon */}
+        <View
+          className="w-20 h-20 rounded-2xl items-center justify-center mb-5"
+          style={{ backgroundColor: 'rgba(229, 9, 20, 0.15)' }}>
+          <MaterialCommunityIcons
+            name="movie-open"
+            size={44}
+            color="#E50914"
+          />
+        </View>
+
         <Text
           style={{
-            color: colors.onSurface,
-            fontSize: 24,
-            fontWeight: '700',
+            color: '#FFFFFF',
+            fontSize: 26,
+            fontWeight: '800',
             textAlign: 'center',
-            marginBottom: 16,
+            letterSpacing: -0.5,
+            marginBottom: 8,
           }}>
-          No Provider Installed
+          Welcome to Cinema
         </Text>
+
         <Text
           style={{
-            color: colors.onSurfaceVariant,
-            fontSize: 16,
+            color: 'rgba(255, 255, 255, 0.65)',
+            fontSize: 14,
             textAlign: 'center',
             marginBottom: 24,
-            lineHeight: 24,
+            lineHeight: 22,
           }}>
-          Connect your cloud provider to play network streams or play local
-          content.
+          Your server-independent streaming powerhouse. Install all extensions with one tap to get started immediately.
         </Text>
+
+        {/* 1-Tap Select All & Install All */}
         <TouchableOpacity
-          onPress={handleGoToExtensions}
-          className="px-6 py-3 rounded-xl w-full flex-row items-center justify-center"
-          style={{backgroundColor: colors.primary}}>
-          <MaterialCommunityIcons
-            name="download"
-            size={20}
-            color={colors.onPrimary}
-          />
+          disabled={installingAll}
+          onPress={handleQuickInstallAll}
+          activeOpacity={0.8}
+          className="px-6 py-3.5 rounded-2xl w-full flex-row items-center justify-center mb-3 shadow-lg"
+          style={{ backgroundColor: '#E50914', opacity: installingAll ? 0.7 : 1 }}>
+          {installingAll ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <MaterialCommunityIcons
+              name="download-multiple"
+              size={20}
+              color="#FFFFFF"
+            />
+          )}
           <Text
             style={{
-              color: colors.onPrimary,
-              fontSize: 16,
-              fontWeight: '600',
+              color: '#FFFFFF',
+              fontSize: 15,
+              fontWeight: '700',
               marginLeft: 8,
             }}>
-            Install Cloud Providers
+            {installingAll ? 'Installing Extensions...' : 'Install All Extensions (1-Tap)'}
           </Text>
         </TouchableOpacity>
+
+        {installingAll && (
+          <Text
+            style={{
+              color: '#E50914',
+              fontSize: 12,
+              fontWeight: '600',
+              marginBottom: 12,
+              textAlign: 'center',
+            }}>
+            {installProgress}
+          </Text>
+        )}
+
+        {/* Choose extensions manually */}
         <TouchableOpacity
-          onPress={handlePlayLocalFile}
-          className="px-6 py-3 rounded-xl w-full flex-row items-center justify-center mt-3"
+          disabled={installingAll}
+          onPress={handleGoToExtensions}
+          activeOpacity={0.7}
+          className="px-6 py-3 rounded-2xl w-full flex-row items-center justify-center mb-3"
           style={{
-            backgroundColor: colors.secondaryContainer,
-            borderColor: colors.outline,
+            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
             borderWidth: 1,
           }}>
           <MaterialCommunityIcons
-            name="play-circle-outline"
-            size={20}
-            color={colors.onSecondaryContainer}
+            name="tune"
+            size={18}
+            color="rgba(255, 255, 255, 0.85)"
           />
           <Text
             style={{
-              color: colors.onSecondaryContainer,
-              fontSize: 16,
+              color: 'rgba(255, 255, 255, 0.85)',
+              fontSize: 14,
               fontWeight: '600',
               marginLeft: 8,
             }}>
-            Play local file
+            Select Extensions Manually
+          </Text>
+        </TouchableOpacity>
+
+        {/* Play Local File */}
+        <TouchableOpacity
+          disabled={installingAll}
+          onPress={handlePlayLocalFile}
+          activeOpacity={0.7}
+          className="px-6 py-2.5 rounded-2xl w-full flex-row items-center justify-center"
+          style={{
+            backgroundColor: 'transparent',
+          }}>
+          <MaterialCommunityIcons
+            name="folder-play-outline"
+            size={18}
+            color="rgba(255, 255, 255, 0.5)"
+          />
+          <Text
+            style={{
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: 13,
+              fontWeight: '500',
+              marginLeft: 6,
+            }}>
+            Play Local Video File
           </Text>
         </TouchableOpacity>
       </Animated.View>

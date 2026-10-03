@@ -63,6 +63,7 @@ import {
 } from './lib/sync/syncService';
 import StreamingTabBar from './components/navigation/StreamingTabBar';
 import AppDialogHost from './components/AppDialogHost';
+import { SplashAndOnboarding } from './components/SplashAndOnboarding';
 import {
   getAnalytics,
   getCrashlytics,
@@ -577,6 +578,8 @@ const App = () => {
     );
   }
 
+  const [showAppSplash, setShowAppSplash] = React.useState(true);
+
   useEffect(() => {
     const isPlayStore = Constants.expoConfig?.extra?.isPlayStore;
     if (!isPlayStore && settingsStorage.isAutoCheckUpdateEnabled()) {
@@ -687,6 +690,19 @@ const App = () => {
                 mounted for the app lifetime: every provider call is dispatched
                 into it. */}
               <ProviderSandboxHost />
+              {showAppSplash && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 99999,
+                  }}>
+                  <SplashAndOnboarding onFinish={() => setShowAppSplash(false)} />
+                </View>
+              )}
             </View>
           </QueryClientProvider>
         </GlobalErrorBoundary>

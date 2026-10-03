@@ -19,7 +19,7 @@ const DownloadLocationDialog = ({
     <AppDialog
       visible={visible}
       title="Select download location"
-      message="Choose the folder where Vega should save downloaded movies and episodes. Android will open its folder picker after you continue."
+      message="Choose the folder where Cinema should save downloaded movies and episodes. Android will open its folder picker after you continue."
       primary=""
       actions={[
         {label: 'Cancel'},

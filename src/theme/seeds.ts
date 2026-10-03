@@ -3,7 +3,7 @@ export type SeedOption = {
   color: string;
 };
 
-export const DEFAULT_SEED = '#FFFFFF';
+export const DEFAULT_SEED = '#E50914';
 export const LEGACY_TERTIARY_BACKGROUND = '#171717';
 
 type HexColor = `#${string}`;
@@ -13,15 +13,30 @@ export const mixHex = (
   target: string,
   amount: number,
 ): HexColor => {
-  const parse = (value: string) =>
-    [1, 3, 5].map(index => parseInt(value.slice(index, index + 2), 16));
-  const sourceRgb = parse(color);
-  const targetRgb = parse(target);
-  const mixed = sourceRgb.map((channel, index) =>
-    Math.round(channel + (targetRgb[index] - channel) * amount),
-  );
-  return `#${mixed.map(channel => channel.toString(16).padStart(2, '0')).join('')}`.toUpperCase() as HexColor;
+  if (!color || typeof color !== 'string' || !target || typeof target !== 'string') {
+    return '#E50914';
+  }
+  const parse = (value: string) => {
+    const clean = value.replace('#', '');
+    if (clean.length === 3) {
+      return clean.split('').map(c => parseInt(c + c, 16));
+    }
+    return [0, 2, 4].map(idx => parseInt(clean.slice(idx, idx + 2) || '00', 16));
+  };
+  try {
+    const sourceRgb = parse(color);
+    const targetRgb = parse(target);
+    const mixed = sourceRgb.map((channel, index) => {
+      const c = isNaN(channel) ? 0 : channel;
+      const t = isNaN(targetRgb[index]) ? 0 : targetRgb[index];
+      return Math.round(c + (t - c) * amount);
+    });
+    return `#${mixed.map(channel => Math.max(0, Math.min(255, channel)).toString(16).padStart(2, '0')).join('')}`.toUpperCase() as HexColor;
+  } catch {
+    return '#E50914';
+  }
 };
+
 
 export const readableOnColor = (color: string): HexColor => {
   const [red, green, blue] = [1, 3, 5].map(index =>
@@ -103,11 +118,13 @@ export const LEGACY_NEUTRAL_SURFACE_ROLES = {
  * full Material 3 palette, so every option yields usable contrast in dark mode.
  */
 export const M3_SEEDS: SeedOption[] = [
-  {name: 'White', color: DEFAULT_SEED},
+  {name: 'Cinema Red', color: '#E50914'},
   {name: 'Tomato', color: '#FF6347'},
-  {name: 'Gray', color: '#9E9E9E'},
   {name: 'Blue', color: '#2196F3'},
-  {name: 'Lavender', color: '#B2A4D4'},
+  {name: 'Emerald', color: '#10B981'},
+  {name: 'Purple', color: '#9333EA'},
+  {name: 'Amber', color: '#F59E0B'},
+  {name: 'White', color: '#FFFFFF'},
 ];
 
 export const isCuratedSeed = (color: string): boolean =>

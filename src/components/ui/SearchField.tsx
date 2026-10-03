@@ -1,17 +1,13 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import {
-  Host,
-  RNHostView,
-  Shape,
-  Text,
-  TextField,
-  type TextFieldRef,
-  useNativeState,
-} from '@expo/ui/jetpack-compose';
-import {fillMaxWidth} from '@expo/ui/jetpack-compose/modifiers';
-import React, {forwardRef, useEffect, useImperativeHandle, useRef} from 'react';
-import {View} from 'react-native';
-import {useM3Colors, useM3HostTheme} from '../../theme/M3PaletteContext';
+  View,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ViewStyle,
+} from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useM3Colors } from '../../theme/M3PaletteContext';
 
 interface SearchFieldProps {
   value: string;
@@ -19,6 +15,7 @@ interface SearchFieldProps {
   onSubmit: (value: string) => void;
   onFocusChange?: (focused: boolean) => void;
   placeholder?: string;
+  style?: ViewStyle;
 }
 
 export interface SearchFieldRef {
@@ -27,75 +24,96 @@ export interface SearchFieldRef {
 
 const SearchField = forwardRef<SearchFieldRef, SearchFieldProps>(
   (
-    {value, onChangeText, onSubmit, onFocusChange, placeholder = 'Search'},
+    {
+      value,
+      onChangeText,
+      onSubmit,
+      onFocusChange,
+      placeholder = 'Search',
+      style,
+    },
     ref,
   ) => {
     const colors = useM3Colors();
-    const hostTheme = useM3HostTheme();
-    const nativeValue = useNativeState(value);
-    const fieldRef = useRef<TextFieldRef>(null);
+    const inputRef = useRef<TextInput>(null);
 
     useImperativeHandle(ref, () => ({
       focus: () => {
-        fieldRef.current?.focus();
+        inputRef.current?.focus();
       },
     }));
 
-    useEffect(() => {
-      fieldRef.current?.setText(value);
-    }, [value]);
-
     return (
-      <Host
-        style={{width: '100%'}}
-        matchContents={{vertical: true}}
-        {...hostTheme}>
-        <TextField
-          ref={fieldRef}
-          value={nativeValue}
-          singleLine
-          onValueChange={onChangeText}
-          onFocusChanged={onFocusChange}
-          keyboardOptions={{
-            autoCorrectEnabled: false,
-            capitalization: 'none',
-            imeAction: 'search',
-          }}
-          keyboardActions={{onSearch: onSubmit}}
-          shape={Shape.Pill({})}
-          textStyle={{fontSize: 16}}
-          colors={{
-            focusedContainerColor: colors.surfaceContainerHigh,
-            unfocusedContainerColor: colors.surfaceContainerLow,
-            focusedTextColor: colors.onSurface,
-            unfocusedTextColor: colors.onSurface,
-            cursorColor: colors.primary,
-            focusedIndicatorColor: 'transparent',
-            unfocusedIndicatorColor: 'transparent',
-            focusedLeadingIconColor: colors.primary,
-            unfocusedLeadingIconColor: colors.onSurfaceVariant,
-            focusedPlaceholderColor: colors.onSurfaceVariant,
-            unfocusedPlaceholderColor: colors.onSurfaceVariant,
-          }}
-          modifiers={[fillMaxWidth()]}>
-          <TextField.Placeholder>
-            <Text color={colors.onSurfaceVariant}>{placeholder}</Text>
-          </TextField.Placeholder>
-          <TextField.LeadingIcon>
-            <RNHostView matchContents>
-              <View style={{height: 24, width: 24}}>
-                <MaterialCommunityIcons
-                  name="magnify"
-                  size={24}
-                  color={colors.onSurfaceVariant}
-                />
-              </View>
-            </RNHostView>
-          </TextField.LeadingIcon>
-        </TextField>
-      </Host>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: colors.surfaceContainerHigh || '#222222',
+            borderColor: '#333333',
+          },
+          style,
+        ]}>
+        <MaterialCommunityIcons
+          name="magnify"
+          size={22}
+          color={colors.primary || '#E50914'}
+          style={styles.searchIcon}
+        />
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.onSurfaceVariant || '#8E8E93'}
+          returnKeyType="search"
+          onSubmitEditing={() => onSubmit(value)}
+          onFocus={() => onFocusChange?.(true)}
+          onBlur={() => onFocusChange?.(false)}
+          autoCorrect={false}
+          autoCapitalize="none"
+          selectionColor={colors.primary || '#E50914'}
+          style={[styles.input, { color: colors.onSurface || '#FFFFFF' }]}
+        />
+        {value.length > 0 && (
+          <TouchableOpacity
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => onChangeText('')}
+            style={styles.clearButton}>
+            <MaterialCommunityIcons
+              name="close-circle"
+              size={18}
+              color={colors.onSurfaceVariant || '#888888'}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
     );
   },
 );
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    width: '100%',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    height: '100%',
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  clearButton: {
+    marginLeft: 6,
+    padding: 2,
+  },
+});
 
 export default SearchField;

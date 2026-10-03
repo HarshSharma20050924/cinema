@@ -185,41 +185,61 @@ class NotificationService {
       ? options.color || settingsStorage.getPrimaryColor()
       : options.color || '#FFFFFF';
 
-    await notifee.displayNotification({
-      id: options.id,
-      title: options.title,
-      body: options.body,
-      data: options.data,
-      android: {
-        smallIcon:
-          options.smallIcon ||
-          (isDownloadNotification
-            ? 'ic_download_notification'
-            : 'ic_notification'),
-        channelId: channelId || this._defaultChannelId,
-        color: notificationColor,
-        pressAction: this.getAppLaunchPressAction(),
-        ...(options.progress ? {progress: options.progress} : {}),
-        ...(options.actions ? {actions: options.actions} : {}),
-        ...(options.groupId ? {groupId: options.groupId} : {}),
-        ...(options.sortKey ? {sortKey: options.sortKey} : {}),
-        ...(options.groupSummary !== undefined
-          ? {groupSummary: options.groupSummary}
-          : {}),
-        ...(options.groupAlertBehavior !== undefined
-          ? {groupAlertBehavior: options.groupAlertBehavior}
-          : {}),
-        onlyAlertOnce: options.onlyAlertOnce || false,
-        asForegroundService: options.asForegroundService ?? false,
-        ...(options.asForegroundService
-          ? {
-              foregroundServiceTypes: [
-                AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-              ],
-            }
-          : {}),
-      },
-    });
+    try {
+      await notifee.displayNotification({
+        id: options.id,
+        title: options.title,
+        body: options.body,
+        data: options.data,
+        android: {
+          smallIcon: options.smallIcon || 'ic_notification',
+          channelId: channelId || this._defaultChannelId,
+          color: notificationColor,
+          pressAction: this.getAppLaunchPressAction(),
+          ...(options.progress ? {progress: options.progress} : {}),
+          ...(options.actions ? {actions: options.actions} : {}),
+          ...(options.groupId ? {groupId: options.groupId} : {}),
+          ...(options.sortKey ? {sortKey: options.sortKey} : {}),
+          ...(options.groupSummary !== undefined
+            ? {groupSummary: options.groupSummary}
+            : {}),
+          ...(options.groupAlertBehavior !== undefined
+            ? {groupAlertBehavior: options.groupAlertBehavior}
+            : {}),
+          onlyAlertOnce: options.onlyAlertOnce || false,
+          asForegroundService: options.asForegroundService ?? false,
+          ...(options.asForegroundService
+            ? {
+                foregroundServiceTypes: [
+                  AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                ],
+              }
+            : {}),
+        },
+      });
+    } catch (err) {
+      console.warn(
+        'Notification display failed, retrying with ic_notification fallback:',
+        err,
+      );
+      try {
+        await notifee.displayNotification({
+          id: options.id,
+          title: options.title,
+          body: options.body,
+          data: options.data,
+          android: {
+            smallIcon: 'ic_notification',
+            channelId: channelId || this._defaultChannelId,
+            color: notificationColor,
+            pressAction: this.getAppLaunchPressAction(),
+            ...(options.progress ? {progress: options.progress} : {}),
+          },
+        });
+      } catch (innerErr) {
+        console.warn('Notification secondary fallback failed:', innerErr);
+      }
+    }
   }
 
   /**
@@ -269,7 +289,7 @@ class NotificationService {
       id: this._downloadForegroundId,
       title: count === 1 ? 'Download in progress' : 'Downloads in progress',
       body: count === 1 ? '1 active download' : `${count} active downloads`,
-      smallIcon: 'ic_download_notification_system',
+      smallIcon: 'ic_download_notification',
       data: {navigationTarget: 'downloads'},
       onlyAlertOnce: true,
       asForegroundService: true,
@@ -323,7 +343,7 @@ class NotificationService {
       id: downloadId,
       title: title,
       body: 'Starting download',
-      smallIcon: 'ic_download_notification_system',
+      smallIcon: 'ic_download_notification',
       color,
       data: this.getDownloadData(downloadId, sourceType),
       groupId: 'vega-downloads',
@@ -387,10 +407,7 @@ class NotificationService {
       id: downloadId,
       title: title,
       body: progressText,
-      smallIcon:
-        action === 'pause'
-          ? 'ic_download_notification_system'
-          : 'ic_download_notification',
+      smallIcon: 'ic_download_notification',
       color,
       data: this.getDownloadData(downloadId, sourceType),
       groupId: 'vega-downloads',

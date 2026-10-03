@@ -51,7 +51,7 @@ export const parseDownloadLocation = (
       return parsed;
     }
 
-    if (parsed.type === 'path' && parsed.path && Platform.OS !== 'android') {
+    if (parsed.type === 'path' && parsed.path) {
       return {
         type: 'path',
         path: parsed.path,
@@ -65,6 +65,19 @@ export const parseDownloadLocation = (
   return null;
 };
 
+export const getDefaultDownloadLocation = (): DownloadLocationConfig => {
+  const basePath =
+    RNFS.DownloadDirectoryPath ||
+    RNFS.ExternalDirectoryPath ||
+    RNFS.DocumentDirectoryPath;
+  const path = `${basePath}/Cinema`;
+  return {
+    type: 'path',
+    path,
+    label: 'Downloads/Cinema',
+  };
+};
+
 export const isSafDownloadLocation = (
   config: DownloadLocationConfig,
 ): config is SafDownloadLocation => {
@@ -75,7 +88,7 @@ export const getDownloadLocationDisplayValue = (
   config?: DownloadLocationConfig | null,
 ): string => {
   if (!config) {
-    return 'Select a download folder';
+    return 'Downloads/Cinema (Default)';
   }
   return config.type === 'saf' ? config.label : config.path;
 };
@@ -136,16 +149,21 @@ export const validateDownloadLocationAccess = async (
   }
   try {
     if (location.type === 'saf') {
-      await FileSystem.StorageAccessFramework.readDirectoryAsync(location.uri);
+      try {
+        await FileSystem.StorageAccessFramework.readDirectoryAsync(location.uri);
+        return true;
+      } catch (safErr) {
+        console.log('SAF directory inaccessible:', safErr);
+        return false;
+      }
+    }
+    if (location.type === 'path' && location.path) {
+      if (!(await RNFS.exists(location.path))) {
+        await RNFS.mkdir(location.path);
+      }
       return true;
     }
-    if (Platform.OS === 'android') {
-      return false;
-    }
-    if (!(await RNFS.exists(location.path))) {
-      await RNFS.mkdir(location.path);
-    }
-    return true;
+    return false;
   } catch (error) {
     console.log('Download location is unavailable:', error);
     return false;
@@ -154,14 +172,13 @@ export const validateDownloadLocationAccess = async (
 
 export const ensureDownloadLocationAccess = async (
   location?: DownloadLocationConfig | null,
-): Promise<DownloadLocationConfig | undefined> => {
-  if (await validateDownloadLocationAccess(location)) {
-    return location || undefined;
+): Promise<DownloadLocationConfig> => {
+  if (location && (await validateDownloadLocationAccess(location))) {
+    return location;
   }
-  const selectedLocation = await selectDownloadLocation();
-  return (await validateDownloadLocationAccess(selectedLocation))
-    ? selectedLocation
-    : undefined;
+  const defaultLoc = getDefaultDownloadLocation();
+  await validateDownloadLocationAccess(defaultLoc);
+  return defaultLoc;
 };
 
 export const getDownloadFileName = (fileName: string, fileType: string) => {

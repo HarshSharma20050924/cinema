@@ -92,7 +92,7 @@ const AppearancePreference = () => {
             Accent color
           </AppText>
           <AppText role="bodySmall" className="mt-1 text-m3-on-surface-variant">
-            Choose a curated seed for Vega's dark palette
+            Choose a curated seed for Cinema's dark palette
           </AppText>
           <View className="mt-4 flex-row flex-wrap gap-3">
             {M3_SEEDS.map(seed => {

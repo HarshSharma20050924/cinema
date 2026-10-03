@@ -290,12 +290,14 @@ export const startDownload = async (
       .cancelNotification(downloadId)
       .catch(() => undefined);
     await notificationService.ensureDownloadPermission().catch(() => false);
-    await notificationService.showDownloadStarting(
-      record.title,
-      downloadId,
-      record.sourceType,
-      await getDownloadNotificationColor(record),
-    );
+    await notificationService
+      .showDownloadStarting(
+        record.title,
+        downloadId,
+        record.sourceType,
+        await getDownloadNotificationColor(record),
+      )
+      .catch(err => console.warn('Could not show download start notification:', err));
     subscriptions.push(
       useDownloadsStore.subscribe(state => {
         const updatedRecord = state.downloads[downloadId];
@@ -344,12 +346,14 @@ export const startDownload = async (
       finalDocumentUri: output.finalDocumentUri,
       totalBytes: output.size,
     });
-    await notificationService.showDownloadComplete(
-      record.title,
-      downloadId,
-      record.sourceType,
-      await getDownloadNotificationColor(record),
-    );
+    await notificationService
+      .showDownloadComplete(
+        record.title,
+        downloadId,
+        record.sourceType,
+        await getDownloadNotificationColor(record),
+      )
+      .catch(err => console.warn('Could not show download complete notification:', err));
   } catch (error) {
     const cancelled = cancelledDownloads.has(downloadId);
     const pauseFailed = pauseFailedDownloads.has(downloadId);

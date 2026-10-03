@@ -102,7 +102,7 @@ const Preferences = () => {
         <AppText
           role="bodyLarge"
           className="mb-7 mt-1 text-m3-on-surface-variant">
-          Shape how Vega looks, plays, and downloads
+          Shape how Cinema looks, plays, and downloads
         </AppText>
 
         <SettingsSection title="Experience">
@@ -183,7 +183,7 @@ const Preferences = () => {
           <SettingsSection title="Privacy">
             <SettingsSwitchRow
               title="Usage and crash reports"
-              description="Help improve Vega with anonymous diagnostics"
+              description="Help improve Cinema with anonymous diagnostics"
               value={telemetryOptIn}
               divider={false}
               onValueChange={async next => {

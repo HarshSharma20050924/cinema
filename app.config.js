@@ -21,8 +21,8 @@ module.exports = () => {
   const IS_PLAYSTORE = process.env.APP_VARIANT === 'playstore';
   const HAS_FIREBASE =
     !IS_PLAYSTORE && (hasAndroidGoogleServices || hasIosGooglePlist);
-  const PACKAGE_NAME = IS_PLAYSTORE ? 'vega.app' : 'com.vega';
-  const APP_SCHEME = IS_PLAYSTORE ? 'vegaapp' : 'com.vega';
+  const PACKAGE_NAME = IS_PLAYSTORE ? 'cinema.app' : 'com.cinema.app';
+  const APP_SCHEME = IS_PLAYSTORE ? 'cinema' : 'cinema';
   const plugins = [
     './plugins/with-custom-native-modules.js',
     './plugins/android-native-config.js',
@@ -109,15 +109,15 @@ module.exports = () => {
   ];
   return {
     expo: {
-      name: 'Vega',
+      name: 'Cinema',
       scheme: APP_SCHEME,
-      displayName: 'Vega',
+      displayName: 'Cinema',
       jsEngine: 'hermes',
       newArchEnabled: true,
       autolinking: { exclude: ['expo-splash-screen'] },
       plugins,
-      slug: 'vega',
-      version: '4.0.6',
+      slug: 'cinema',
+      version: '4.0.7',
       userInterfaceStyle: 'dark',
       experiments: {
         reactCompiler: true,
@@ -128,7 +128,7 @@ module.exports = () => {
           : {}),
         minSdkVersion: 28,
         package: PACKAGE_NAME,
-        versionCode: 192,
+        versionCode: 193,
         permissions: [
           'FOREGROUND_SERVICE',
           'FOREGROUND_SERVICE_DATA_SYNC',

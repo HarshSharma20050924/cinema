@@ -284,21 +284,21 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer}: HeroProps) => {
         }}>
         <HeroTopButton
           icon="menu"
-          iconColor={searchButtonColor}
+          iconColor="#FFFFFF"
           label="Open provider drawer"
           disabled={isDrawerOpen}
           onPress={onOpenDrawer}
         />
         <HeroTopButton
           icon="magnify"
-          iconColor={searchButtonColor}
+          iconColor="#FFFFFF"
           label={`Search in ${provider.display_name}`}
           onPress={() => setSearchActive(true)}
         />
       </View>
 
       <Animated.View
-        entering={FadeInDown.delay(100).springify().damping(18).stiffness(180)}
+        entering={FadeIn.duration(250)}
         style={{
           alignItems: 'center',
           bottom: 22,
@@ -365,8 +365,8 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer}: HeroProps) => {
           }}>
           <Button
             variant="filled"
-            containerColor={searchButtonColor}
-            contentColor={getReadableContentColor(searchButtonColor)}
+            containerColor="#E50914"
+            contentColor="#FFFFFF"
             onPress={openDetails}>
             Watch now
           </Button>

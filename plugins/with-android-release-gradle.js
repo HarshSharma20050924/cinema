@@ -21,7 +21,7 @@ module.exports = function withAndroidReleaseGradle(config) {
 if (project.android) {
   project.android.applicationVariants.all { variant ->
     variant.outputs.each { output ->
-      project.ext { appName = 'Vega' }
+      project.ext { appName = 'Cinema' }
       def version = variant.versionName
       def newName = output.outputFile.name
             // Keep project.ext.appName as a Gradle variable (escaped from Node template evaluation)
@@ -42,7 +42,7 @@ if (project.android) {
       abi {
         enable true
         reset()
-        include 'armeabi-v7a', 'arm64-v8a'
+        include 'armeabi-v7a', 'arm64-v8a', 'x86_64'
         universalApk true
       }
     }

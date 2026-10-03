@@ -380,7 +380,6 @@ const DnsPreference = () => {
                         bottomEnd: 12,
                       },
                     })}
-                    textStyle={{ fontSize: 13, color: colors.onSurface }}
                     colors={{
                       focusedContainerColor: colors.surfaceContainerHigh,
                       unfocusedContainerColor: colors.surfaceContainerHigh,
@@ -491,7 +490,6 @@ const DnsPreference = () => {
                       bottomEnd: 16,
                     },
                   })}
-                  textStyle={{ fontSize: 14, color: colors.onSurface }}
                   colors={{
                     focusedContainerColor: colors.surfaceContainerHigh,
                     unfocusedContainerColor: colors.surfaceContainerHigh,

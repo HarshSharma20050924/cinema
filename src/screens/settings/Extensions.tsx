@@ -5,8 +5,11 @@ import {
   StatusBar,
   FlatList,
   RefreshControl,
+  Text,
+  ActivityIndicator,
 } from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {SettingsStackParamList} from '../../App';
 import {MaterialCommunityIcons, FontAwesome6} from '@expo/vector-icons';
 import useThemeStore from '../../lib/zustand/themeStore';
@@ -71,6 +74,7 @@ const isSameProvider = (
   left?.value === right.value && left.source?.author === right.source?.author;
 
 const Extensions = ({navigation}: Props) => {
+  const insets = useSafeAreaInsets();
   const colors = useM3Colors();
   const primary = colors.primary;
   const activeExtensionProvider = useContentStore(state => state.provider);
@@ -274,6 +278,95 @@ const Extensions = ({navigation}: Props) => {
       setInstallingProvider(null);
     }
   };
+
+  const [batchInstalling, setBatchInstalling] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number;
+    total: number;
+    name: string;
+  }>({current: 0, total: 0, name: ''});
+
+  const currentData = useMemo(() => {
+    const allProviders = [
+      ...(availableProviders || []),
+      ...(installedProviders || []),
+    ].filter(item => item && item.value);
+
+    const providersMap = new Map<string, ProviderExtension>();
+    for (const item of allProviders) {
+      const key = `${item.source?.author || ''}:${item.value}`;
+      const existing = providersMap.get(key);
+      providersMap.set(key, {
+        ...(existing || {}),
+        ...item,
+        hasSettings: Boolean(item.hasSettings || existing?.hasSettings),
+      });
+    }
+
+    return Array.from(providersMap.values());
+  }, [availableProviders, installedProviders]);
+
+  const uninstalledCount = useMemo(() => {
+    return currentData.filter(
+      p =>
+        !(installedProviders || []).some(installed =>
+          isSameProvider(installed, p),
+        ),
+    ).length;
+  }, [currentData, installedProviders]);
+
+  const handleInstallAll = async () => {
+    const toInstall = currentData.filter(
+      p =>
+        !(installedProviders || []).some(installed =>
+          isSameProvider(installed, p),
+        ),
+    );
+
+    if (toInstall.length === 0) {
+      showDialog(
+        'Info',
+        'All available extensions are already installed!',
+        'info',
+      );
+      return;
+    }
+
+    setBatchInstalling(true);
+    let success = 0;
+    for (let i = 0; i < toInstall.length; i++) {
+      const p = toInstall[i];
+      setBatchProgress({
+        current: i + 1,
+        total: toInstall.length,
+        name: p.display_name || p.value,
+      });
+
+      try {
+        await extensionManager.installProvider(p);
+        success++;
+      } catch (err: any) {
+        console.warn(`Failed to install ${p.display_name}:`, err?.message);
+      }
+    }
+
+    loadProviders(activeSourceAuthor);
+    const refreshed = extensionStorage.getInstalledProviders() || [];
+    setInstalledProviders(refreshed);
+
+    const currentProvider = useContentStore.getState().provider;
+    if (!currentProvider?.value && refreshed.length > 0) {
+      setActiveExtensionProvider(refreshed[0]);
+    }
+
+    setBatchInstalling(false);
+    showDialog(
+      'Installation Complete',
+      `Successfully installed ${success} out of ${toInstall.length} extensions!`,
+      'info',
+    );
+  };
+
   const handleUninstallProvider = (provider: ProviderExtension) => {
     if (!provider || !provider.value) {
       showDialog('Error', 'Invalid provider data', 'error');
@@ -454,25 +547,7 @@ const Extensions = ({navigation}: Props) => {
   const handleRefresh = async () => {
     await refreshProviders(activeSourceAuthor);
   };
-  const currentData = useMemo(() => {
-    const allProviders = [
-      ...(availableProviders || []),
-      ...(installedProviders || []),
-    ].filter(item => item && item.value);
 
-    const providersMap = new Map<string, ProviderExtension>();
-    for (const item of allProviders) {
-      const key = `${item.source?.author || ''}:${item.value}`;
-      const existing = providersMap.get(key);
-      providersMap.set(key, {
-        ...(existing || {}),
-        ...item,
-        hasSettings: Boolean(item.hasSettings || existing?.hasSettings),
-      });
-    }
-
-    return Array.from(providersMap.values());
-  }, [availableProviders, installedProviders]);
 
   const renderProviderCard = useCallback(
     ({item}: {item: ProviderExtension}) => {
@@ -597,6 +672,71 @@ const Extensions = ({navigation}: Props) => {
         </View>
       </View>
 
+      {/* Cinema Batch Installation Toolbar */}
+      <View
+        className="mx-5 my-2.5 p-3.5 rounded-2xl flex-row items-center justify-between"
+        style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          borderWidth: 1,
+          borderColor: 'rgba(255, 255, 255, 0.08)',
+        }}>
+        <View className="flex-1 mr-3">
+          <AppText role="labelLargeEmphasized" style={{color: '#FFFFFF'}}>
+            {batchInstalling
+              ? `Installing (${batchProgress.current}/${batchProgress.total})...`
+              : uninstalledCount > 0
+                ? `${uninstalledCount} Extensions Ready to Install`
+                : 'All Extensions Installed'}
+          </AppText>
+          <AppText
+            role="bodySmall"
+            numberOfLines={1}
+            style={{color: colors.onSurfaceVariant, marginTop: 2}}>
+            {batchInstalling
+              ? `Downloading: ${batchProgress.name}`
+              : 'Direct 1-tap bulk add like Cinema Web'}
+          </AppText>
+        </View>
+
+        {batchInstalling ? (
+          <View className="flex-row items-center px-3 py-2">
+            <ActivityIndicator size="small" color="#E50914" />
+          </View>
+        ) : uninstalledCount > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Install all extensions"
+            onPress={handleInstallAll}
+            className="px-4 py-2.5 rounded-xl flex-row items-center gap-x-2"
+            style={({pressed}) => ({
+              backgroundColor: '#E50914',
+              opacity: pressed ? 0.75 : 1,
+            })}>
+            <MaterialCommunityIcons
+              name="download-multiple"
+              size={18}
+              color="#FFFFFF"
+            />
+            <Text style={{color: '#FFFFFF', fontWeight: 'bold', fontSize: 13}}>
+              Install All
+            </Text>
+          </Pressable>
+        ) : (
+          <View
+            className="flex-row items-center gap-x-1.5 px-3 py-1.5 rounded-lg"
+            style={{backgroundColor: 'rgba(34, 197, 94, 0.15)'}}>
+            <MaterialCommunityIcons
+              name="check-circle"
+              size={16}
+              color="#22C55E"
+            />
+            <Text style={{color: '#22C55E', fontSize: 12, fontWeight: '600'}}>
+              All Installed
+            </Text>
+          </View>
+        )}
+      </View>
+
       {/* Provider list */}
       <FlatList
         data={currentData}
@@ -605,7 +745,9 @@ const Extensions = ({navigation}: Props) => {
         }
         renderItem={renderProviderCard}
         className="mt-3 flex-1"
-        contentContainerStyle={{paddingBottom: 24}}
+        contentContainerStyle={{
+          paddingBottom: Math.max(insets.bottom, 24) + 60,
+        }}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         refreshControl={

@@ -18,24 +18,27 @@ export interface Content {
   setActiveExtensionProvider: (provider: ProviderExtension | null) => void;
 }
 
+const initialInstalled = extensionStorage.getInstalledProviders();
+const initialActive = initialInstalled[0] || {
+  value: 'hdhub4u',
+  display_name: 'HdHub4u',
+  type: 'global' as const,
+  installed: true,
+  disabled: false,
+  version: '2.27',
+  icon: 'https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/hdhub4u.png',
+  source: {author: 'harsh-cinema', url: 'https://raw.githubusercontent.com/Zenda-Cross/vega-providers/refs/heads/main'},
+  installedAt: 0,
+  lastUpdated: 0,
+};
+
 const useContentStore = create<Content>()(
   persist(
     (set, _get) => ({
-      provider: {
-        value: '',
-        display_name: '',
-        type: 'global',
-        installed: false,
-        disabled: false,
-        version: '0.0.1',
-        icon: '',
-        source: {author: '', url: ''},
-        installedAt: 0,
-        lastUpdated: 0,
-      },
-      installedProviders: extensionStorage
-        .getInstalledProviders()
-        .sort((a, b) => a.display_name.localeCompare(b.display_name)),
+      provider: initialActive,
+      installedProviders: initialInstalled.sort((a, b) =>
+        a.display_name.localeCompare(b.display_name),
+      ),
       availableProviders: [],
       activeExtensionProvider: null,
 

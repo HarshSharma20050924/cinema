@@ -1,19 +1,17 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import React, { useState } from 'react';
 import {
-  DropdownMenuItem,
-  ExposedDropdownMenu,
-  ExposedDropdownMenuBox,
-  Host,
-  RNHostView,
-  Shape,
+  View,
   Text,
-  TextField,
-} from '@expo/ui/jetpack-compose';
-import {fillMaxWidth, menuAnchor} from '@expo/ui/jetpack-compose/modifiers';
-import React, {useState} from 'react';
-import {View, ViewStyle} from 'react-native';
-import {useM3Colors, useM3HostTheme} from '../../theme/M3PaletteContext';
-import {LEGACY_TERTIARY_BACKGROUND} from '../../theme/seeds';
+  TouchableOpacity,
+  Modal,
+  FlatList,
+  StyleSheet,
+  ViewStyle,
+  TouchableWithoutFeedback,
+} from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useM3Colors } from '../../theme/M3PaletteContext';
+import { LEGACY_TERTIARY_BACKGROUND } from '../../theme/seeds';
 
 interface DropdownFieldProps<T> {
   options: readonly T[];
@@ -27,7 +25,7 @@ interface DropdownFieldProps<T> {
   disabled?: boolean;
 }
 
-const DropdownField = <T,>({
+export default function DropdownField<T>({
   options,
   value,
   getKey,
@@ -37,109 +35,182 @@ const DropdownField = <T,>({
   showFullOptionLabels = false,
   style,
   disabled = false,
-}: DropdownFieldProps<T>) => {
+}: DropdownFieldProps<T>) {
   const colors = useM3Colors();
-  const hostTheme = useM3HostTheme();
-  const [expanded, setExpanded] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+
   const selectedKey = value ? getKey(value) : undefined;
   const selectedOption = options.find(option => getKey(option) === selectedKey);
   const selectedLabel = selectedOption ? getLabel(selectedOption) : placeholder;
 
+  const handleSelect = (option: T) => {
+    onChange(option);
+    setModalVisible(false);
+  };
+
   return (
-    <View style={[{width: '100%', minHeight: 56}, style]}>
-      <Host
-        matchContents={{vertical: true}}
-        style={{width: '100%', minHeight: 56, opacity: disabled ? 0.45 : 1}}
-        pointerEvents={disabled ? 'none' : 'auto'}
-        {...hostTheme}>
-      <ExposedDropdownMenuBox
-        expanded={disabled ? false : expanded}
-        onExpandedChange={next => !disabled && setExpanded(next)}>
-        <TextField
-          readOnly
-          singleLine
-          modifiers={[menuAnchor(), fillMaxWidth()]}
-          shape={Shape.RoundedCorner({
-            cornerRadii: {
-              topStart: 16,
-              topEnd: 16,
-              bottomStart: 16,
-              bottomEnd: 16,
-            },
-          })}
-          textStyle={{fontSize: 14, color: colors.onSurface}}
-          colors={{
-            focusedContainerColor: LEGACY_TERTIARY_BACKGROUND,
-            unfocusedContainerColor: LEGACY_TERTIARY_BACKGROUND,
-            focusedTextColor: colors.onSurface,
-            unfocusedTextColor: colors.onSurface,
-            focusedIndicatorColor: colors.primary,
-            unfocusedIndicatorColor: colors.outlineVariant,
-            focusedPlaceholderColor: colors.onSurface,
-            unfocusedPlaceholderColor: colors.onSurface,
-          }}>
-          <TextField.Placeholder>
-            <Text
-              color={colors.onSurface}
-              maxLines={1}
-              overflow="ellipsis"
-              softWrap={false}>
-              {selectedLabel}
-            </Text>
-          </TextField.Placeholder>
-          <TextField.TrailingIcon>
-            <RNHostView matchContents>
+    <View style={[{ width: '100%' }, style]}>
+      {/* Trigger Button */}
+      <TouchableOpacity
+        activeOpacity={0.75}
+        disabled={disabled}
+        onPress={() => setModalVisible(true)}
+        style={[
+          styles.trigger,
+          {
+            backgroundColor: LEGACY_TERTIARY_BACKGROUND,
+            borderColor: modalVisible ? colors.primary : '#333333',
+            opacity: disabled ? 0.45 : 1,
+          },
+        ]}>
+        <Text
+          numberOfLines={1}
+          style={[styles.selectedText, { color: colors.onSurface }]}>
+          {selectedLabel}
+        </Text>
+        <MaterialCommunityIcons
+          name={modalVisible ? 'menu-up' : 'menu-down'}
+          size={24}
+          color={colors.primary || '#E50914'}
+        />
+      </TouchableOpacity>
+
+      {/* Options Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
               <View
-                style={{
-                  alignItems: 'center',
-                  height: 24,
-                  justifyContent: 'center',
-                  width: 24,
-                }}>
-                <MaterialCommunityIcons
-                  name={expanded ? 'menu-up' : 'menu-down'}
-                  size={22}
-                  color={colors.primary}
+                style={[
+                  styles.modalContent,
+                  {
+                    backgroundColor: '#1E1E1E',
+                    borderColor: '#333333',
+                  },
+                ]}>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: colors.onSurface }]}>
+                    {placeholder}
+                  </Text>
+                  <TouchableOpacity
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => setModalVisible(false)}>
+                    <MaterialCommunityIcons
+                      name="close"
+                      size={20}
+                      color="#888888"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <FlatList
+                  data={options as T[]}
+                  keyExtractor={item => getKey(item)}
+                  style={{ maxHeight: 320 }}
+                  showsVerticalScrollIndicator={true}
+                  renderItem={({ item }) => {
+                    const key = getKey(item);
+                    const isSelected = key === selectedKey;
+                    return (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleSelect(item)}
+                        style={[
+                          styles.optionItem,
+                          isSelected && {
+                            backgroundColor: 'rgba(229, 9, 20, 0.12)',
+                          },
+                        ]}>
+                        <Text
+                          numberOfLines={showFullOptionLabels ? undefined : 2}
+                          style={[
+                            styles.optionLabel,
+                            {
+                              color: isSelected
+                                ? (colors.primary || '#E50914')
+                                : colors.onSurface,
+                              fontWeight: isSelected ? '700' : '400',
+                            },
+                          ]}>
+                          {getLabel(item)}
+                        </Text>
+                        {isSelected && (
+                          <MaterialCommunityIcons
+                            name="check"
+                            size={18}
+                            color={colors.primary || '#E50914'}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  }}
                 />
               </View>
-            </RNHostView>
-          </TextField.TrailingIcon>
-        </TextField>
-        <ExposedDropdownMenu
-          expanded={expanded}
-          containerColor={LEGACY_TERTIARY_BACKGROUND}
-          onDismissRequest={() => setExpanded(false)}>
-          {options.map(option => {
-            const key = getKey(option);
-            const selected = key === selectedKey;
-            return (
-              <DropdownMenuItem
-                key={key}
-                elementColors={{
-                  textColor: selected ? colors.primary : colors.onSurface,
-                }}
-                onClick={() => {
-                  onChange(option);
-                  setExpanded(false);
-                }}>
-                <DropdownMenuItem.Text>
-                  <Text
-                    color={selected ? colors.primary : colors.onSurface}
-                    maxLines={showFullOptionLabels ? undefined : 2}
-                    overflow={showFullOptionLabels ? undefined : 'ellipsis'}
-                    softWrap={showFullOptionLabels}
-                    style={{fontWeight: selected ? '700' : '400'}}>
-                    {getLabel(option)}
-                  </Text>
-                </DropdownMenuItem.Text>
-              </DropdownMenuItem>
-            );
-          })}
-        </ExposedDropdownMenu>
-      </ExposedDropdownMenuBox>
-    </Host>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
-};
+}
 
-export default DropdownField;
+const styles = StyleSheet.create({
+  trigger: {
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectedText: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    marginRight: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+    paddingVertical: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2E2E2E',
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  optionLabel: {
+    fontSize: 14,
+    flex: 1,
+  },
+});

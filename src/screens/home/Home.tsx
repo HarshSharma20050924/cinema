@@ -1,4 +1,5 @@
-import {SafeAreaView, ScrollView, RefreshControl, View} from 'react-native';
+import {SafeAreaView, ScrollView, RefreshControl, View, TouchableOpacity, Linking} from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Slider from '../../components/Slider';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
@@ -246,6 +247,34 @@ const Home = ({}: Props) => {
               <View className="relative z-20 pb-8">
                 {isLoading ? loadingSliders : contentSliders}
                 {errorComponent}
+              </View>
+
+              {/* Footer: written and directed by harsh + minimal GitHub & Instagram icons */}
+              <View className="items-center py-6 border-t border-white/10 mx-8 mt-4">
+                <AppText
+                  role="bodyMedium"
+                  style={{
+                    color: '#8E8E9A',
+                    fontStyle: 'italic',
+                    letterSpacing: 0.8,
+                    marginBottom: 12,
+                  }}>
+                  written and directed by harsh
+                </AppText>
+                <View className="flex-row items-center justify-center gap-6">
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL('https://github.com/HarshSharma20050924')}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <MaterialCommunityIcons name="github" size={22} color="#A0A0B0" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL('https://instagram.com')}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <MaterialCommunityIcons name="instagram" size={22} color="#A0A0B0" />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View className="h-8" />

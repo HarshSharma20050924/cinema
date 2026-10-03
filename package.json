@@ -1,6 +1,6 @@
 {
-  "name": "vega",
-  "version": "4.0.6",
+  "name": "cinema-app",
+  "version": "4.0.7",
   "private": true,
   "scripts": {
     "android": "npm run build:sandbox && expo run:android",
@@ -9,6 +9,9 @@
     "lint": "eslint .",
     "start": "expo start",
     "build:playstore": "eas build --platform android --profile production --auto-submit",
+    "build:apk": "cd android && ./gradlew assembleRelease",
+    "build:apk:arm64": "cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a",
+    "build:apk:debug": "cd android && ./gradlew assembleDebug",
     "build:sandbox": "node scripts/build-sandbox-runtime.mjs",
     "test": "jest",
     "pretest": "npm run build:sandbox",

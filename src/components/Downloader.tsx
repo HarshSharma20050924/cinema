@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, TouchableOpacity, ToastAndroid } from 'react-native';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { ifExists } from '../lib/file/ifExists';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Octicons from '@expo/vector-icons/Octicons';
@@ -7,9 +8,9 @@ import { Stream, SkipInterval } from '../lib/providers/types';
 import Svg, { Circle, Path } from 'react-native-svg';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import useContentStore from '../lib/zustand/contentStore';
-import * as IntentLauncher from 'expo-intent-launcher';
 import { cancelDownload } from '../lib/downloadManager';
 import { downloadManager } from '../lib/downloader';
+import { launchVlcPlayer } from '../lib/services/vlcLauncher';
 import DownloadBottomSheet from './DownloadBottomSheet';
 import LoadingIndicator from './ui/LoadingIndicator';
 import { settingsStorage } from '../lib/storage';
@@ -26,6 +27,7 @@ import useDownloadsStore, {
   CURRENT_DOWNLOAD_STATUSES,
 } from '../lib/zustand/downloadsStore';
 import {
+  getDefaultDownloadLocation,
   selectDownloadLocation,
   validateDownloadLocationAccess,
 } from '../lib/downloadLocation';
@@ -246,13 +248,12 @@ const DownloadComponent = ({
     });
 
   const startDownloadWithLocation = async (request: PendingDownload) => {
-    const currentLocation = settingsStorage.getDownloadLocationConfig();
-    if (await validateDownloadLocationAccess(currentLocation)) {
-      await downloadManager(request);
-      return;
+    let currentLocation = settingsStorage.getDownloadLocationConfig();
+    if (!currentLocation || !(await validateDownloadLocationAccess(currentLocation))) {
+      currentLocation = getDefaultDownloadLocation();
+      settingsStorage.setDownloadLocation(currentLocation);
     }
-    setPendingDownload(request);
-    setLocationDialogVisible(true);
+    await downloadManager(request);
   };
 
   const selectLocationAndContinue = async () => {
@@ -428,23 +429,7 @@ const DownloadComponent = ({
   };
 
   const fetchAndOpenSheet = async (isLongPress = false) => {
-    const isAlwaysExternal =
-      settingsStorage.getBool('alwaysExternalDownloader') === true;
-    const shouldUseQuickDownload =
-      Boolean(quickDownload) &&
-      !isLongPress &&
-      !isAlwaysExternal &&
-      !isVideoDownloaded &&
-      !hasDownloadedSubs;
-
-    if (!shouldUseQuickDownload) {
-      setDownloadModal(true);
-    }
-
-    if (shouldUseQuickDownload && servers.length > 0 && !serverLoading) {
-      downloadQuickStream(servers[0]);
-      return;
-    }
+    setDownloadModal(true);
 
     if (serverLoading || (!isLongPress && servers.length > 0)) {
       return;
@@ -464,20 +449,12 @@ const DownloadComponent = ({
       setServers(validServers);
       if (validServers.length === 0) {
         setServerError('No downloadable streams found');
-        if (shouldUseQuickDownload) {
-          setDownloadModal(true);
-        }
-      } else if (shouldUseQuickDownload) {
-        await downloadQuickStream(validServers[0]);
       }
     } catch (error: any) {
       console.error('Error fetching servers:', error);
       const errorMessage = error?.message || 'Failed to fetch servers';
       setServerError(errorMessage);
       setServers([]);
-      if (shouldUseQuickDownload) {
-        setDownloadModal(true);
-      }
     } finally {
       setServerLoading(false);
     }
@@ -491,48 +468,26 @@ const DownloadComponent = ({
     try {
       const isTorrent =
         targetType === 'torrent' || targetLink.startsWith('magnet:');
-      const intentParams: any = {
-        data: targetLink,
-        flags: 1,
-      };
 
-      if (!isTorrent) {
-        intentParams.type = 'application/octet-stream';
-      }
-
-      if (headers && Object.keys(headers).length > 0) {
-        const extra: Record<string, any> = {
-          ...headers,
-          headers: headers,
-          'android.media.intent.extra.HTTP_HEADERS': headers,
-        };
-
-        const referer = headers['Referer'] || headers['referer'];
-        if (referer) {
-          extra['android.intent.extra.REFERRER'] = referer;
-          extra['android.intent.extra.REFERRER_NAME'] = referer;
-        }
-
-        intentParams.extra = extra;
-      }
-
-      await IntentLauncher.startActivityAsync(
-        'android.intent.action.VIEW',
-        intentParams,
-      );
-    } catch (error) {
-      console.log('Error opening with application/octet-stream:', error);
-      try {
+      if (isTorrent) {
         await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
           data: targetLink,
+          flags: 1,
         });
-      } catch (fallbackError) {
-        console.log('Fallback intent error:', fallbackError);
-        ToastAndroid.show(
-          'No app found to handle this download',
-          ToastAndroid.SHORT,
-        );
+        return;
       }
+
+      await launchVlcPlayer({
+        streamUrl: targetLink,
+        headers,
+        title: title || showName || 'Cinema Video',
+      });
+    } catch (error) {
+      console.log('Error opening external player:', error);
+      ToastAndroid.show(
+        'Failed to open external player',
+        ToastAndroid.SHORT,
+      );
     }
   };
 
@@ -647,7 +602,7 @@ const DownloadComponent = ({
         isSubDownloaded={isSubDownloaded}
         onDeleteSub={deleteSubtitleDownload}
         onPressVideo={(server: Stream) => {
-          downloadSingleVideoStream(server);
+          downloadQuickStream(server);
         }}
         onPressExternalVideo={(server: Stream) => {
           openExternalApp(server.link, server.type, server.headers);

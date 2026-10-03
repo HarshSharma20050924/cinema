@@ -71,6 +71,7 @@ afterEvaluate {
         println "  Final release buildType signingConfig: \${android.buildTypes.release.signingConfig?.name}"
     } else {
         println "❌ Release signing config not applied, using debug keystore"
+        android.buildTypes.release.signingConfig = android.signingConfigs.debug
         if (releaseSigningConfig.storeFile) {
             println "   Keystore file does not exist: \${releaseSigningConfig.storeFile.absolutePath}"
         } else {

@@ -38,7 +38,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const installedProviders = useContentStore(state => state.installedProviders);
   const addItem = useWatchListStore(state => state.addItem);
   const removeItem = useWatchListStore(state => state.removeItem);
-  const providerValue = route.params.provider || provider.value;
+  const providerValue = route.params?.provider || provider?.value || 'hdhub4u';
   const {
     info,
     meta,
@@ -78,7 +78,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const dynamicInfoAccentEnabled = settingsStorage.isDynamicInfoAccentEnabled();
   const contentProviderName = useMemo(
     () =>
-      installedProviders.find(item => item.value === providerValue)
+      (installedProviders || []).find(item => item?.value === providerValue)
         ?.display_name || providerValue,
     [installedProviders, providerValue],
   );
@@ -127,41 +127,45 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   }, [accentBackground, dynamicInfoAccentEnabled]);
 
   const detailColors = useMemo<MaterialColors>(() => {
-    if (!imageAccent) {
+    if (!imageAccent || typeof imageAccent !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(imageAccent)) {
       return colors;
     }
-    const paleAccent = mixHex(imageAccent, '#FFFFFF', 0.72);
-    const darkContent = '#171717' as const;
-    const tintedSurface = (base: string, amount: number) =>
-      mixHex(base, imageAccent, amount);
-    return {
-      ...colors,
-      primary: paleAccent,
-      onPrimary: darkContent,
-      primaryContainer: paleAccent,
-      onPrimaryContainer: darkContent,
-      secondary: mixHex(imageAccent, '#FFFFFF', 0.66),
-      onSecondary: darkContent,
-      secondaryContainer: mixHex(imageAccent, '#FFFFFF', 0.78),
-      onSecondaryContainer: darkContent,
-      tertiary: mixHex(imageAccent, '#FFFFFF', 0.62),
-      onTertiary: darkContent,
-      tertiaryContainer: mixHex(imageAccent, '#FFFFFF', 0.8),
-      onTertiaryContainer: darkContent,
-      surfaceTint: paleAccent,
-      background: mixHex(imageAccent, '#000000', 0.96),
-      surface: tintedSurface('#171717', 0.08),
-      surfaceDim: tintedSurface('#141414', 0.06),
-      surfaceContainerLowest: tintedSurface('#101010', 0.05),
-      surfaceContainerLow: tintedSurface('#1B1B1B', 0.1),
-      surfaceContainer: tintedSurface('#222222', 0.12),
-      surfaceContainerHigh: tintedSurface('#2A2A2A', 0.14),
-      surfaceContainerHighest: tintedSurface('#343434', 0.16),
-      surfaceBright: tintedSurface('#3D3D3D', 0.18),
-      surfaceVariant: tintedSurface('#303030', 0.14),
-      outline: mixHex(imageAccent, '#FFFFFF', 0.48),
-      outlineVariant: tintedSurface('#5A5A5A', 0.18),
-    };
+    try {
+      const paleAccent = mixHex(imageAccent, '#FFFFFF', 0.72);
+      const darkContent = '#171717' as const;
+      const tintedSurface = (base: string, amount: number) =>
+        mixHex(base, imageAccent, amount);
+      return {
+        ...colors,
+        primary: paleAccent,
+        onPrimary: darkContent,
+        primaryContainer: paleAccent,
+        onPrimaryContainer: darkContent,
+        secondary: mixHex(imageAccent, '#FFFFFF', 0.66),
+        onSecondary: darkContent,
+        secondaryContainer: mixHex(imageAccent, '#FFFFFF', 0.78),
+        onSecondaryContainer: darkContent,
+        tertiary: mixHex(imageAccent, '#FFFFFF', 0.62),
+        onTertiary: darkContent,
+        tertiaryContainer: mixHex(imageAccent, '#FFFFFF', 0.8),
+        onTertiaryContainer: darkContent,
+        surfaceTint: paleAccent,
+        background: mixHex(imageAccent, '#000000', 0.96),
+        surface: tintedSurface('#171717', 0.08),
+        surfaceDim: tintedSurface('#141414', 0.06),
+        surfaceContainerLowest: tintedSurface('#101010', 0.05),
+        surfaceContainerLow: tintedSurface('#1B1B1B', 0.1),
+        surfaceContainer: tintedSurface('#222222', 0.12),
+        surfaceContainerHigh: tintedSurface('#2A2A2A', 0.14),
+        surfaceContainerHighest: tintedSurface('#343434', 0.16),
+        surfaceBright: tintedSurface('#3D3D3D', 0.18),
+        surfaceVariant: tintedSurface('#303030', 0.14),
+        outline: mixHex(imageAccent, '#FFFFFF', 0.48),
+        outlineVariant: tintedSurface('#5A5A5A', 0.18),
+      };
+    } catch {
+      return colors;
+    }
   }, [colors, imageAccent]);
 
   const webUrl = info?.webUrl?.trim();
@@ -304,8 +308,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
 
   return (
     <QueryErrorBoundary>
-      <M3PaletteContext.Provider value={detailColors}>
-        <View style={{backgroundColor: detailColors.background, flex: 1}}>
+      <M3PaletteContext.Provider value={colors}>
+        <View style={{backgroundColor: '#000000', flex: 1}}>
           <View
             pointerEvents="none"
             style={{
@@ -359,7 +363,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                 />
                 <View
                   style={{
-                    backgroundColor: detailColors.background,
+                    backgroundColor: '#000000',
                     paddingHorizontal: 18,
                     paddingTop: 24,
                   }}>
@@ -393,7 +397,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
             ListFooterComponent={
               <View
                 style={{
-                  backgroundColor: detailColors.background,
+                  backgroundColor: '#000000',
                   height: 110,
                 }}
               />
@@ -403,8 +407,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
-                colors={[detailColors.primary]}
-                progressBackgroundColor={detailColors.surfaceContainer}
+                colors={[colors.primary]}
+                progressBackgroundColor="#1A1A1A"
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
                 enabled={isAtTop || refreshing}

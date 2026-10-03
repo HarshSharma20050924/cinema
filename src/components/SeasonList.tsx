@@ -32,6 +32,7 @@ import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {EpisodeLink, Link} from '../lib/providers/types';
 import {RootStackParamList} from '../App';
 import Downloader from './Downloader';
+import {launchVlcPlayer} from '../lib/services/vlcLauncher';
 import {cacheStorage, mainStorage, settingsStorage} from '../lib/storage';
 import {ifExists} from '../lib/file/ifExists';
 import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
@@ -314,6 +315,32 @@ const SeasonList: React.FC<SeasonListProps> = ({
     [metaTitle, providerValue],
   );
 
+  // Memoized external player opener
+  const openExternalPlayer = useCallback(
+    async (
+      streamUrl: string,
+      headers?: Record<string, string>,
+      title?: string,
+    ) => {
+      setShowServerModal(false);
+      setVlcLoading(true);
+
+      try {
+        await launchVlcPlayer({
+          streamUrl,
+          headers,
+          title: title || metaTitle || 'Cinema Stream',
+        });
+      } catch (error) {
+        console.error('Error opening external player:', error);
+        ToastAndroid.show('Failed to open VLC player', ToastAndroid.SHORT);
+      } finally {
+        setVlcLoading(false);
+      }
+    },
+    [metaTitle],
+  );
+
   // Memoized external player handler
   const handleExternalPlayer = useCallback(
     async (link: string, streamType: string) => {
@@ -332,13 +359,26 @@ const SeasonList: React.FC<SeasonListProps> = ({
         }
 
         console.log('Available Streams Count:', streams.length);
+
+        // If only 1 stream is available, immediately launch VLC directly!
+        if (streams.length === 1) {
+          setVlcLoading(false);
+          setIsLoadingStreams(false);
+          await openExternalPlayer(
+            streams[0].link,
+            streams[0].headers,
+            `${metaTitle || ''} ${streams[0].server || ''}`.trim(),
+          );
+          return;
+        }
+
         setExternalPlayerStreams([...streams]);
         setIsLoadingStreams(false);
         setVlcLoading(false);
         setShowServerModal(true);
 
         ToastAndroid.show(
-          `Found ${streams.length} servers`,
+          `Found ${streams.length} servers - choose a mirror for VLC`,
           ToastAndroid.SHORT,
         );
       } catch (error: any) {
@@ -350,66 +390,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         setIsLoadingStreams(false);
       }
     },
-    [fetchStreams, providerValue],
-  );
-
-  // Memoized external player opener
-  const openExternalPlayer = useCallback(
-    async (
-      streamUrl: string,
-      headers?: Record<string, string>,
-      title?: string,
-    ) => {
-      setShowServerModal(false);
-      setVlcLoading(true);
-
-      try {
-        const intentParams: any = {
-          data: streamUrl,
-          type: 'video/*',
-          flags: 1,
-        };
-
-        const extra: Record<string, any> = {};
-
-        if (title) {
-          extra.title = title;
-          extra['android.intent.extra.TITLE'] = title;
-        }
-
-        if (headers && Object.keys(headers).length > 0) {
-          Object.assign(extra, headers);
-          extra['android.media.intent.extra.HTTP_HEADERS'] = headers;
-          extra.headers = headers;
-
-          const headersArray = Object.entries(headers).map(
-            ([key, val]) => `${key}: ${val}`,
-          );
-          extra.headers_array = headersArray;
-
-          const referer = headers['Referer'] || headers['referer'];
-          if (referer) {
-            extra['android.intent.extra.REFERRER'] = referer;
-            extra['android.intent.extra.REFERRER_NAME'] = referer;
-          }
-        }
-
-        if (Object.keys(extra).length > 0) {
-          intentParams.extra = extra;
-        }
-
-        await IntentLauncher.startActivityAsync(
-          'android.intent.action.VIEW',
-          intentParams,
-        );
-      } catch (error) {
-        console.error('Error opening external player:', error);
-        ToastAndroid.show('Failed to open external player', ToastAndroid.SHORT);
-      } finally {
-        setVlcLoading(false);
-      }
-    },
-    [],
+    [fetchStreams, providerValue, metaTitle, openExternalPlayer],
   );
 
   // Memoized play handler

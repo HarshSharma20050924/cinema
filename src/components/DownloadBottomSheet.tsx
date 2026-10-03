@@ -271,18 +271,14 @@ const DownloadBottomSheet = ({
           paddingVertical: 12,
         }}
         onPress={() => {
-          if (isAlwaysExternal) {
-            onPressExternalVideo?.(item);
-          } else {
-            onPressVideo(item);
-          }
+          onPressVideo(item);
           bottomSheetRef.current?.close?.();
         }}>
         <View
           style={{
             flex: 1,
             justifyContent: 'center',
-            marginRight: 10,
+            marginRight: 8,
           }}>
           <Text
             numberOfLines={1}
@@ -381,41 +377,74 @@ const DownloadBottomSheet = ({
             style={{
               alignItems: 'center',
               backgroundColor: colors.surfaceContainerHighest,
+              borderColor: colors.outlineVariant,
+              borderWidth: 1,
               borderRadius: 10,
               justifyContent: 'center',
-              padding: 8,
+              padding: 7,
             }}>
             <MaterialCommunityIcons
               name="content-copy"
-              size={18}
+              size={17}
               color={colors.onSurfaceVariant}
             />
           </TouchableOpacity>
 
-          {/* External / Internal Button */}
+          {/* External Player (VLC) Button */}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
-              if (isAlwaysExternal) {
-                onPressVideo(item);
-              } else {
-                onPressExternalVideo?.(item);
-              }
+              onPressExternalVideo?.(item);
               bottomSheetRef.current?.close?.();
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{
               alignItems: 'center',
-              backgroundColor: colors.primaryContainer,
+              backgroundColor: colors.surfaceContainerHighest,
+              borderColor: colors.outlineVariant,
+              borderWidth: 1,
               borderRadius: 10,
               justifyContent: 'center',
-              padding: 8,
+              padding: 7,
             }}>
             <MaterialCommunityIcons
-              name={isAlwaysExternal ? 'download-outline' : 'open-in-new'}
+              name="play-circle-outline"
               size={18}
-              color={colors.onPrimaryContainer}
+              color={colors.onSurfaceVariant}
             />
+          </TouchableOpacity>
+
+          {/* Quick Download Button */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              onPressVideo(item);
+              bottomSheetRef.current?.close?.();
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{
+              alignItems: 'center',
+              backgroundColor: colors.primary,
+              borderRadius: 10,
+              flexDirection: 'row',
+              gap: 4,
+              justifyContent: 'center',
+              paddingHorizontal: 10,
+              paddingVertical: 7,
+            }}>
+            <MaterialCommunityIcons
+              name="download"
+              size={17}
+              color={colors.onPrimary}
+            />
+            <Text
+              style={{
+                color: colors.onPrimary,
+                fontSize: 12,
+                fontWeight: '700',
+              }}>
+              Download
+            </Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>

@@ -5,6 +5,7 @@ import {
   copyFileToSaf,
   DownloadLocationConfig,
   findSafEntryByName,
+  getDefaultDownloadLocation,
   getDownloadFileName,
   getDownloadMimeType,
   getOrCreateSafDirectory,
@@ -71,40 +72,52 @@ export const prepareDownloadDestination = async ({
   outputDirectoryNames?: string[];
 }): Promise<PreparedDownloadDestination> => {
   if (!(await validateDownloadLocation(location))) {
-    throw new Error('Download location is unavailable');
+    location = getDefaultDownloadLocation();
+    await validateDownloadLocation(location);
   }
 
   if (directToSaf) {
-    if (!isSafDownloadLocation(location)) {
-      throw new Error('SAF download location is required');
-    }
+    if (isSafDownloadLocation(location)) {
+      if (
+        existingFinalDocumentUri &&
+        (await downloadOutputExists(existingFinalDocumentUri))
+      ) {
+        return {
+          stagingDirectory: '',
+          stagingPath: existingFinalDocumentUri,
+          directFinalDocumentUri: existingFinalDocumentUri,
+        };
+      }
 
-    if (
-      existingFinalDocumentUri &&
-      (await downloadOutputExists(existingFinalDocumentUri))
-    ) {
+      let directoryUri = location.uri;
+      for (const directoryName of outputDirectoryNames || []) {
+        directoryUri = await getOrCreateSafDirectory(directoryUri, directoryName);
+      }
+      const directFinalDocumentUri =
+        await FileSystem.StorageAccessFramework.createFileAsync(
+          directoryUri,
+          getDownloadFileName(fileName, fileType),
+          getDownloadMimeType(fileType),
+        );
       return {
         stagingDirectory: '',
-        stagingPath: existingFinalDocumentUri,
-        directFinalDocumentUri: existingFinalDocumentUri,
+        stagingPath: directFinalDocumentUri,
+        directFinalDocumentUri,
+      };
+    } else if (location.type === 'path') {
+      const subdirs = (outputDirectoryNames || []).join('/');
+      const finalDir = subdirs ? `${location.path}/${subdirs}` : location.path;
+      if (!(await RNFS.exists(finalDir))) {
+        await RNFS.mkdir(finalDir);
+      }
+      const fullFilePath = `${finalDir}/${getDownloadFileName(fileName, fileType)}`;
+      const fileUri = `file://${fullFilePath}`;
+      return {
+        stagingDirectory: finalDir,
+        stagingPath: fullFilePath,
+        directFinalDocumentUri: fileUri,
       };
     }
-
-    let directoryUri = location.uri;
-    for (const directoryName of outputDirectoryNames || []) {
-      directoryUri = await getOrCreateSafDirectory(directoryUri, directoryName);
-    }
-    const directFinalDocumentUri =
-      await FileSystem.StorageAccessFramework.createFileAsync(
-        directoryUri,
-        getDownloadFileName(fileName, fileType),
-        getDownloadMimeType(fileType),
-      );
-    return {
-      stagingDirectory: '',
-      stagingPath: directFinalDocumentUri,
-      directFinalDocumentUri,
-    };
   }
 
   const stagingDirectory = getDownloadStagingDirectory(downloadId);
@@ -125,6 +138,12 @@ const getLocalFileSize = async (path: string): Promise<number> => {
 };
 
 const getSafFileSize = async (uri: string): Promise<number> => {
+  if (uri.startsWith('file://')) {
+    const localPath = uri.replace(/^file:\/\//, '');
+    const stat = await RNFS.stat(localPath);
+    return Number(stat.size);
+  }
+
   const nativeSize = await getSafCopyModule()?.getUriSize?.(uri);
   if (typeof nativeSize === 'number' && nativeSize >= 0) {
     return nativeSize;
@@ -169,7 +188,7 @@ export const finalizeDownloadOutput = async ({
   if (directFinalDocumentUri) {
     const destinationSize = await getSafFileSize(directFinalDocumentUri);
     if (destinationSize <= 0) {
-      throw new Error('Downloaded SAF file is empty');
+      throw new Error('Downloaded file is empty');
     }
     return {
       filePath: directFinalDocumentUri,
@@ -188,7 +207,25 @@ export const finalizeDownloadOutput = async ({
   }
 
   if (!isSafDownloadLocation(location)) {
-    throw new Error('SAF download location is required');
+    if (location.type === 'path') {
+      const subdirs = (outputDirectoryNames || []).join('/');
+      const finalDir = subdirs ? `${location.path}/${subdirs}` : location.path;
+      if (!(await RNFS.exists(finalDir))) {
+        await RNFS.mkdir(finalDir);
+      }
+      const targetPath = `${finalDir}/${getDownloadFileName(fileName, fileType)}`;
+      if (await RNFS.exists(targetPath)) {
+        await RNFS.unlink(targetPath);
+      }
+      await RNFS.moveFile(stagingPath, targetPath);
+      await cleanupDownloadStaging(downloadId);
+      return {
+        filePath: `file://${targetPath}`,
+        finalDocumentUri: `file://${targetPath}`,
+        size: sourceSize,
+      };
+    }
+    throw new Error('Download location is invalid');
   }
 
   let directoryUri = location.uri;
