@@ -7,6 +7,11 @@ const { spawn } = require('child_process');
 const express = require('express');
 const cors = require('cors');
 
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+}
+
 let mainWindow = null;
 let serverInstance = null;
 let serverPort = 3001;
@@ -47,9 +52,11 @@ async function startLocalServer() {
     const distPath = path.join(__dirname, 'dist');
     if (fs.existsSync(distPath)) {
       localApp.use(express.static(distPath));
-      localApp.get('*', (req, res) => {
+      localApp.use((req, res) => {
         if (!req.path.startsWith('/api')) {
           res.sendFile(path.join(distPath, 'index.html'));
+        } else {
+          res.status(404).json({ error: 'Not found' });
         }
       });
       console.log('✅ [Engine] Production UI bundle mounted from dist/');
