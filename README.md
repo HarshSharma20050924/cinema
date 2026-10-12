@@ -94,15 +94,21 @@ Enter this key in the provider setup prompt to unlock the complete streaming lib
 Access the platform instantly from any modern web browser:
 **[cinema-dwh.pages.dev](https://cinema-dwh.pages.dev/)**
 
+### Application Versions
+
+* **Cinema Web & Desktop Client**: v4.0.8
+* **Cinema Android Client APK**: v4.0.8 (`Cinema.apk`)
+* **Cinema Node Runner (Desktop & Android APK)**: v2.2.0 (`Cinema-Runner.apk`)
+
 ### Desktop and Mobile Downloads (Release v4.0.9)
 
-| Platform | Cinema Streaming App | Cinema Node Runner |
+| Platform | Cinema Streaming App (v4.0.8) | Cinema Node Runner (v2.2.0) |
 | :--- | :--- | :--- |
-| macOS (Apple Silicon / M-series) | [Cinema-4.0.8-arm64.dmg](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8-arm64.dmg) | [Cinema.Node.Runner-2.2.0-arm64.dmg](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0-arm64.dmg) |
-| Windows (Installer) | [Cinema.Setup.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Setup.4.0.8.exe) | [Cinema.Node.Runner.Setup.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.Setup.2.2.0.exe) |
-| Windows (Portable) | [Cinema.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.4.0.8.exe) | [Cinema.Node.Runner.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.2.2.0.exe) |
-| Linux (Universal AppImage) | [Cinema-4.0.8.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8.AppImage) | [Cinema.Node.Runner-2.2.0.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0.AppImage) |
-| Android Client | [Cinema.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema.apk) | [Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema-Runner.apk) |
+| macOS (Apple Silicon / M-series) | [Cinema-4.0.8-arm64.dmg](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8-arm64.dmg) (v4.0.8) | [Cinema.Node.Runner-2.2.0-arm64.dmg](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0-arm64.dmg) (v2.2.0) |
+| Windows (Installer) | [Cinema.Setup.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Setup.4.0.8.exe) (v4.0.8) | [Cinema.Node.Runner.Setup.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.Setup.2.2.0.exe) (v2.2.0) |
+| Windows (Portable) | [Cinema.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.4.0.8.exe) (v4.0.8) | [Cinema.Node.Runner.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.2.2.0.exe) (v2.2.0) |
+| Linux (Universal AppImage) | [Cinema-4.0.8.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8.AppImage) (v4.0.8) | [Cinema.Node.Runner-2.2.0.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0.AppImage) (v2.2.0) |
+| Android Client (APK) | [Cinema.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema.apk) (v4.0.8 APK) | [Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema-Runner.apk) (v2.2.0 APK) |
 
 #### Running on Linux (Ubuntu / Debian / Fedora / Arch)
 Make the downloaded AppImage executable:
