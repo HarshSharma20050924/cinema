@@ -11,10 +11,10 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "dist:linux": "electron-builder --linux AppImage",
-    "dist:win": "electron-builder --win nsis portable",
-    "dist:mac": "electron-builder --mac dmg",
-    "dist:all": "electron-builder -wlm"
+    "dist:linux": "electron-builder --linux AppImage --publish never",
+    "dist:win": "electron-builder --win nsis portable --publish never",
+    "dist:mac": "electron-builder --mac dmg --publish never",
+    "dist:all": "electron-builder -wlm --publish never"
   },
   "dependencies": {
     "axios": "^1.20.0",
@@ -30,7 +30,6 @@
     "appId": "com.cinema.runner",
     "productName": "Cinema Node Runner",
     "copyright": "Copyright © 2026 Cinema",
-    "publish": "never",
     "directories": {
       "output": "release"
     },
