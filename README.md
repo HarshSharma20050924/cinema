@@ -9,7 +9,7 @@ Building a distraction-free, theater-grade experience for Movies & TV Series.
 <br>
 
 [![Live Web App](https://img.shields.io/badge/Live%20Web%20App-E50914?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=0d1117)](https://cinema-dwh.pages.dev/)
-[![Release](https://img.shields.io/badge/Release-v4.0.8-B81D24?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1117)](https://github.com/HarshSharma20050924/cinema/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v4.0.9-B81D24?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1117)](https://github.com/HarshSharma20050924/cinema/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache%202.0-E50914?style=for-the-badge&logo=opensourceinitiative&logoColor=white&labelColor=0d1117)](https://github.com/HarshSharma20050924/cinema)
 
 <br><br>
@@ -64,16 +64,17 @@ The flagship streaming destination. Built for speed, responsiveness, and fluid n
 * **Smart Navigation**: Remembers your exact search terms and scroll positions when navigating between titles.
 * **Shield Protection**: Intelligent proxy routing ensures artwork and posters load flawlessly without being blocked by browser shields.
 
-### 2. Cinema Node Runner
-A background service application built for Android devices. It turns any spare device into a private, high-speed streaming gateway.
-* **One-Tap Operation**: Launches background scrapers and establishes secure Cloudflare tunnels automatically.
-* **Always Connected**: Built with native Android background services to prevent battery management suspensions.
-* **Seamless Updates**: Features in-app background downloading that updates the engine directly without visiting external websites.
+### 2. Cinema Desktop App
+Dedicated standalone desktop application for macOS, Windows, and Linux. Built with embedded player optimization, hardware acceleration, and background cache persistence.
+* macOS: Native Apple Silicon (arm64) DMG package.
+* Windows: Official Setup Installer and Portable executable.
+* Linux: Universal AppImage executable for all distributions.
 
-### 3. Cinema Android Client
-A standalone mobile player for on-the-go streaming and media management.
-* **External Player Forwarding**: Stream directly to your favorite media players, including VLC and MX Player.
-* **Fast Downloads**: Resumable multi-mirror download options for offline viewing.
+### 3. Cinema Node Runner
+High-performance background server runner available on Android, macOS, Windows, and Linux. Runs automated Cloudflare tunnel coordination to power media scrapers.
+
+### 4. Cinema Android Client
+Standalone mobile player for on-the-go streaming and media management with external player forwarding (VLC, MX Player) and offline downloads.
 
 ---
 
@@ -87,11 +88,28 @@ Enter this key in the provider setup prompt to unlock the complete streaming lib
 
 ---
 
-## Experience Cinema
+## Downloads and Access
 
 ### Web Application
 Access the platform instantly from any modern web browser:
 **[cinema-dwh.pages.dev](https://cinema-dwh.pages.dev/)**
+
+### Desktop and Mobile Downloads (Release v4.0.9)
+
+| Platform | Cinema Streaming App | Cinema Node Runner |
+| :--- | :--- | :--- |
+| macOS (Apple Silicon / M-series) | [Cinema-4.0.8-arm64.dmg](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8-arm64.dmg) | [Cinema.Node.Runner-2.2.0-arm64.dmg](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0-arm64.dmg) |
+| Windows (Installer) | [Cinema.Setup.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Setup.4.0.8.exe) | [Cinema.Node.Runner.Setup.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.Setup.2.2.0.exe) |
+| Windows (Portable) | [Cinema.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.4.0.8.exe) | [Cinema.Node.Runner.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.2.2.0.exe) |
+| Linux (Universal AppImage) | [Cinema-4.0.8.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8.AppImage) | [Cinema.Node.Runner-2.2.0.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0.AppImage) |
+| Android Client | [Cinema.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema.apk) | [Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema-Runner.apk) |
+
+#### Running on Linux (Ubuntu / Debian / Fedora / Arch)
+Make the downloaded AppImage executable:
+```bash
+chmod +x Cinema-4.0.8.AppImage
+./Cinema-4.0.8.AppImage --no-sandbox
+```
 
 ### Local Development
 To run the project locally on your machine:
