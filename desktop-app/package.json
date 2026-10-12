@@ -3,6 +3,11 @@
   "productName": "Cinema",
   "version": "4.0.8",
   "description": "High-Performance Standalone Desktop Cinema Streaming App",
+  "author": "Harsh Sharma",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HarshSharma20050924/cinema.git"
+  },
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -25,6 +30,11 @@
     "appId": "com.cinema.streaming",
     "productName": "Cinema",
     "copyright": "Copyright © 2026 Cinema",
+    "publish": {
+      "provider": "github",
+      "owner": "HarshSharma20050924",
+      "repo": "cinema"
+    },
     "directories": {
       "output": "release"
     },
