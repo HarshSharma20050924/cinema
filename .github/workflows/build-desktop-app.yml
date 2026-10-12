@@ -27,6 +27,19 @@ jobs:
         with:
           node-version: 22
 
+      - name: Build Frontend Web Bundle
+        run: |
+          npm ci || npm install
+          npm run build
+
+      - name: Prepare Desktop App Assets
+        run: |
+          mkdir -p desktop-app/dist desktop-app/server desktop-app/public
+          cp -r dist/* desktop-app/dist/
+          cp -r server/* desktop-app/server/
+          cp -r public/* desktop-app/public/
+        shell: bash
+
       - name: Install Dependencies
         working-directory: desktop-app
         run: npm ci || npm install
