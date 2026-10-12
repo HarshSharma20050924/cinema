@@ -55,9 +55,9 @@ jobs:
             desktop-app/release/*.zip
 
       - name: Upload to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v4.0.9' }}
           files: |
             desktop-app/release/*.exe
             desktop-app/release/*.AppImage
