@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="cRedGradRound" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff3b53"/>
+      <stop offset="100%" stop-color="#d60017"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Round Circle Background -->
+  <circle cx="256" cy="256" r="256" fill="#0b0c10"/>
+  
+  <!-- Minimalist 'C' Arc (Cinema) -->
+  <path d="M 334 178 
+           A 110 110 0 1 0 334 334" 
+        fill="none" 
+        stroke="url(#cRedGradRound)" 
+        stroke-width="28" 
+        stroke-linecap="round"/>
+
+  <!-- Minimalist White Play Triangle -->
+  <path d="M 234 212 
+           C 226 207, 218 212, 218 221 
+           L 218 291 
+           C 218 300, 226 305, 234 300 
+           L 294 265 
+           C 302 260, 302 252, 294 247 
+           Z" 
+        fill="#ffffff"/>
+</svg>

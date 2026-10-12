@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg2" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#121318"/>
+      <stop offset="100%" stop-color="#050608"/>
+    </radialGradient>
+    <linearGradient id="neonRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff2e4d"/>
+      <stop offset="100%" stop-color="#d60017"/>
+    </linearGradient>
+    <filter id="glow2" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="20" flood-color="#ff2e4d" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Deep Obsidian Canvas -->
+  <rect width="512" height="512" rx="118" fill="url(#bg2)"/>
+  <rect x="4" y="4" width="504" height="504" rx="114" fill="none" stroke="rgba(255, 255, 255, 0.06)" stroke-width="2"/>
+
+  <!-- Minimalist 'C' + Play aperture node -->
+  <g filter="url(#glow2)">
+    <!-- Outer Arc: Sleek C -->
+    <path d="M 330 150 
+             A 140 140 0 1 0 330 362" 
+          fill="none" 
+          stroke="url(#neonRed)" 
+          stroke-width="32" 
+          stroke-linecap="round"/>
+    <!-- Minimalist Core Play Triangle -->
+    <path d="M 235 205 
+             C 235 198, 243 194, 249 198 
+             L 305 250 
+             C 310 254, 310 258, 305 262 
+             L 249 314 
+             C 243 318, 235 314, 235 307 
+             Z" 
+          fill="url(#neonRed)"/>
+  </g>
+</svg>

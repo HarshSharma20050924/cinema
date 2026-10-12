@@ -1,0 +1,19 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('Capacitor', {
+  isNativePlatform: () => true,
+  getPlatform: () => process.platform,
+  Plugins: {
+    Cinema: {
+      start: () => ipcRenderer.invoke('cinema:start'),
+      stop: () => ipcRenderer.invoke('cinema:stop'),
+      reconnect: () => ipcRenderer.invoke('cinema:reconnect'),
+      getStatus: () => ipcRenderer.invoke('cinema:getStatus'),
+      openExternal: (url) => ipcRenderer.invoke('cinema:openExternal', url),
+      getDeviceInfo: () => ipcRenderer.invoke('cinema:getDeviceInfo'),
+      getAutoStart: () => ipcRenderer.invoke('cinema:getAutoStart'),
+      toggleAutoStart: (val) => ipcRenderer.invoke('cinema:toggleAutoStart', val),
+      windowAction: (action) => ipcRenderer.invoke('cinema:windowAction', action),
+    },
+  },
+});

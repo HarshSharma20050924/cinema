@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111217"/>
+      <stop offset="100%" stop-color="#060608"/>
+    </linearGradient>
+    <linearGradient id="playRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff2a44"/>
+      <stop offset="100%" stop-color="#cc081b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep Obsidian Black Background -->
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="#232530" stroke-width="2.5"/>
+
+  <!-- Ultra-Minimalist Balanced Play Symbol (Optically Centered) -->
+  <!-- Triangle width = 176, height = 204. Center of bounding box is (272, 256) for optical center of play icon -->
+  <path d="M 200 162 
+           C 188 155, 174 163, 174 178 
+           L 174 334 
+           C 174 349, 188 357, 200 350 
+           L 336 272 
+           C 348 265, 348 247, 336 240 
+           Z" 
+        fill="url(#playRed)"/>
+</svg>

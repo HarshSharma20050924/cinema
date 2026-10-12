@@ -1,0 +1,23 @@
+{
+  "name": "Cinema Server Runner",
+  "short_name": "Cinema Server",
+  "description": "1-Click Mobile Cinema Server Engine & Tunnel Broadcaster",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#07090e",
+  "theme_color": "#07090e",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
