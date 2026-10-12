@@ -97,7 +97,7 @@ Access the platform instantly from any modern web browser:
 ### Application Versions
 
 * **Cinema Web & Desktop Client**: v4.0.8
-* **Cinema Android Client APK**: v4.0.8 (`Cinema.apk`)
+* **Cinema Web Mobile APK (Cinema Main)**: v4.0.8 (`Cinema-Web.apk`)
 * **Cinema Node Runner (Desktop & Android APK)**: v2.2.0 (`Cinema-Runner.apk`)
 
 ### Desktop and Mobile Downloads (Release v4.0.9)
@@ -108,7 +108,7 @@ Access the platform instantly from any modern web browser:
 | Windows (Installer) | [Cinema.Setup.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Setup.4.0.8.exe) (v4.0.8) | [Cinema.Node.Runner.Setup.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.Setup.2.2.0.exe) (v2.2.0) |
 | Windows (Portable) | [Cinema.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.4.0.8.exe) (v4.0.8) | [Cinema.Node.Runner.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.2.2.0.exe) (v2.2.0) |
 | Linux (Universal AppImage) | [Cinema-4.0.8.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8.AppImage) (v4.0.8) | [Cinema.Node.Runner-2.2.0.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0.AppImage) (v2.2.0) |
-| Android Client (APK) | [Cinema.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema.apk) (v4.0.8 APK) | [Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema-Runner.apk) (v2.2.0 APK) |
+| Android Mobile (APK) | [Cinema-Web.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-Web.apk) (Cinema Main v4.0.8) | [Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-Runner.apk) (Runner v2.2.0) |
 
 #### Running on Linux (Ubuntu / Debian / Fedora / Arch)
 Make the downloaded AppImage executable:
