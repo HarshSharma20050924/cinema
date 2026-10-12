@@ -1,3 +1,7 @@
+try {
+  process.chdir(require('os').homedir());
+} catch (_) {}
+
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -62,27 +66,18 @@ async function startLocalServer() {
       console.log('✅ [Engine] Production UI bundle mounted from dist/');
     }
 
-    // Find available port starting from 3001
-    const tryListen = (port) => {
-      const server = localApp.listen(port, '127.0.0.1', () => {
-        serverPort = port;
-        serverInstance = server;
-        console.log(`🎬 [Engine] Standalone Cinema Engine active on http://127.0.0.1:${serverPort}`);
-        resolve(port);
-      });
+    // Listen on dynamic free port (0) to prevent any port collisions with background dev servers
+    const server = localApp.listen(0, '127.0.0.1', () => {
+      serverPort = server.address().port;
+      serverInstance = server;
+      console.log(`🎬 [Engine] Standalone Cinema Engine active on http://127.0.0.1:${serverPort}`);
+      resolve(serverPort);
+    });
 
-      server.on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-          console.warn(`[Engine] Port ${port} occupied, attempting port ${port + 1}...`);
-          tryListen(port + 1);
-        } else {
-          console.error('[Engine] Server error:', err);
-          resolve(port);
-        }
-      });
-    };
-
-    tryListen(serverPort);
+    server.on('error', (err) => {
+      console.error('[Engine] Server error:', err);
+      resolve(serverPort);
+    });
   });
 }
 
