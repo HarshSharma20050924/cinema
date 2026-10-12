@@ -3,6 +3,11 @@
   "productName": "Cinema Node Runner",
   "version": "2.2.0",
   "description": "Cross-Platform Desktop Node Runner for Cinema Streaming Platform",
+  "author": "Harsh Sharma",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HarshSharma20050924/cinema.git"
+  },
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -25,6 +30,11 @@
     "appId": "com.cinema.runner",
     "productName": "Cinema Node Runner",
     "copyright": "Copyright © 2026 Cinema",
+    "publish": {
+      "provider": "github",
+      "owner": "HarshSharma20050924",
+      "repo": "cinema"
+    },
     "directories": {
       "output": "release"
     },
