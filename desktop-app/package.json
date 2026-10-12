@@ -71,6 +71,7 @@
           "arch": ["x64"]
         }
       ],
+      "executableArgs": ["--no-sandbox"],
       "category": "AudioVideo",
       "icon": "public/logo.png",
       "maintainer": "Cinema Team"
