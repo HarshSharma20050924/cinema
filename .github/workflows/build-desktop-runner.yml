@@ -41,7 +41,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Upload Artifacts
+      - name: Upload Artifacts (Actions tab)
         uses: actions/upload-artifact@v4
         with:
           name: cinema-desktop-runner-${{ matrix.os }}
@@ -50,3 +50,15 @@ jobs:
             desktop-runner/release/*.AppImage
             desktop-runner/release/*.dmg
             desktop-runner/release/*.zip
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop-runner/release/*.exe
+            desktop-runner/release/*.AppImage
+            desktop-runner/release/*.dmg
+            desktop-runner/release/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
