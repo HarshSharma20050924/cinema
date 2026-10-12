@@ -27,6 +27,14 @@ jobs:
         with:
           node-version: 22
 
+      - name: Prepare Runner Assets
+        run: |
+          mkdir -p desktop-runner/server desktop-runner/public
+          cp -r server/* desktop-runner/server/
+          cp -r server.cjs desktop-runner/server.cjs
+          cp -r public/* desktop-runner/public/
+        shell: bash
+
       - name: Install Dependencies
         working-directory: desktop-runner
         run: npm ci || npm install
