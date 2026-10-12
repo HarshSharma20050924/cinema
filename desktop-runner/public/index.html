@@ -20,13 +20,14 @@
 
   <style>
     :root {
-      --bg: #090c13;
-      --card-bg: rgba(18, 23, 34, 0.85);
+      --bg: #070709;
+      --card-bg: rgba(18, 18, 22, 0.92);
       --card-border: rgba(255, 255, 255, 0.08);
-      --red: #dc2626;
+      --red: #e50914;
       --green: #10b981;
       --amber: #f59e0b;
-      --blue: #3b82f6;
+      --blue: #e50914;
+      --accent: #ef4444;
       --text: #f8fafc;
       --text-muted: #8492a6;
     }
@@ -79,11 +80,12 @@
       width: 38px;
       height: 38px;
       border-radius: 10px;
-      background: #141926;
+      background: #141418;
       border: 1px solid var(--card-border);
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
     .logo-title {
       font-size: 15px;
@@ -192,7 +194,7 @@
     }
     /* Fluid smooth spinner when starting/connecting */
     .power-btn-container.connecting .ring-progress {
-      stroke: #38bdf8;
+      stroke: #ef4444;
       stroke-width: 2.5;
       animation: smoothRingSpin 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     }
@@ -229,8 +231,8 @@
       width: 162px;
       height: 162px;
       border-radius: 50%;
-      background: #0d111a;
-      border: 1px solid rgba(255, 255, 255, 0.07);
+      background: #111116;
+      border: 1px solid rgba(255, 255, 255, 0.08);
       color: #94a3b8;
       display: flex;
       flex-direction: column;
@@ -346,7 +348,7 @@
       font-weight: 600;
     }
     .step-item.active .step-indicator {
-      background: #38bdf8;
+      background: #ef4444;
     }
     .step-item.done {
       color: #10b981;
@@ -443,12 +445,12 @@
       font-weight: 600;
     }
     .stat-value.highlight {
-      color: #38bdf8;
+      color: #ef4444;
     }
     .stat-value.mono {
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
-      color: #38bdf8;
+      color: #ef4444;
     }
 
     /* Action Buttons */
@@ -617,11 +619,11 @@
   <div class="header">
     <div class="logo-badge">
       <div class="logo-icon">
-        <svg class="icon" style="color: #38bdf8;" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        <img src="icon.png" style="width: 28px; height: 28px; border-radius: 7px; object-fit: contain; display: block;" alt="Cinema" />
       </div>
       <div>
         <div class="logo-title">Cinema Node</div>
-        <div class="logo-sub">Automated Mobile Host</div>
+        <div class="logo-sub">Automated Node Host</div>
       </div>
     </div>
     <div class="header-actions">
@@ -800,6 +802,55 @@
     let wakeLockSentinel = null;
     let heartbeatInterval = null;
     let isActionInProgress = false;
+
+    // Sync Identity with native process (Electron & Android)
+    async function initDeviceIdentity() {
+      if (window.Capacitor?.Plugins?.Cinema?.getDeviceInfo) {
+        try {
+          const info = await window.Capacitor.Plugins.Cinema.getDeviceInfo();
+          if (info && info.deviceId) {
+            deviceId = info.deviceId;
+            if (info.deviceName) deviceName = info.deviceName;
+            localStorage.setItem('cinema_dev_id', deviceId);
+            localStorage.setItem('cinema_dev_name', deviceName);
+            const devEl = document.getElementById('devNameTxt');
+            if (devEl) devEl.innerText = deviceName;
+          }
+        } catch (_) {}
+      }
+
+      if (window.Capacitor?.Plugins?.Cinema?.onRevoked) {
+        window.Capacitor.Plugins.Cinema.onRevoked((data) => {
+          console.warn('⛔ [Native] Received access revocation signal:', data);
+          currentState = 'disabled';
+          currentRole = 'disabled';
+          liveTunnelUrl = '';
+          const heading = document.getElementById('nodeCardHeading');
+          if (heading) heading.innerText = 'Access Revoked by Administrator';
+          renderUI();
+          alert(`⛔ Access Revoked: ${data?.message || 'Server access has been revoked by Administrator.'}`);
+        });
+      }
+    }
+    initDeviceIdentity();
+
+    // Real-Time Admin Revocation Monitor
+    setInterval(async () => {
+      if (currentState === 'running' || currentState === 'starting') {
+        const hb = await sendHeartbeat(currentState === 'running' ? 'running' : 'starting', liveTunnelUrl);
+        if (hb && (hb.allowed === false || hb.command === 'STOP_SERVER')) {
+          console.warn('⛔ [Heartbeat] Access revoked by Administrator! Stopping...');
+          currentState = 'disabled';
+          currentRole = 'disabled';
+          liveTunnelUrl = '';
+          await nativeStop();
+          const heading = document.getElementById('nodeCardHeading');
+          if (heading) heading.innerText = 'Access Revoked by Administrator';
+          renderUI();
+          alert(`⛔ Access Revoked: ${hb.message || 'Server access has been revoked by Administrator.'}`);
+        }
+      }
+    }, 10000);
 
     async function requestWakeLock() {
       if ('wakeLock' in navigator) {
@@ -1097,6 +1148,17 @@
         releaseWakeLock();
         isActionInProgress = false;
       } else {
+        // Pre-check authorization before starting
+        const perm = await checkPermission();
+        if (perm && perm.allowed === false) {
+          currentState = 'disabled';
+          currentRole = 'disabled';
+          renderUI();
+          alert(`⛔ Access Revoked: ${perm.message || 'Server access has been revoked by Administrator.'}`);
+          isActionInProgress = false;
+          return;
+        }
+
         // START
         currentState = 'starting';
         renderUI();
@@ -1174,18 +1236,45 @@
         let remoteVer = (updateData.version || updateData.tag_name || "").replace(/^v/i, "").trim();
         let downloadUrl = updateData.downloadUrl;
 
+        // Auto-select binary matching host operating system
+        const platform = window.Capacitor?.getPlatform ? window.Capacitor.getPlatform() : 'android';
+        if (updateData.desktop) {
+          if (platform === 'win32') {
+            downloadUrl = updateData.desktop.windowsSetup || updateData.desktop.windowsPortable;
+          } else if (platform === 'linux') {
+            downloadUrl = updateData.desktop.linuxAppImage;
+          } else if (platform === 'darwin') {
+            downloadUrl = updateData.desktop.macDmg || updateData.desktop.macZip;
+          }
+        }
+
         if (!downloadUrl && updateData.assets && updateData.assets.length > 0) {
-          const apkAsset = updateData.assets.find(a => a.name && a.name.toLowerCase().endsWith('.apk'));
-          if (apkAsset) downloadUrl = apkAsset.browser_download_url;
+          if (platform === 'win32') {
+            const exeAsset = updateData.assets.find(a => a.name && a.name.toLowerCase().endsWith('.exe'));
+            if (exeAsset) downloadUrl = exeAsset.browser_download_url;
+          } else if (platform === 'linux') {
+            const appImageAsset = updateData.assets.find(a => a.name && a.name.toLowerCase().endsWith('.appimage'));
+            if (appImageAsset) downloadUrl = appImageAsset.browser_download_url;
+          } else if (platform === 'darwin') {
+            const dmgAsset = updateData.assets.find(a => a.name && (a.name.toLowerCase().endsWith('.dmg') || a.name.toLowerCase().endsWith('.zip')));
+            if (dmgAsset) downloadUrl = dmgAsset.browser_download_url;
+          } else {
+            const apkAsset = updateData.assets.find(a => a.name && a.name.toLowerCase().endsWith('.apk'));
+            if (apkAsset) downloadUrl = apkAsset.browser_download_url;
+          }
         }
 
         if (!downloadUrl) {
-          downloadUrl = 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk';
+          downloadUrl = platform === 'win32'
+            ? 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Node-Runner-Setup.exe'
+            : platform === 'linux'
+            ? 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Node-Runner.AppImage'
+            : 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk';
         }
 
         if (remoteVer && isNewerVersion(remoteVer, RUNNER_APP_VERSION)) {
           pendingUpdateUrl = downloadUrl;
-          document.getElementById('updateVersionText').innerText = `Version ${remoteVer} is ready`;
+          document.getElementById('updateVersionText').innerText = `Version ${remoteVer} is ready (${platform === 'win32' ? 'Windows' : platform === 'linux' ? 'Linux' : 'Android'})`;
           document.getElementById('updateBanner').style.display = 'block';
         }
       } catch (err) {
