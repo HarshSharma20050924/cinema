@@ -26,6 +26,7 @@ import { DownloadPage } from "./components/download/DownloadPage";
 import { TermsPage } from "./components/legal/TermsPage";
 import { PrivacyPage } from "./components/legal/PrivacyPage";
 import { DisclaimerPage } from "./components/legal/DisclaimerPage";
+import { ServerIcon, DownloadIcon, RefreshIcon } from "./icons";
 import { api } from "./api/client";
 import { appCache } from "./utils/cache";
 import {
@@ -1175,59 +1176,104 @@ export default function App() {
               >
                 <div
                   style={{
-                    width: "64px",
-                    height: "64px",
-                    borderRadius: "50%",
-                    background: "rgba(229, 9, 20, 0.15)",
-                    border: "2px solid rgba(229, 9, 20, 0.4)",
+                    width: "56px",
+                    height: "56px",
+                    borderRadius: "14px",
+                    background: "rgba(229, 9, 20, 0.12)",
+                    border: "1px solid rgba(229, 9, 20, 0.3)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     marginBottom: "18px",
+                    color: "#e50914",
                   }}
                 >
-                  <span style={{ fontSize: "28px" }}>📡</span>
+                  <ServerIcon size={26} />
                 </div>
 
                 <h3 style={{ fontSize: "22px", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
                   Server Inactive or Catalog Empty
                 </h3>
-                <p style={{ fontSize: "14px", color: "#94a3b8", maxWidth: "440px", marginBottom: "26px", lineHeight: "1.6" }}>
-                  The mobile backend cluster may be reconnecting or the current provider has not loaded titles yet. Tap below to reload the servers and restore the catalog.
+
+                <p style={{ fontSize: "14px", color: "#a3a3a3", maxWidth: "480px", marginBottom: "20px", lineHeight: "1.6" }}>
+                  The local backend server is not running or the provider is still loading.
                 </p>
 
-                <button
-                  onClick={() => {
-                    appCache.clear();
-                    window.location.reload();
-                  }}
+                {/* Helpful Activation Guide Box */}
+                <div
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "13px 32px",
-                    borderRadius: "10px",
-                    background: "#e50914",
-                    color: "#ffffff",
-                    fontSize: "15px",
-                    fontWeight: 800,
-                    border: "none",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 20px rgba(229, 9, 20, 0.5)",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#b80710";
-                    e.currentTarget.style.transform = "scale(1.04)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#e50914";
-                    e.currentTarget.style.transform = "scale(1)";
+                    maxWidth: "460px",
+                    width: "100%",
+                    background: "#0e0e11",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: "16px",
+                    padding: "18px 22px",
+                    marginBottom: "24px",
+                    textAlign: "left",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.3)",
                   }}
                 >
-                  <span style={{ fontSize: "16px" }}>↻</span>
-                  <span>Reload Server & Catalog</span>
-                </button>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#ffffff", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ color: "#e50914" }}>•</span>
+                    <span>How to activate the server:</span>
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "12px", color: "#888888", lineHeight: "1.6" }}>
+                    <li>Go to the <strong style={{ color: "#ffffff" }}>Downloads</strong> section.</li>
+                    <li>Install <strong style={{ color: "#ffffff" }}>Cinema APK</strong> or <strong style={{ color: "#ffffff" }}>Cinema Runner</strong> on your device.</li>
+                    <li>Keep Runner or the app active in the background to automatically scrape and stream catalog sources.</li>
+                  </ul>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
+                  <button
+                    onClick={() => handleSelectCategoryNav("downloads")}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "11px 24px",
+                      borderRadius: "12px",
+                      background: "#e50914",
+                      color: "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "background 0.2s ease, transform 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#b80710")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "#e50914")}
+                  >
+                    <DownloadIcon size={16} />
+                    <span>Go to Downloads</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      appCache.clear();
+                      window.location.reload();
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "11px 24px",
+                      borderRadius: "12px",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      color: "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "border-color 0.2s ease, transform 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)")}
+                  >
+                    <RefreshIcon size={16} />
+                    <span>Reload Catalog</span>
+                  </button>
+                </div>
               </div>
             ) : filters.length > 0 ? (
               filters.slice(0, 10).map((f, idx) => (

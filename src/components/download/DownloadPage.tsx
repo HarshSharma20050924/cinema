@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { DownloadIcon, GithubIcon, ServerIcon, FilmIcon } from "../../icons";
+import { DownloadIcon, GithubIcon } from "../../icons";
+import { ShadedHeading } from "../common/ShadedHeading";
 import packageJson from "../../../package.json";
 
 interface ReleaseAsset {
@@ -137,7 +138,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
       >
         {/* Header Title Area */}
         <div style={{ marginBottom: "36px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
             <span style={{ fontSize: "12px", fontWeight: 700, color: "#e50914" }}>
               Cinema Downloads
             </span>
@@ -146,23 +147,32 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
             </span>
           </div>
 
-          <h1
-            style={{
-              fontSize: "clamp(28px, 4vw, 40px)",
-              fontWeight: 900,
-              letterSpacing: "-0.02em",
-              margin: "0 0 10px 0",
-              color: "#ffffff",
-            }}
-          >
-            Download Cinema
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "0 0 10px 0" }}>
+            <div
+              style={{
+                width: "4.5px",
+                height: "32px",
+                backgroundColor: "#e50914",
+                borderRadius: "2px",
+              }}
+            />
+            <ShadedHeading
+              text="Download Cinema"
+              tag="h1"
+              style={{
+                fontSize: "clamp(28px, 4vw, 40px)",
+                fontWeight: 900,
+                letterSpacing: "-0.02em",
+                margin: 0,
+              }}
+            />
+          </div>
 
           <p style={{ fontSize: "15px", color: "#a3a3a3", margin: "0 0 22px 0", maxWidth: "600px" }}>
             Choose your device to download the app.
           </p>
 
-          {/* Clean Tab Switcher */}
+          {/* Clean Curvy Tab Switcher */}
           <div
             style={{
               display: "inline-flex",
@@ -170,21 +180,22 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               gap: "6px",
               background: "#111114",
               border: "1px solid rgba(255, 255, 255, 0.08)",
-              padding: "4px",
-              borderRadius: "10px",
+              padding: "5px",
+              borderRadius: "28px",
             }}
           >
             <button
               onClick={() => setActiveTab("all")}
               style={{
-                padding: "8px 18px",
-                borderRadius: "7px",
+                padding: "8px 20px",
+                borderRadius: "22px",
                 border: "none",
                 background: activeTab === "all" ? "#e50914" : "transparent",
                 color: "#ffffff",
                 fontSize: "13px",
                 fontWeight: 700,
                 cursor: "pointer",
+                transition: "all 0.2s ease",
               }}
             >
               All Downloads
@@ -193,14 +204,15 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
             <button
               onClick={() => setActiveTab("app")}
               style={{
-                padding: "8px 18px",
-                borderRadius: "7px",
+                padding: "8px 20px",
+                borderRadius: "22px",
                 border: "none",
                 background: activeTab === "app" ? "#e50914" : "transparent",
                 color: "#ffffff",
                 fontSize: "13px",
                 fontWeight: 700,
                 cursor: "pointer",
+                transition: "all 0.2s ease",
               }}
             >
               Cinema App
@@ -209,14 +221,15 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
             <button
               onClick={() => setActiveTab("runner")}
               style={{
-                padding: "8px 18px",
-                borderRadius: "7px",
+                padding: "8px 20px",
+                borderRadius: "22px",
                 border: "none",
                 background: activeTab === "runner" ? "#e50914" : "transparent",
                 color: "#ffffff",
                 fontSize: "13px",
                 fontWeight: 700,
                 cursor: "pointer",
+                transition: "all 0.2s ease",
               }}
             >
               Runner App
@@ -227,25 +240,37 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
         {/* SECTION 1: CINEMA APPLICATION */}
         {(activeTab === "all" || activeTab === "app") && (
           <div style={{ marginBottom: "50px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "18px" }}>
               <img
                 src="/logo.png"
                 alt="Cinema App"
                 style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "9px",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "12px",
                   objectFit: "cover",
-                  boxShadow: "0 2px 10px rgba(229, 9, 20, 0.35)",
+                  boxShadow: "0 4px 14px rgba(229, 9, 20, 0.35)",
                 }}
               />
-              <div>
-                <h2 style={{ fontSize: "19px", fontWeight: 800, margin: 0 }}>
-                  Cinema App
-                </h2>
-                <span style={{ fontSize: "12px", color: "#888888" }}>
-                  Watch movies and series on your phone, TV, or computer.
-                </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    width: "4px",
+                    height: "22px",
+                    backgroundColor: "#e50914",
+                    borderRadius: "2px",
+                  }}
+                />
+                <div>
+                  <ShadedHeading
+                    text="Cinema App"
+                    tag="h2"
+                    style={{ fontSize: "20px", fontWeight: 800 }}
+                  />
+                  <div style={{ fontSize: "12px", color: "#888888", marginTop: "2px" }}>
+                    Watch movies and series on your phone, TV, or computer.
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -259,13 +284,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               {/* Windows Card (Shows Setup & Portable) */}
               <div
                 style={{
-                  background: "#0e0e11",
+                  background: "linear-gradient(180deg, #121217 0%, #0d0d10 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "20px",
+                  borderRadius: "20px",
+                  padding: "22px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
                 <div>
@@ -287,11 +313,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#e50914",
                       border: "none",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -312,11 +339,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.12)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -333,13 +361,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               {/* Android Card (Shows Cinema APK 30MB Primary & Cinema Web APK 3.2MB Secondary) */}
               <div
                 style={{
-                  background: "#0e0e11",
+                  background: "linear-gradient(180deg, #121217 0%, #0d0d10 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "20px",
+                  borderRadius: "20px",
+                  padding: "22px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
                 <div>
@@ -361,11 +390,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#e50914",
                       border: "none",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -386,11 +416,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.12)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -407,13 +438,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               {/* Linux Card (Shows .deb & .AppImage) */}
               <div
                 style={{
-                  background: "#0e0e11",
+                  background: "linear-gradient(180deg, #121217 0%, #0d0d10 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "20px",
+                  borderRadius: "20px",
+                  padding: "22px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
                 <div>
@@ -435,11 +467,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#e50914",
                       border: "none",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -460,11 +493,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.12)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -481,13 +515,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               {/* macOS Card (Shows Apple Silicon & Universal DMG) */}
               <div
                 style={{
-                  background: "#0e0e11",
+                  background: "linear-gradient(180deg, #121217 0%, #0d0d10 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "20px",
+                  borderRadius: "20px",
+                  padding: "22px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
                 <div>
@@ -509,11 +544,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#e50914",
                       border: "none",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -534,11 +570,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.12)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -558,25 +595,37 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
         {/* SECTION 2: RUNNER APP */}
         {(activeTab === "all" || activeTab === "runner") && (
           <div style={{ marginBottom: "50px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "18px" }}>
               <img
                 src="/runner-icon.png"
                 alt="Runner App"
                 style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "9px",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "12px",
                   objectFit: "cover",
-                  boxShadow: "0 2px 10px rgba(255, 255, 255, 0.15)",
+                  boxShadow: "0 4px 14px rgba(255, 255, 255, 0.15)",
                 }}
               />
-              <div>
-                <h2 style={{ fontSize: "19px", fontWeight: 800, margin: 0 }}>
-                  Runner App
-                </h2>
-                <span style={{ fontSize: "12px", color: "#888888" }}>
-                  A background helper that scrapes links and sources.
-                </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    width: "4px",
+                    height: "22px",
+                    backgroundColor: "#e50914",
+                    borderRadius: "2px",
+                  }}
+                />
+                <div>
+                  <ShadedHeading
+                    text="Runner App"
+                    tag="h2"
+                    style={{ fontSize: "20px", fontWeight: 800 }}
+                  />
+                  <div style={{ fontSize: "12px", color: "#888888", marginTop: "2px" }}>
+                    A background helper that scrapes links and sources.
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -590,13 +639,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               {/* Android Runner */}
               <div
                 style={{
-                  background: "#0e0e11",
+                  background: "linear-gradient(180deg, #121217 0%, #0d0d10 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "20px",
+                  borderRadius: "20px",
+                  padding: "22px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
                 <div>
@@ -618,11 +668,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.14)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease, border-color 0.2s ease",
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
                     onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
@@ -645,11 +696,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#111114",
                       border: "1px solid rgba(255, 255, 255, 0.08)",
                       color: "#a3a3a3",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 600,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease, border-color 0.2s ease",
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = "#ffffff";
@@ -674,13 +726,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               {/* Windows Runner (Shows Setup & Portable) */}
               <div
                 style={{
-                  background: "#0e0e11",
+                  background: "linear-gradient(180deg, #121217 0%, #0d0d10 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "20px",
+                  borderRadius: "20px",
+                  padding: "22px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
                 <div>
@@ -702,11 +755,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.14)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease, border-color 0.2s ease",
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
                     onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
@@ -721,7 +775,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   </button>
 
                   <button
-                    onClick={() => downloadFile("Cinema.Node.Runner.exe", /runner\.[0-9].*\.exe/i)}
+                    onClick={() => downloadFile("Cinema.Node.Runner.exe", /runner\.[0-9].*\.exe$/i)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -729,11 +783,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.14)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease, border-color 0.2s ease",
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
                     onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
@@ -752,13 +807,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               {/* Linux Runner */}
               <div
                 style={{
-                  background: "#0e0e11",
+                  background: "linear-gradient(180deg, #121217 0%, #0d0d10 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "20px",
+                  borderRadius: "20px",
+                  padding: "22px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
                 <div>
@@ -780,11 +836,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.14)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease, border-color 0.2s ease",
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
                     onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
@@ -807,11 +864,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#111114",
                       border: "1px solid rgba(255, 255, 255, 0.08)",
                       color: "#a3a3a3",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 600,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease, border-color 0.2s ease",
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = "#ffffff";
@@ -836,13 +894,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               {/* macOS Runner */}
               <div
                 style={{
-                  background: "#0e0e11",
+                  background: "linear-gradient(180deg, #121217 0%, #0d0d10 100%)",
                   border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "20px",
+                  borderRadius: "20px",
+                  padding: "22px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
                 <div>
@@ -864,11 +923,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#18181c",
                       border: "1px solid rgba(255, 255, 255, 0.14)",
                       color: "#ffffff",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease, border-color 0.2s ease",
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
                     onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
@@ -891,11 +951,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       background: "#111114",
                       border: "1px solid rgba(255, 255, 255, 0.08)",
                       color: "#a3a3a3",
-                      padding: "10px 14px",
-                      borderRadius: "8px",
+                      padding: "11px 16px",
+                      borderRadius: "12px",
                       fontSize: "12px",
                       fontWeight: 600,
                       cursor: "pointer",
+                      transition: "transform 0.15s ease, border-color 0.2s ease",
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = "#ffffff";
@@ -925,8 +986,9 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
           style={{
             background: "#0a0a0c",
             border: "1px solid rgba(255, 255, 255, 0.08)",
-            borderRadius: "14px",
-            padding: "22px 24px",
+            borderRadius: "20px",
+            padding: "24px",
+            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
           }}
         >
           <div
@@ -936,16 +998,28 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               justifyContent: "space-between",
               flexWrap: "wrap",
               gap: "14px",
-              marginBottom: release?.assets && release.assets.length > 0 ? "16px" : "0",
+              marginBottom: release?.assets && release.assets.length > 0 ? "18px" : "0",
             }}
           >
-            <div>
-              <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", margin: "0 0 2px 0" }}>
-                All Release Files
-              </h3>
-              <p style={{ fontSize: "12px", color: "#777777", margin: 0 }}>
-                Every file published with the latest release.
-              </p>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{
+                  width: "4px",
+                  height: "22px",
+                  backgroundColor: "#e50914",
+                  borderRadius: "2px",
+                }}
+              />
+              <div>
+                <ShadedHeading
+                  text="All Release Files"
+                  tag="h3"
+                  style={{ fontSize: "18px", fontWeight: 800 }}
+                />
+                <p style={{ fontSize: "12px", color: "#777777", margin: "2px 0 0 0" }}>
+                  Every file published with the latest release.
+                </p>
+              </div>
             </div>
 
             <a
@@ -959,11 +1033,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                 background: "rgba(255, 255, 255, 0.06)",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
                 color: "#ffffff",
-                padding: "8px 14px",
-                borderRadius: "8px",
+                padding: "8px 16px",
+                borderRadius: "12px",
                 fontSize: "12px",
                 fontWeight: 600,
                 textDecoration: "none",
+                transition: "all 0.2s ease",
               }}
             >
               <GithubIcon size={15} />
@@ -988,9 +1063,9 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "8px 10px",
+                    padding: "10px 14px",
                     background: "rgba(255, 255, 255, 0.02)",
-                    borderRadius: "6px",
+                    borderRadius: "10px",
                     fontSize: "13px",
                   }}
                 >

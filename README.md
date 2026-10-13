@@ -4,16 +4,17 @@
 
 <br/>
 
-**Decentralized Theater-Grade Streaming & Autonomous Node Ecosystem**
+**Open-Source Media Streaming Client & Scraper Daemon Ecosystem**
 
-A client-side media browser, search indexer, and playback environment for high-definition movies and television series.
+A fast, client-side streaming application and provider indexing system for movies and series across Web, Android, Windows, Linux, and macOS.
 
 <br/>
 
 [![Live Web App](https://img.shields.io/badge/Web_App-cinema--dwh.pages.dev-E50914?style=flat-square&logo=googlechrome&logoColor=white)](https://cinema-dwh.pages.dev/)
 [![Latest Release](https://img.shields.io/github/v/release/HarshSharma20050924/cinema?color=E50914&label=Latest%20Release&style=flat-square&logo=github)](https://github.com/HarshSharma20050924/cinema/releases/latest)
-[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Linux%20%7C%20Windows%20%7C%20macOS-111111?style=flat-square)](https://github.com/HarshSharma20050924/cinema/releases/latest)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Web-111111?style=flat-square)](https://github.com/HarshSharma20050924/cinema/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache%202.0-111111?style=flat-square)](LICENSE)
+[![Contributions](https://img.shields.io/badge/Contributions-Welcome-E50914?style=flat-square)](CONTRIBUTING.md)
 
 <br/>
 
@@ -23,104 +24,294 @@ A client-side media browser, search indexer, and playback environment for high-d
 
 ---
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Ecosystem Components](#ecosystem-components)
+- [Official Downloads](#official-downloads)
+- [Running in All Environments](#running-in-all-environments)
+  - [1. Web Application](#1-web-application-browser)
+  - [2. Local Backend Server](#2-local-backend-server)
+  - [3. Desktop Application (Windows, Linux, macOS)](#3-desktop-application-electron)
+  - [4. Desktop Runner Daemon](#4-desktop-runner-daemon)
+  - [5. Android Mobile Application](#5-android-mobile-application)
+  - [6. Android Runner Daemon](#6-android-runner-daemon)
+  - [7. Docker Container](#7-docker-container)
+  - [8. Cloudflare Pages Deployment](#8-cloudflare-pages-deployment)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [Author & Contact Details](#author--contact-details)
+- [Legal Disclaimer](#legal-disclaimer)
+- [License](#license)
+
+---
+
 ## Overview
 
-Cinema is engineered to eliminate intrusive advertisements, redirect loops, and fragmented subscription catalogs. By separating media indexing from decentralized stream resolvers, Cinema delivers a smooth, theater-grade viewing experience across mobile phones, desktop workstations, and smart television displays.
+Cinema provides a clean, ad-free streaming interface by separating the presentation layer from media resolvers. It indexes public streaming sources, parses HLS video manifests, and streams high-definition video directly to local players without popups, banners, or redirects.
+
+Key features:
+* **Multi-Platform Support**: Runs on Web browsers, Android phones, Android TV, Windows, Linux distros, and macOS.
+* **Dual-Engine Architecture**: Main media player and background scraper helper work together seamlessly.
+* **HLS Adaptive Playback**: Automatic resolution switching (480p to 4K), multi-language audio track selection, and subtitles.
+* **External Player Forwarding**: Instant 1-click playback through external players like VLC, MPV, and MX Player.
+* **Offline Download Manager**: Background multi-stream downloader with resume support.
+* **Zero Telemetry**: No trackers, analytics SDKs, or session loggers.
 
 ---
 
-## Ecosystem Architecture
+## Ecosystem Components
 
-The Cinema ecosystem comprises two distinct, interoperable products:
+Cinema is divided into two main products:
 
-### 1. Cinema Application (Player & Streaming Client)
-The primary client application available for Web, Android, Linux, Windows, and macOS.
-* **Adaptive Streaming**: HLS streaming engine with multi-track audio selection, custom subtitle tracks, and resolutions from 480p up to 4K.
-* **External Player Forwarding**: Instant 1-click launching into external decoders including VLC, MPV, and MX Player.
-* **Offline Download Manager**: Multi-connection stream downloading directly into local file storage.
-* **Resilient Poster Proxy**: Built-in image proxying to prevent browser privacy shields and ad-blockers from dropping media artwork.
+### 1. Cinema Application (Player & Catalog UI)
+The primary client application for watching content.
+* **Web**: React 19 single-page app running in modern browsers.
+* **Desktop**: Electron wrapper for Windows 10/11, Linux (.deb & .AppImage), and macOS (Apple Silicon & Intel).
+* **Android**: Native APK and lightweight Capacitor web app.
 
-### 2. Cinema Runner (Autonomous Scraper Daemon)
-A background headless daemon and tunnel coordinator available for Android, Linux servers, Windows, and macOS.
-* **Persistent Node Host**: Executes provider scrapers and resolves stream manifests locally.
-* **Zero Root Android Daemon**: Runs persistently as an Android foreground service with automatic coordinator syncing.
-* **Encrypted Edge Tunnels**: Creates local Cloudflare proxy tunnels to route stream queries securely.
+### 2. Cinema Runner (Background Scraper Daemon)
+A background service that connects to provider sources, resolves links, and exposes a local scraping API for the client.
+* **Android Runner**: Android foreground service running without root permissions.
+* **Desktop Runner**: Headless background service for servers, Linux, Windows, and macOS.
 
 ---
 
-## Downloads & Release Assets
+## Official Downloads
 
-Direct links to compiled releases from the latest stable release tag:
+All precompiled binaries and installation packages are published on the [GitHub Releases Page](https://github.com/HarshSharma20050924/cinema/releases/latest).
 
 ### Cinema Application (Player)
 
-| Platform | Format | Direct Download |
-| :--- | :--- | :--- |
-| Android (Mobile & TV) | Universal APK | [Download Cinema-Web.apk](https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Web.apk) |
-| Linux (Debian / Ubuntu / Mint) | .deb Package | [Download .deb](https://github.com/HarshSharma20050924/cinema/releases/latest) |
-| Linux (Universal) | Standalone .AppImage | [Download .AppImage](https://github.com/HarshSharma20050924/cinema/releases/latest) |
-| Windows 10 / 11 | Setup Installer (.exe) | [Download Setup.exe](https://github.com/HarshSharma20050924/cinema/releases/latest) |
-| Windows 10 / 11 | Portable Executable (.exe) | [Download Portable.exe](https://github.com/HarshSharma20050924/cinema/releases/latest) |
-| macOS (Apple Silicon & Intel) | DMG Disk Image | [Download .dmg](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Platform | Variant | Package Type | Direct Download |
+| :--- | :--- | :--- | :--- |
+| Android | Universal Native APK | `.apk` (~30 MB) | [Download Cinema.apk](https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.apk) |
+| Android | Web Wrapper APK | `.apk` (~3.2 MB) | [Download Cinema-Web.apk](https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Web.apk) |
+| Windows | Setup Installer | `.exe` (~80 MB) | [Download Setup (.exe)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Windows | Portable Executable | `.exe` (~80 MB) | [Download Portable (.exe)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Linux | Ubuntu, Debian, Mint | `.deb` (~72 MB) | [Download Debian Package (.deb)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Linux | All Distributions | `.AppImage` (~105 MB) | [Download Universal AppImage](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| macOS | Apple Silicon & Intel | `.dmg` (~96 MB) | [Download Disk Image (.dmg)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
 
-### Cinema Runner (Node Daemon)
+### Cinema Runner (Background Daemon)
 
-| Platform | Format | Direct Download |
-| :--- | :--- | :--- |
-| Android | Background Daemon APK | [Download Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk) |
-| Linux / Server | Standalone .AppImage | [Download Runner AppImage](https://github.com/HarshSharma20050924/cinema/releases/latest) |
-| Windows | Setup Installer (.exe) | [Download Runner Setup.exe](https://github.com/HarshSharma20050924/cinema/releases/latest) |
-| Windows | Portable Executable (.exe) | [Download Runner Portable.exe](https://github.com/HarshSharma20050924/cinema/releases/latest) |
-| macOS | DMG Disk Image | [Download Runner .dmg](https://github.com/HarshSharma20050924/cinema/releases/latest) |
-
-> Complete binary manifests, release notes, and SHA-256 checksums are published on the [GitHub Releases Page](https://github.com/HarshSharma20050924/cinema/releases/latest).
+| Platform | Variant | Package Type | Direct Download |
+| :--- | :--- | :--- | :--- |
+| Android | Android Runner Service | `.apk` (~31 MB) | [Download Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk) |
+| Windows | Runner Setup Installer | `.exe` (~80 MB) | [Download Runner Setup (.exe)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Windows | Runner Portable | `.exe` (~80 MB) | [Download Runner Portable (.exe)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Linux / Server | Standalone Runner | `.AppImage` (~105 MB) | [Download Runner AppImage](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| macOS | macOS Runner | `.dmg` (~96 MB) | [Download Runner Disk Image (.dmg)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
 
 ---
 
-## Getting Started Locally
+## Running in All Environments
 
-### Prerequisites
-* Node.js 22 or higher
-* npm 10 or higher
+### 1. Web Application (Browser)
 
-### Installation & Run
+Requires Node.js 22+ and npm 10+.
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/HarshSharma20050924/cinema.git
 cd cinema
 
-# Install web application dependencies
+# Install dependencies
 npm install
 
-# Start development server and API runner
+# Start development client (http://localhost:5174)
 npm run dev
+
+# Build production bundle (outputs to dist/)
+npm run build
+
+# Preview production build locally
+npm run preview
 ```
 
-The web client will be available at `http://localhost:5173`.
+### 2. Local Backend Server
 
-### Desktop Build
+The Node.js server handles provider scraping, stream resolution, and poster proxying.
 
 ```bash
-cd desktop-app
+cd cinema/server
+
+# Install server dependencies
 npm install
 
-# Build for current operating system
-npm run dist:linux    # on Linux (.deb & .AppImage)
-npm run dist:win      # on Windows (.exe Setup & Portable)
-npm run dist:mac      # on macOS (.dmg)
+# Start local server on port 3000
+node index.cjs
+```
+
+To run both client and server together with one command from the project root:
+```bash
+npm start
+```
+
+### 3. Desktop Application (Electron)
+
+Desktop apps provide native window controls, hardware decoding, and automatic link routing.
+
+```bash
+cd cinema/desktop-app
+
+# Install desktop dependencies
+npm install
+
+# Run desktop app in development mode
+npm start
+
+# Build installer packages
+npm run dist:win      # Windows Setup (.exe) and Portable (.exe)
+npm run dist:linux    # Linux Debian (.deb) and AppImage (.AppImage)
+npm run dist:mac      # macOS Disk Image (.dmg)
+```
+
+Generated binaries will be located in `desktop-app/release/`.
+
+### 4. Desktop Runner Daemon
+
+The standalone runner executes provider scrapers as a background daemon.
+
+```bash
+cd cinema/desktop-runner
+
+# Install dependencies
+npm install
+
+# Run runner in development mode
+npm start
+
+# Package standalone executables for all platforms
+npm run dist:all
+```
+
+### 5. Android Mobile Application
+
+Built using Capacitor and modern Android toolchains (Java 21, Android SDK 34+).
+
+```bash
+# 1. Build the web app
+npm run build
+
+# 2. Sync web assets to Capacitor
+cd mobile-app
+npm install
+rm -rf dist && cp -r ../dist ./dist
+npx cap sync android
+
+# 3. Build release APK
+cd android
+chmod +x gradlew
+./gradlew assembleRelease
+```
+
+The APK will be generated at `mobile-app/android/app/build/outputs/apk/release/app-release.apk`.
+
+### 6. Android Runner Daemon
+
+The Android Runner runs locally on your phone as a persistent background service.
+
+```bash
+# Sync runner web assets
+mkdir -p android/app/src/main/assets/public
+cp -r runner-app/public/* android/app/src/main/assets/public/
+
+# Build runner APK
+cd android
+chmod +x gradlew
+./gradlew assembleRelease
+```
+
+The output APK will be in `android/app/build/outputs/apk/release/app-release.apk`.
+
+### 7. Docker Container
+
+You can run Cinema inside a self-contained Docker container:
+
+```bash
+# Build Docker image
+docker build -t cinema:latest .
+
+# Run container on port 5174
+docker run -d -p 5174:5174 --name cinema-app cinema:latest
+
+# Check container logs
+docker logs -f cinema-app
+```
+
+Access the application in your browser at `http://localhost:5174`.
+
+### 8. Cloudflare Pages Deployment
+
+Cinema deploys directly to Cloudflare Pages as a high-performance static web application with serverless functions:
+
+```bash
+# 1. Build production bundle
+npm run build
+
+# 2. Deploy dist/ to Cloudflare Pages via Wrangler
+npx wrangler pages deploy dist --project-name=cinema
+```
+
+Or push changes to the `main` branch to trigger the automated Cloudflare GitHub integration.
+
+---
+
+## Project Structure
+
+```
+cinema/
+├── src/                    # React 19 client application
+│   ├── components/         # UI components (catalog, media, hero, layout, download)
+│   ├── hooks/              # Custom React hooks (useCatalog, useProviders, useSettings)
+│   ├── api/                # API client and TMDB integration
+│   └── utils/              # Cache and navigation state helpers
+├── server/                 # Express backend provider engine
+│   ├── controllers/        # Media and stream controllers
+│   ├── providers/          # Community provider scrapers
+│   └── routes/             # API routes
+├── desktop-app/            # Electron desktop application (Windows, Linux, macOS)
+├── desktop-runner/         # Standalone desktop scraper daemon
+├── mobile-app/             # Capacitor mobile wrapper
+├── runner-app/             # Android background runner UI
+├── android/                # Native Android gradle project
+├── public/                 # Static assets, logos, and icons
+├── functions/              # Cloudflare Pages serverless functions
+├── .github/workflows/      # GitHub Actions CI/CD workflows
+│   ├── build-desktop-app.yml     # Desktop builds
+│   ├── build-desktop-runner.yml  # Runner builds
+│   └── build-mobile-apps.yml     # Android APK builds
+├── wrangler.toml           # Cloudflare Pages configuration
+└── CONTRIBUTING.md         # Contribution guidelines
 ```
 
 ---
 
-## Privacy & Decentralization
+## Contributing
 
-* **Local-First Storage**: User preferences, watch history, bookmarks, and installed extensions reside strictly on the user's device via local storage.
-* **Zero Telemetry**: No third-party analytics SDKs, session recorders, tracking cookies, or user identifiers are included.
-* **Non-Hosting Policy**: Cinema does not host, upload, or transmit video files. Media references are indexed client-side through public community scrapers.
+Contributions, bug reports, and provider additions are appreciated. Please read the [Contributing Guidelines](CONTRIBUTING.md) before submitting pull requests.
+
+---
+
+## Author & Contact Details
+
+* **Author**: Harsh Sharma
+* **Email**: [harsh20050924@gmail.com](mailto:harsh20050924@gmail.com)
+* **GitHub**: [github.com/HarshSharma20050924](https://github.com/HarshSharma20050924)
+* **Instagram**: [instagram.com/harshsharma200509](https://www.instagram.com/harshsharma200509/)
+* **Live Web App**: [cinema-dwh.pages.dev](https://cinema-dwh.pages.dev/)
+
+---
+
+## Legal Disclaimer
+
+Cinema is a client-side media indexer and player. It does not host, upload, store, or broadcast any video or media content on its own servers. All media information and stream references are retrieved from community scrapers. Users are responsible for complying with all applicable local copyright laws.
+
+For details, view our [Terms of Service](https://cinema-dwh.pages.dev/?tab=terms) and [DMCA Policy](https://cinema-dwh.pages.dev/?tab=disclaimer).
 
 ---
 
 ## License
 
-Distributed under the Apache 2.0 License. See `LICENSE` for details.
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
