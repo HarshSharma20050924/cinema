@@ -16,7 +16,7 @@ export interface NavbarProps {
   onOpenSettings: () => void;
   onOpenDownloads?: () => void;
   onGoHome?: () => void;
-  onSelectCategoryNav?: (type: "home" | "movies" | "tv" | "categories") => void;
+  onSelectCategoryNav?: (type: "home" | "movies" | "tv" | "categories" | "downloads") => void;
   activeNavTab?: string;
   isModalNavbar?: boolean;
   onClose?: () => void;
@@ -61,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   const navItems: Array<{
-    id: "home" | "movies" | "tv" | "categories";
+    id: "home" | "movies" | "tv" | "categories" | "downloads";
     label: string;
     onClick: () => void;
   }> = [
@@ -92,6 +92,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       label: "Categories",
       onClick: () => {
         if (onSelectCategoryNav) onSelectCategoryNav("categories");
+      },
+    },
+    {
+      id: "downloads",
+      label: "Download",
+      onClick: () => {
+        if (onSelectCategoryNav) onSelectCategoryNav("downloads");
       },
     },
   ];

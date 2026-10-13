@@ -2,7 +2,7 @@ import React from "react";
 import { GithubIcon, InstagramIcon } from "../../icons";
 
 interface FooterProps {
-  onNavigateTab?: (tab: "movies" | "tv" | "categories") => void;
+  onNavigateTab?: (tab: "movies" | "tv" | "categories" | "downloads" | "terms" | "privacy" | "disclaimer") => void;
   onExploreNiches?: () => void;
 }
 
@@ -194,6 +194,35 @@ export const Footer: React.FC<FooterProps> = ({ onNavigateTab, onExploreNiches }
             >
               Categories
             </button>
+
+            <button
+              onClick={() => {
+                if (onNavigateTab) onNavigateTab("downloads");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#ffffff",
+                fontSize: "12px",
+                fontWeight: 800,
+                letterSpacing: "0.1em",
+                cursor: "pointer",
+                textTransform: "uppercase",
+                textShadow: "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textShadow = "0 0 16px rgba(229, 9, 20, 1), 0 0 30px rgba(255, 50, 70, 0.8)";
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textShadow = "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+            >
+              Downloads
+            </button>
           </div>
 
           {/* Shaded Red Tagline */}
@@ -212,6 +241,82 @@ export const Footer: React.FC<FooterProps> = ({ onNavigateTab, onExploreNiches }
             }}
           >
             Cinema is cheaper than therapy
+          </div>
+
+          {/* Legal and Compliance Links */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexWrap: "wrap",
+              gap: "18px",
+              fontSize: "12px",
+              color: "rgba(255, 255, 255, 0.7)",
+            }}
+          >
+            <button
+              onClick={() => {
+                if (onNavigateTab) onNavigateTab("terms");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "rgba(255, 255, 255, 0.75)",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "2px 6px",
+                transition: "color 0.2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.75)")}
+            >
+              Terms of Service
+            </button>
+            <span style={{ opacity: 0.3 }}>•</span>
+            <button
+              onClick={() => {
+                if (onNavigateTab) onNavigateTab("privacy");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "rgba(255, 255, 255, 0.75)",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "2px 6px",
+                transition: "color 0.2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.75)")}
+            >
+              Privacy Policy
+            </button>
+            <span style={{ opacity: 0.3 }}>•</span>
+            <button
+              onClick={() => {
+                if (onNavigateTab) onNavigateTab("disclaimer");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "rgba(255, 255, 255, 0.75)",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "2px 6px",
+                transition: "color 0.2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.75)")}
+            >
+              DMCA Disclaimer
+            </button>
           </div>
 
           {/* Transparent Strip with Original Cinema Logo on left of Harsh Sharma */}

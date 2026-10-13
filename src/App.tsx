@@ -22,6 +22,10 @@ import { DownloadManagerModal } from "./components/downloads/DownloadManagerModa
 import { OnboardingModal } from "./components/setup/OnboardingModal";
 import { SettingsModal } from "./components/settings/SettingsModal";
 import { UpdateModal } from "./components/updater/UpdateModal";
+import { DownloadPage } from "./components/download/DownloadPage";
+import { TermsPage } from "./components/legal/TermsPage";
+import { PrivacyPage } from "./components/legal/PrivacyPage";
+import { DisclaimerPage } from "./components/legal/DisclaimerPage";
 import { api } from "./api/client";
 import { appCache } from "./utils/cache";
 import {
@@ -37,7 +41,7 @@ const initialNavState: NavigationState | null = loadNavigationState();
 
 function getInitialRouteState(saved: NavigationState | null) {
   const urlParams = new URLSearchParams(window.location.search);
-  const tab = urlParams.get("tab") as "home" | "movies" | "tv" | "categories" | null;
+  const tab = urlParams.get("tab");
   const q = urlParams.get("q");
   const filter = urlParams.get("filter");
   const title = urlParams.get("title");
@@ -45,9 +49,62 @@ function getInitialRouteState(saved: NavigationState | null) {
   const isGlobal = urlParams.get("global") === "1";
   const pageNum = parseInt(urlParams.get("page") || "1", 10);
 
+  if (tab === "downloads" || tab === "download") {
+    return {
+      tab: "downloads" as const,
+      customPage: "downloads" as const,
+      isBrowsingCategories: false,
+      viewAllCategory: null,
+      searchQuery: "",
+      isGlobalSearch: false,
+      nicheId: null,
+      page: 1,
+    };
+  }
+
+  if (tab === "terms") {
+    return {
+      tab: "terms" as const,
+      customPage: "terms" as const,
+      isBrowsingCategories: false,
+      viewAllCategory: null,
+      searchQuery: "",
+      isGlobalSearch: false,
+      nicheId: null,
+      page: 1,
+    };
+  }
+
+  if (tab === "privacy") {
+    return {
+      tab: "privacy" as const,
+      customPage: "privacy" as const,
+      isBrowsingCategories: false,
+      viewAllCategory: null,
+      searchQuery: "",
+      isGlobalSearch: false,
+      nicheId: null,
+      page: 1,
+    };
+  }
+
+  if (tab === "disclaimer") {
+    return {
+      tab: "disclaimer" as const,
+      customPage: "disclaimer" as const,
+      isBrowsingCategories: false,
+      viewAllCategory: null,
+      searchQuery: "",
+      isGlobalSearch: false,
+      nicheId: null,
+      page: 1,
+    };
+  }
+
   if (tab === "categories") {
     return {
       tab: "categories" as const,
+      customPage: null,
       isBrowsingCategories: true,
       viewAllCategory: null,
       searchQuery: "",
@@ -192,19 +249,26 @@ export default function App() {
   const [isMergedFilter, setIsMergedFilter] = useState<boolean>(false);
   const selectedNicheId = selectedCategoryId || selectedGenreCategory?.id || null;
 
+  const [activeCustomPage, setActiveCustomPage] = useState<"downloads" | "terms" | "privacy" | "disclaimer" | null>(
+    (initialRoute as any).customPage || null
+  );
+
   // Derive active navbar tab
-  const activeNavTab: "home" | "movies" | "tv" | "categories" = isBrowsingCategories
-    ? "categories"
-    : searchQuery
-    ? "home"
-    : !viewAllCategory
-    ? "home"
-    : viewAllCategory.title.toLowerCase().includes("movie")
-    ? "movies"
-    : viewAllCategory.title.toLowerCase().includes("tv") ||
-      viewAllCategory.title.toLowerCase().includes("series")
-    ? "tv"
-    : "categories";
+  const activeNavTab: "home" | "movies" | "tv" | "categories" | "downloads" =
+    activeCustomPage === "downloads"
+      ? "downloads"
+      : isBrowsingCategories
+      ? "categories"
+      : searchQuery
+      ? "home"
+      : !viewAllCategory
+      ? "home"
+      : viewAllCategory.title.toLowerCase().includes("movie")
+      ? "movies"
+      : viewAllCategory.title.toLowerCase().includes("tv") ||
+        viewAllCategory.title.toLowerCase().includes("series")
+      ? "tv"
+      : "categories";
 
   // 1. Settings Hook
   const {
@@ -581,6 +645,7 @@ export default function App() {
 
   // Back to multi-row home
   const handleBackToHome = () => {
+    setActiveCustomPage(null);
     setViewAllCategory(null);
     setIsBrowsingCategories(false);
     setSelectedCategoryId(null);
@@ -804,8 +869,18 @@ export default function App() {
     }
   };
 
-  // Handle Navbar Category Links (Home, Movies, TV Shows, Categories)
-  const handleSelectCategoryNav = (type: "home" | "movies" | "tv" | "categories") => {
+  // Handle Navbar and Footer Links (Home, Movies, TV Shows, Categories, Downloads, Legal)
+  const handleSelectCategoryNav = (
+    type: "home" | "movies" | "tv" | "categories" | "downloads" | "terms" | "privacy" | "disclaimer"
+  ) => {
+    if (type === "downloads" || type === "terms" || type === "privacy" || type === "disclaimer") {
+      setActiveCustomPage(type);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setActiveCustomPage(null);
+
     if (type === "home") {
       handleBackToHome();
       return;
@@ -908,11 +983,19 @@ export default function App() {
         onGoHome={handleBackToHome}
         onSelectCategoryNav={handleSelectCategoryNav}
         activeNavTab={activeNavTab}
-        hasHero={!searchQuery && !isBrowsingCategories && !viewAllCategory && !!heroPost}
+        hasHero={!activeCustomPage && !searchQuery && !isBrowsingCategories && !viewAllCategory && !!heroPost}
       />
 
       {/* 2. MAIN CONTENT AREA */}
-      {searchQuery ? (
+      {activeCustomPage === "downloads" ? (
+        <DownloadPage onBack={handleBackToHome} />
+      ) : activeCustomPage === "terms" ? (
+        <TermsPage onBack={handleBackToHome} />
+      ) : activeCustomPage === "privacy" ? (
+        <PrivacyPage onBack={handleBackToHome} />
+      ) : activeCustomPage === "disclaimer" ? (
+        <DisclaimerPage onBack={handleBackToHome} />
+      ) : searchQuery ? (
         /* A. SEARCH RESULTS VIEW (with Niche Dropdown, Pagination & Back Button) */
         <div className="cinema-subpage-container" style={{ width: "100%", paddingTop: "64px" }}>
           <div

@@ -458,9 +458,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           }}
         >
           {extractedYear && <span>{extractedYear}</span>}
-          {seasonTag && (
-            <span style={{ color: "#38bdf8", fontWeight: 700 }}>{seasonTag}</span>
-          )}
           {rating && (
             <span
               style={{
