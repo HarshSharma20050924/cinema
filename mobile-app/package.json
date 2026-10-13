@@ -1,0 +1,18 @@
+{
+  "name": "cinema-mobile-app",
+  "version": "4.0.8",
+  "description": "Cinema Web Android Mobile Application",
+  "author": "Harsh Sharma",
+  "scripts": {
+    "build:web": "cd .. && npm run build",
+    "sync": "cap sync android",
+    "build:apk": "cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2"
+  }
+}

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#121318"/>
+      <stop offset="100%" stop-color="#08080a"/>
+    </linearGradient>
+    <linearGradient id="neonRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff2a44"/>
+      <stop offset="100%" stop-color="#e50914"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep Dark Canvas -->
+  <rect width="512" height="512" rx="116" fill="url(#bg3)"/>
+  <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="#232530" stroke-width="2.5"/>
+
+  <!-- Minimalist Cinema Clapper / Play Frame -->
+  <!-- A clean minimal square frame with rounded corners and a play cutout or sleek play symbol inside -->
+  <rect x="136" y="136" width="240" height="240" rx="44" fill="none" stroke="rgba(255, 255, 255, 0.15)" stroke-width="12"/>
+  
+  <!-- Glowing Play Arrow inside -->
+  <path d="M 232 196 
+           C 222 190, 210 198, 210 210 
+           L 210 302 
+           C 210 314, 222 322, 232 316 
+           L 306 270 
+           C 316 264, 316 248, 306 242 
+           Z" 
+        fill="url(#neonRed)"/>
+</svg>

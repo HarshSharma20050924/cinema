@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="gradRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff3b53"/>
+      <stop offset="100%" stop-color="#e50914"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Pure Matte Black Canvas -->
+  <rect width="512" height="512" rx="120" fill="#090a0f"/>
+
+  <!-- Minimalist Double Forward Runner (Fast-forward / Node Runner) -->
+  <g transform="translate(142, 140)">
+    <!-- First Chevron / Arrow -->
+    <path d="M 28 32 L 108 116 L 28 200" 
+          fill="none" 
+          stroke="rgba(255, 255, 255, 0.2)" 
+          stroke-width="28" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+
+    <!-- Second Primary Crimson Chevron -->
+    <path d="M 124 32 L 204 116 L 124 200" 
+          fill="none" 
+          stroke="url(#gradRed)" 
+          stroke-width="28" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+  </g>
+</svg>

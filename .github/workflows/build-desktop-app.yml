@@ -56,15 +56,26 @@ jobs:
             desktop-app/release/*.dmg
             desktop-app/release/*.zip
 
+      - name: Resolve Dynamic Release Tag
+        id: vars
+        shell: bash
+        run: |
+          TAG="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}"
+          if [ -z "$TAG" ]; then
+            TAG="v$(node -p "require('./package.json').version")"
+          fi
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v4.1.0' }}
+          tag_name: ${{ steps.vars.outputs.tag_name }}
           files: |
             desktop-app/release/*.exe
             desktop-app/release/*.AppImage
             desktop-app/release/*.deb
             desktop-app/release/*.dmg
             desktop-app/release/*.zip
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,6 @@
+{
+  "version": "2.2.0",
+  "versionCode": 220,
+  "downloadUrl": "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk",
+  "releaseNotes": "Auto background reconnect, infinite skeleton fix, duplicate titles fix, and background in-app updater."
+}

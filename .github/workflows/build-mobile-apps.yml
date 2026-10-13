@@ -56,6 +56,8 @@ jobs:
       # 2. Build Cinema Node Runner Android App
       - name: Build Cinema Node Runner Android App
         run: |
+          mkdir -p android/app/src/main/assets/public
+          cp -r runner-app/public/* android/app/src/main/assets/public/
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
@@ -63,19 +65,32 @@ jobs:
 
       # 3. Build Cinema Alternative Native Mobile App
       - name: Build Cinema Alternative Native App
-        working-directory: vega-app
         run: |
-          npm ci || npm install
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
-          UNIVERSAL_APK=$(find app/build/outputs/apk/release -name "*universal*.apk" | head -n 1)
-          if [ -n "$UNIVERSAL_APK" ]; then
-            cp "$UNIVERSAL_APK" ../../Cinema.apk
+          if [ -d "vega-app" ] && [ -f "vega-app/package.json" ]; then
+            cd vega-app
+            npm ci || npm install
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleRelease
+            UNIVERSAL_APK=$(find app/build/outputs/apk/release -name "*universal*.apk" | head -n 1)
+            if [ -n "$UNIVERSAL_APK" ]; then
+              cp "$UNIVERSAL_APK" ../../Cinema.apk
+            else
+              ANY_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+              [ -n "$ANY_APK" ] && cp "$ANY_APK" ../../Cinema.apk || true
+            fi
           else
-            ANY_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
-            cp "$ANY_APK" ../../Cinema.apk
+            echo "Alternative app source not present, skipping."
           fi
+
+      - name: Resolve Dynamic Release Tag
+        id: vars
+        run: |
+          TAG="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}"
+          if [ -z "$TAG" ]; then
+            TAG="v$(node -p "require('./package.json').version")"
+          fi
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
 
       - name: Upload Artifacts (Actions tab)
         uses: actions/upload-artifact@v4
@@ -84,15 +99,17 @@ jobs:
           path: |
             Cinema-Web.apk
             Cinema-Runner.apk
-            Cinema.apk
+            Cinema*.apk
+          if-no-files-found: warn
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v4.0.9' }}
+          tag_name: ${{ steps.vars.outputs.tag_name }}
           files: |
             Cinema-Web.apk
             Cinema-Runner.apk
-            Cinema.apk
+            Cinema*.apk
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

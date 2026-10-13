@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgC" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111319"/>
+      <stop offset="100%" stop-color="#050608"/>
+    </linearGradient>
+    <linearGradient id="cRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff334b"/>
+      <stop offset="100%" stop-color="#d60017"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep Dark Canvas -->
+  <rect width="512" height="512" rx="116" fill="url(#bgC)"/>
+  <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="#222530" stroke-width="2.5"/>
+
+  <!-- Minimalist 'C' Outer Ring with Open Right Edge -->
+  <path d="M 324 164 
+           A 136 136 0 1 0 324 348" 
+        fill="none" 
+        stroke="url(#cRed)" 
+        stroke-width="36" 
+        stroke-linecap="round"/>
+
+  <!-- Centered Sharp Minimal Play Triangle -->
+  <path d="M 230 206 
+           C 222 201, 212 207, 212 216 
+           L 212 296 
+           C 212 305, 222 311, 230 306 
+           L 298 266 
+           C 306 261, 306 251, 298 246 
+           Z" 
+        fill="#ffffff"/>
+</svg>

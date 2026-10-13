@@ -1,0 +1,6 @@
+{
+  "deviceId": "cinema_main_runner",
+  "deviceName": "Cinema High-Performance Engine",
+  "coordinatorUrl": "https://cinema-admin.pages.dev",
+  "autoStart": true
+}

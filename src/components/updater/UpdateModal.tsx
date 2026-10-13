@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import packageJson from "../../../package.json";
 
 declare global {
   interface Window {
@@ -27,6 +28,20 @@ export const UpdateModal: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("");
   const [isReadyToApply, setIsReadyToApply] = useState(false);
+
+  const currentAppVersion = (window.CinemaDesktop?.version || packageJson?.version || "").replace(/^v/i, "").trim();
+
+  const isNewerVersion = (remote: string, current: string): boolean => {
+    const r = remote.replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+    const c = current.replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(r.length, c.length); i++) {
+      const rPart = r[i] || 0;
+      const cPart = c[i] || 0;
+      if (rPart > cPart) return true;
+      if (rPart < cPart) return false;
+    }
+    return false;
+  };
 
   // Check for updates on startup
   useEffect(() => {
@@ -72,6 +87,45 @@ export const UpdateModal: React.FC = () => {
           setProgress(100);
           setStatusText("Download complete! Ready to restart and apply.");
         });
+      } else {
+        // 2. Mobile (Capacitor) and Web Environments
+        try {
+          const endpoints = [
+            "https://api.github.com/repos/HarshSharma20050924/cinema/releases/latest",
+            "https://raw.githubusercontent.com/HarshSharma20050924/cinema/main/package.json"
+          ];
+          for (const ep of endpoints) {
+            try {
+              const res = await fetch(ep, { cache: "no-store" });
+              if (!res.ok) continue;
+              const data = await res.json();
+              const tag = data.tag_name || data.version || "";
+              const remoteVer = tag.replace(/^v/i, "").trim();
+              if (remoteVer && isNewerVersion(remoteVer, currentAppVersion)) {
+                let downloadUrl = "https://github.com/HarshSharma20050924/cinema/releases/latest";
+                if (data.assets && Array.isArray(data.assets)) {
+                  const webApk = data.assets.find((a: any) => a.name?.toLowerCase() === "cinema-web.apk");
+                  const runnerApk = data.assets.find((a: any) => a.name?.toLowerCase() === "cinema-runner.apk");
+                  const anyApk = data.assets.find((a: any) => a.name?.toLowerCase().endsWith(".apk"));
+                  if (webApk) {
+                    downloadUrl = webApk.browser_download_url;
+                  } else if (runnerApk) {
+                    downloadUrl = runnerApk.browser_download_url;
+                  } else if (anyApk) {
+                    downloadUrl = anyApk.browser_download_url;
+                  }
+                }
+                setUpdateInfo({
+                  version: remoteVer,
+                  notes: data.body || "A new update for Cinema is available.",
+                  downloadUrl,
+                });
+                setIsOpen(true);
+                break;
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
       }
     };
 
@@ -105,6 +159,10 @@ export const UpdateModal: React.FC = () => {
         setIsDownloading(false);
         setStatusText("Download failed. Please try again.");
       }
+    } else {
+      // Mobile / Web: Open download link directly
+      window.open(updateInfo.downloadUrl, "_blank");
+      setIsOpen(false);
     }
   };
 

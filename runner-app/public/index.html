@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Cinema Node Runner</title>
+  
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0d14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cinema Node">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #090c13;
+      --card-bg: rgba(18, 23, 34, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --red: #dc2626;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --text: #f8fafc;
+      --text-muted: #8492a6;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 20px env(safe-area-inset-bottom, 24px);
+      overflow-x: hidden;
+    }
+    .icon {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      stroke-width: 2;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vertical-align: middle;
+    }
+    .header {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      z-index: 10;
+    }
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #141926;
+      border: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      color: #ffffff;
+    }
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-icon {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-icon:active {
+      transform: scale(0.95);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+
+    /* Main Center Container */
+    .center-card {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      z-index: 5;
+      margin: 16px 0;
+    }
+
+    /* Status Pill */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+    .status-dot.green { background: #10b981; }
+    .status-dot.yellow { background: #f59e0b; }
+    .status-dot.red { background: #ef4444; }
+
+    /* Precision Circular Button & Concentric Loader Ring */
+    .power-btn-container {
+      position: relative;
+      width: 196px;
+      height: 196px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 26px;
+    }
+    .loader-ring-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .ring-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.05);
+      stroke-width: 2.5;
+    }
+    .ring-progress {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-dasharray: 540;
+      stroke-dashoffset: 540;
+      transform-origin: 98px 98px;
+      transition: stroke-dashoffset 0.4s ease, stroke 0.3s ease;
+    }
+    /* Fluid smooth spinner when starting/connecting */
+    .power-btn-container.connecting .ring-progress {
+      stroke: #38bdf8;
+      stroke-width: 2.5;
+      animation: smoothRingSpin 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    /* Solid crisp ring when active */
+    .power-btn-container.running .ring-progress {
+      stroke: #10b981;
+      stroke-dasharray: 540;
+      stroke-dashoffset: 0;
+      transform: rotate(-90deg);
+      animation: none;
+    }
+    @keyframes smoothRingSpin {
+      0% {
+        stroke-dasharray: 20 520;
+        stroke-dashoffset: 0;
+        transform: rotate(-90deg);
+      }
+      50% {
+        stroke-dasharray: 240 300;
+        stroke-dashoffset: -90;
+        transform: rotate(90deg);
+      }
+      100% {
+        stroke-dasharray: 20 520;
+        stroke-dashoffset: -540;
+        transform: rotate(270deg);
+      }
+    }
+
+    .power-btn {
+      position: relative;
+      z-index: 10;
+      touch-action: manipulation;
+      width: 162px;
+      height: 162px;
+      border-radius: 50%;
+      background: #0d111a;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: #94a3b8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+    }
+    .power-btn:active {
+      transform: scale(0.96);
+    }
+    .power-btn.primary {
+      background: #0b1714;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: #ffffff;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+    }
+    .power-btn.primary .icon {
+      color: #10b981;
+    }
+    .power-btn.standby {
+      background: #17130b;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      color: #ffffff;
+    }
+    .power-btn.standby .icon {
+      color: #f59e0b;
+    }
+    .power-btn.disabled {
+      background: #170b0b;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+      cursor: not-allowed;
+    }
+    .power-btn.reconnecting {
+      background: #1e1305;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
+    .power-btn.reconnecting .icon {
+      color: #fbbf24;
+    }
+    .power-btn.offline {
+      background: #1e0909;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+    .power-btn.offline .icon {
+      color: #ef4444;
+    }
+    .power-text {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+    }
+
+    /* Automated Setup Progress Card */
+    .progress-card {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin-bottom: 10px;
+    }
+    .progress-track {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #3b82f6;
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+    .progress-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .step-indicator {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #475569;
+    }
+    .step-item.active {
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .step-item.active .step-indicator {
+      background: #38bdf8;
+    }
+    .step-item.done {
+      color: #10b981;
+      font-weight: 600;
+    }
+    .step-item.done .step-indicator {
+      background: #10b981;
+    }
+
+    /* High Precision Node Card (Clean & Modern Dashboard Look) */
+    .node-card {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .node-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 12px;
+    }
+    .node-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .node-type-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+    .node-badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-muted);
+    }
+    .node-badge.green {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+    }
+    .node-badge.amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+    }
+    .node-badge.red {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+    }
+    .node-stat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .node-stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .node-stat-row.stacked {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 5px;
+      padding: 6px 0 2px;
+    }
+    .node-stat-row.stacked .stat-value {
+      max-width: 100%;
+      width: 100%;
+      word-break: break-all;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .stat-label {
+      color: var(--text-muted);
+    }
+    .stat-value {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+    .stat-value.highlight {
+      color: #38bdf8;
+    }
+    .stat-value.mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #38bdf8;
+    }
+
+    /* Action Buttons */
+    .action-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .btn-action {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 11px 14px;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-action:active {
+      transform: scale(0.96);
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .btn-action.highlight {
+      background: #dc2626;
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .btn-action.reconnect {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, #e50914, #ff334b);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: white;
+      box-shadow: 0 4px 14px rgba(229, 9, 20, 0.35);
+    }
+
+    /* Keep Screen Awake */
+    .keepalive-bar {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+    }
+    .keepalive-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: rgba(255, 255, 255, 0.15);
+      transition: .25s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .25s;
+      border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #10b981; }
+    input:checked + .slider:before { transform: translateX(18px); }
+
+    .footer {
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      position: relative;
+      z-index: 5;
+    }
+    .device-info-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, 0.35);
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-content {
+      width: 100%;
+      max-width: 380px;
+      background: #111624;
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+    }
+    .form-group {
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: #ffffff;
+      font-size: 12px;
+      outline: none;
+    }
+    .btn-save {
+      width: 100%;
+      padding: 11px;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-badge">
+      <div class="logo-icon">
+        <svg class="icon" style="color: #38bdf8;" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      </div>
+      <div>
+        <div class="logo-title">Cinema Node</div>
+        <div class="logo-sub">Automated Mobile Host</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon" onclick="openGuide()" title="Setup Guide">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+      </button>
+      <button class="btn-icon" onclick="openSettings()" title="Settings">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Center Action -->
+  <div class="center-card">
+    <!-- In-App Auto Update Banner -->
+    <div id="updateBanner" style="display: none; width: 100%; max-width: 400px; margin-bottom: 20px; padding: 14px 16px; border-radius: 14px; background: linear-gradient(135deg, rgba(30, 58, 138, 0.4), rgba(16, 185, 129, 0.15)); border: 1px solid rgba(59, 130, 246, 0.4); backdrop-filter: blur(12px); text-align: left; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(59, 130, 246, 0.25); border: 1px solid rgba(59, 130, 246, 0.4); display: flex; align-items: center; justify-content: center; color: #60a5fa; flex-shrink: 0;">
+            <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          </div>
+          <div style="min-width: 0;">
+            <div style="font-size: 13px; font-weight: 800; color: #ffffff; letter-spacing: -0.2px;">Update Available</div>
+            <div style="font-size: 11px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="updateVersionText">New version ready</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <button id="updateLaterBtn" onclick="dismissUpdateBanner()" style="padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #cbd5e1; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+            Later
+          </button>
+          <button id="updateBtn" onclick="handleDownloadUpdate()" style="padding: 8px 14px; border-radius: 10px; background: linear-gradient(135deg, #2563eb, #3b82f6); border: none; color: #ffffff; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45); transition: all 0.2s;">
+            Update
+          </button>
+        </div>
+      </div>
+      <div id="updateProgressContainer" style="display: none; margin-top: 12px;">
+        <div style="width: 100%; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden;">
+          <div id="updateProgressBar" style="width: 0%; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #3b82f6, #10b981); transition: width 0.15s ease;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: #94a3b8;">
+          <span id="updateProgressStatus">Downloading update in background...</span>
+          <span id="updateProgressPercent" style="font-weight: 700; color: #60a5fa;">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-pill" id="statusPill">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">READY</span>
+    </div>
+
+    <div class="power-btn-container" id="powerBtnContainer">
+      <!-- Clean High-Precision Concentric SVG Loader Ring -->
+      <svg class="loader-ring-svg" viewBox="0 0 196 196">
+        <circle class="ring-bg" cx="98" cy="98" r="86" />
+        <circle class="ring-progress" id="ringProgress" cx="98" cy="98" r="86" />
+      </svg>
+
+      <button class="power-btn" id="powerBtn" onclick="handlePowerClick()">
+        <svg class="icon" style="width: 32px; height: 32px;" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+        <span class="power-text" id="powerBtnText">START</span>
+      </button>
+    </div>
+
+    <!-- Clean, Precision Node Dashboard Card -->
+    <div class="node-card" id="nodeCard">
+      <div class="node-card-header">
+        <div class="node-card-title">
+          <span class="node-type-dot" id="nodeTypeDot"></span>
+          <span id="nodeCardHeading">Distributed Node</span>
+        </div>
+        <span class="node-badge" id="nodeBadge">STANDBY</span>
+      </div>
+      <div class="node-stat-list">
+        <div class="node-stat-row">
+          <span class="stat-label">Cluster Target</span>
+          <span class="stat-value highlight">cinema-dwh.pages.dev</span>
+        </div>
+        <div class="node-stat-row stacked" id="tunnelRow" style="display: none;">
+          <span class="stat-label">Live Tunnel Endpoint</span>
+          <span class="stat-value mono" id="tunnelUrlDisplay">None</span>
+        </div>
+        <div class="node-stat-row">
+          <span class="stat-label">Cloudflare Edge Ping</span>
+          <span class="stat-value" id="cardPingTxt">Checking…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-grid" id="actionGrid" style="display: none;">
+      <button class="btn-action reconnect" id="reconnectBtn" onclick="handleReconnect()">
+        <svg class="icon" style="width: 15px; height: 15px;" viewBox="0 0 24 24"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        <span>Reconnect Tunnel</span>
+      </button>
+      <a href="https://cinema-dwh.pages.dev/" target="_blank" class="btn-action highlight">
+        <span>Visit Site</span>
+      </a>
+      <button class="btn-action" onclick="copyTunnel()">
+        <span>Copy Tunnel</span>
+      </button>
+    </div>
+
+    <!-- WakeLock Toggle -->
+    <div class="keepalive-bar">
+      <div class="keepalive-label">Keep Screen Active</div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="wakeLockCheck" onchange="toggleWakeLock(this.checked)" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="device-info-pill">
+      <span id="devNameTxt">Node</span> • <span id="pingTxt">Checking</span>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-content">
+      <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">Node Configuration</h3>
+      <div class="form-group">
+        <label>Device Identifier Name</label>
+        <input type="text" id="cfgDevName" class="form-control" />
+      </div>
+      <button class="btn-save" onclick="saveSettings()">Save Configuration</button>
+    </div>
+  </div>
+
+  <!-- Guide Modal -->
+  <div class="modal" id="guideModal">
+    <div class="modal-content" style="max-width: 380px; text-align: left;">
+      <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 10px;">Quick Start Guide</h3>
+      <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 12px;">
+        Cinema Node runs scrapers on your mobile device to bypass Cloudflare edge datacenter IP blocks.
+      </p>
+      <ul style="font-size: 12px; color: #cbd5e1; line-height: 1.6; margin-left: 18px; margin-bottom: 16px;">
+        <li>Runs locked in background like a VPN.</li>
+        <li>Swiping from recents keeps the engine active.</li>
+        <li>Automatic failover routes traffic seamlessly.</li>
+      </ul>
+      <button class="btn-save" onclick="closeGuide()">Dismiss</button>
+    </div>
+  </div>
+
+  <script>
+    const COORDINATOR_BASE = 'https://cinema-admin.pages.dev';
+    const PRODUCTION_SITE = 'https://cinema-dwh.pages.dev';
+
+    function getDeviceId() {
+      let id = localStorage.getItem('cinema_dev_id');
+      if (!id) {
+        id = 'dev_mob_' + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem('cinema_dev_id', id);
+      }
+      return id;
+    }
+
+    function getDeviceName() {
+      let name = localStorage.getItem('cinema_dev_name');
+      if (!name) {
+        const ua = navigator.userAgent;
+        if (/Android/i.test(ua)) {
+          const match = ua.match(/Android[^;]+;\s*([^;)]+)/);
+          name = match ? `${match[1].trim()}` : 'Android Device';
+        } else {
+          name = 'Cinema Mobile Node';
+        }
+        localStorage.setItem('cinema_dev_name', name);
+      }
+      return name;
+    }
+
+    let deviceId = getDeviceId();
+    let deviceName = getDeviceName();
+    let currentState = 'idle'; // 'idle' | 'starting' | 'running' | 'disabled'
+    let currentRole = 'idle'; // 'primary' | 'standby' | 'idle'
+    let wakeLockSentinel = null;
+    let heartbeatInterval = null;
+    let isActionInProgress = false;
+
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try { wakeLockSentinel = await navigator.wakeLock.request('screen'); } catch (err) {}
+      }
+    }
+    function releaseWakeLock() {
+      if (wakeLockSentinel) {
+        wakeLockSentinel.release().catch(() => {});
+        wakeLockSentinel = null;
+      }
+    }
+    function toggleWakeLock(enabled) {
+      if (enabled) requestWakeLock();
+      else releaseWakeLock();
+    }
+
+    // ── Native Cinema Plugin (Android) ───────────────────────────────────
+    const hasCinemaPlugin = () =>
+      typeof window.Capacitor !== 'undefined' &&
+      window.Capacitor.Plugins &&
+      window.Capacitor.Plugins.Cinema;
+
+    async function nativeStart() {
+      if (!hasCinemaPlugin()) return false;
+      try {
+        await window.Capacitor.Plugins.Cinema.start();
+        return true;
+      } catch (e) { return false; }
+    }
+
+    async function nativeStop() {
+      if (!hasCinemaPlugin()) return;
+      try { await window.Capacitor.Plugins.Cinema.stop(); } catch (e) {}
+    }
+
+    async function nativeReconnect() {
+      if (!hasCinemaPlugin()) return false;
+      try {
+        if (window.Capacitor.Plugins.Cinema.reconnect) {
+          await window.Capacitor.Plugins.Cinema.reconnect();
+          return true;
+        }
+      } catch (e) {}
+      await nativeStop();
+      await new Promise(r => setTimeout(r, 600));
+      return await nativeStart();
+    }
+
+    async function nativeGetStatus() {
+      if (!hasCinemaPlugin()) return null;
+      try { return await window.Capacitor.Plugins.Cinema.getStatus(); }
+      catch (e) { return null; }
+    }
+
+    let liveTunnelUrl = '';
+    let consecutivePingFails = 0;
+
+    async function syncRealStatus() {
+      const s = await nativeGetStatus();
+      if (!s) return;
+
+      if (s.running && s.tunnelUrl) {
+        if (currentState !== 'running' || liveTunnelUrl !== s.tunnelUrl) {
+          currentState = 'running';
+          currentRole = 'primary';
+          liveTunnelUrl = s.tunnelUrl;
+          const urlEl = document.getElementById('tunnelUrlDisplay');
+          const tunnelRow = document.getElementById('tunnelRow');
+          if (urlEl) urlEl.innerText = s.tunnelUrl;
+          if (tunnelRow) tunnelRow.style.display = 'flex';
+          renderUI();
+        }
+      } else if (s.running && !s.tunnelUrl) {
+        if (currentState !== 'starting' && currentState !== 'reconnecting') {
+          currentState = 'reconnecting';
+          renderUI();
+        }
+        if (s.status) {
+          const heading = document.getElementById('nodeCardHeading');
+          if (heading) heading.innerText = s.status;
+        }
+      } else {
+        // NOT running: stopped via notification shade button, killed, or idle
+        if (currentState !== 'idle' && currentState !== 'disabled') {
+          currentState = 'idle';
+          currentRole = 'idle';
+          liveTunnelUrl = '';
+          const tunnelRow = document.getElementById('tunnelRow');
+          if (tunnelRow) tunnelRow.style.display = 'none';
+          renderUI();
+        }
+      }
+    }
+
+    // Direct Heartbeat to Admin Panel
+    async function sendHeartbeat(status = 'running', tunnelUrl = '') {
+      try {
+        const resp = await fetch(`${COORDINATOR_BASE}/api/runner/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId, deviceName, status, tunnelUrl }),
+        });
+        return await resp.json();
+      } catch (err) {
+        return null;
+      }
+    }
+
+    async function checkPermission() {
+      try {
+        const res = await fetch(`${COORDINATOR_BASE}/api/runner/check?deviceId=${encodeURIComponent(deviceId)}&deviceName=${encodeURIComponent(deviceName)}`);
+        return await res.json();
+      } catch (err) {
+        return null;
+      }
+    }
+
+    async function measurePing() {
+      const startTime = Date.now();
+      let ok = false;
+      let ping = 0;
+
+      // Real health test: check live tunnel or local node rather than edge static pages
+      if (currentState === 'running' && liveTunnelUrl) {
+        try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), 4000);
+          const res = await fetch(`${liveTunnelUrl}/api/providers`, {
+            method: 'GET',
+            cache: 'no-store',
+            signal: ctrl.signal
+          });
+          clearTimeout(tid);
+          if (res.ok) {
+            ok = true;
+            ping = Date.now() - startTime;
+          }
+        } catch (e) {
+          ok = false;
+        }
+      } else {
+        // Standby check to coordinator
+        try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), 4000);
+          await fetch(`${COORDINATOR_BASE}/api/runner/check?deviceId=${encodeURIComponent(deviceId)}`, {
+            method: 'GET',
+            cache: 'no-store',
+            signal: ctrl.signal
+          });
+          clearTimeout(tid);
+          ping = Date.now() - startTime;
+          ok = true;
+        } catch (e) {
+          ok = false;
+        }
+      }
+
+      if (ok) {
+        consecutivePingFails = 0;
+        document.getElementById('pingTxt').innerText = `${ping}ms`;
+        document.getElementById('cardPingTxt').innerText = `${ping}ms`;
+        if (currentState === 'offline') {
+          currentState = 'running';
+          renderUI();
+        }
+      } else {
+        consecutivePingFails++;
+        document.getElementById('pingTxt').innerText = 'Offline';
+        document.getElementById('cardPingTxt').innerText = 'Unreachable';
+
+        if (currentState === 'running' && consecutivePingFails >= 2) {
+          console.warn('Mobile tunnel unresponsive for 2 checks. Marking OFFLINE and reconnecting...');
+          currentState = 'offline';
+          renderUI();
+          handleReconnect();
+        }
+      }
+    }
+
+    function renderUI() {
+      document.getElementById('devNameTxt').innerText = deviceName;
+
+      const container = document.getElementById('powerBtnContainer');
+      const btn = document.getElementById('powerBtn');
+      const btnText = document.getElementById('powerBtnText');
+      const dot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      const nodeHeading = document.getElementById('nodeCardHeading');
+      const nodeBadge = document.getElementById('nodeBadge');
+      const nodeTypeDot = document.getElementById('nodeTypeDot');
+      const actionGrid = document.getElementById('actionGrid');
+
+      container.className = 'power-btn-container';
+      actionGrid.style.display = 'none';
+
+      if (currentState === 'running') {
+        container.classList.add('running');
+        actionGrid.style.display = 'grid';
+        btnText.innerText = 'STOP';
+
+        btn.className = 'power-btn primary';
+        dot.className = 'status-dot green';
+        statusText.innerText = 'ONLINE';
+        nodeTypeDot.style.background = '#10b981';
+        nodeHeading.innerText = 'Distributed Node Active';
+        nodeBadge.className = 'node-badge green';
+        nodeBadge.innerText = 'ONLINE';
+      } else if (currentState === 'reconnecting' || currentState === 'offline') {
+        container.classList.add('connecting');
+        actionGrid.style.display = 'grid';
+        btn.className = currentState === 'offline' ? 'power-btn offline' : 'power-btn reconnecting';
+        btnText.innerText = 'RECONNECT';
+        dot.className = currentState === 'offline' ? 'status-dot red' : 'status-dot yellow';
+        statusText.innerText = currentState === 'offline' ? 'OFFLINE' : 'RECONNECTING';
+        nodeTypeDot.style.background = currentState === 'offline' ? '#ef4444' : '#f59e0b';
+        nodeHeading.innerText = currentState === 'offline' ? 'Tunnel Inactive • Offline' : 'Reconnecting Tunnel…';
+        nodeBadge.className = currentState === 'offline' ? 'node-badge red' : 'node-badge yellow';
+        nodeBadge.innerText = currentState === 'offline' ? 'OFFLINE' : 'RECONNECTING';
+      } else if (currentState === 'disabled') {
+        btn.className = 'power-btn disabled';
+        btnText.innerText = 'SUSPENDED';
+        dot.className = 'status-dot red';
+        statusText.innerText = 'SUSPENDED';
+        nodeTypeDot.style.background = '#ef4444';
+        nodeHeading.innerText = 'Node Suspended';
+        nodeBadge.className = 'node-badge red';
+        nodeBadge.innerText = 'REVOKED';
+      } else if (currentState === 'starting') {
+        container.classList.add('connecting');
+        btn.className = 'power-btn';
+        btnText.innerText = 'STARTING';
+        dot.className = 'status-dot yellow';
+        statusText.innerText = 'CONNECTING';
+        nodeTypeDot.style.background = '#3b82f6';
+        nodeBadge.className = 'node-badge';
+        nodeBadge.innerText = 'CONNECTING';
+      } else {
+        btn.className = 'power-btn';
+        btnText.innerText = 'START';
+        dot.className = 'status-dot';
+        statusText.innerText = 'READY';
+        nodeTypeDot.style.background = '#64748b';
+        nodeHeading.innerText = 'Distributed Node';
+        nodeBadge.className = 'node-badge';
+        nodeBadge.innerText = 'STANDBY';
+        document.getElementById('tunnelRow').style.display = 'none';
+      }
+    }
+
+    async function handleReconnect() {
+      if (isActionInProgress) return;
+      isActionInProgress = true;
+      currentState = 'reconnecting';
+      renderUI();
+      try { if (navigator.vibrate) navigator.vibrate(40); } catch (e) {}
+
+      const success = await nativeReconnect();
+      if (!success) {
+        // Fallback for browser testing
+        await new Promise(r => setTimeout(r, 800));
+        currentState = 'running';
+        renderUI();
+      }
+      isActionInProgress = false;
+    }
+
+    async function handlePowerClick() {
+      if (isActionInProgress) return;
+      isActionInProgress = true;
+
+      try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
+
+      if (currentState === 'disabled') {
+        alert('Device suspended in Admin Console.');
+        isActionInProgress = false;
+        return;
+      }
+
+      if (currentState === 'offline' || currentState === 'reconnecting') {
+        await handleReconnect();
+        isActionInProgress = false;
+        return;
+      }
+
+      if (currentState === 'running' || currentState === 'starting') {
+        // STOP
+        currentState = 'idle';
+        currentRole = 'idle';
+        liveTunnelUrl = '';
+        renderUI();
+        await nativeStop();
+        await sendHeartbeat('stopped');
+        releaseWakeLock();
+        isActionInProgress = false;
+      } else {
+        // Pre-check authorization before starting
+        const perm = await checkPermission();
+        if (perm && perm.allowed === false) {
+          currentState = 'disabled';
+          currentRole = 'disabled';
+          renderUI();
+          alert(`⛔ Access Revoked: ${perm.message || 'Server access has been revoked by Administrator.'}`);
+          isActionInProgress = false;
+          return;
+        }
+
+        // START
+        currentState = 'starting';
+        renderUI();
+        if (document.getElementById('wakeLockCheck').checked) requestWakeLock();
+
+        const isNative = await nativeStart();
+        if (!isNative) {
+          // Fallback if testing in web browser
+          const hbData = await sendHeartbeat('running');
+          currentState = 'running';
+          currentRole = (hbData && hbData.role) ? hbData.role : 'node';
+          renderUI();
+        }
+        isActionInProgress = false;
+      }
+    }
+
+    function copyTunnel() {
+      const url = document.getElementById('tunnelUrlDisplay').innerText || PRODUCTION_SITE;
+      navigator.clipboard.writeText(url);
+      try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) {}
+      alert(`Copied endpoint: ${url}`);
+    }
+
+    function openSettings() {
+      document.getElementById('cfgDevName').value = deviceName;
+      document.getElementById('settingsModal').style.display = 'flex';
+    }
+    function saveSettings() {
+      const newName = document.getElementById('cfgDevName').value.trim();
+      if (newName) {
+        deviceName = newName;
+        localStorage.setItem('cinema_dev_name', deviceName);
+      }
+      document.getElementById('settingsModal').style.display = 'none';
+      renderUI();
+    }
+    function openGuide() { document.getElementById('guideModal').style.display = 'flex'; }
+    function closeGuide() { document.getElementById('guideModal').style.display = 'none'; }
+
+    let currentRunnerAppVersion = "";
+    async function getLocalRunnerVersion() {
+      if (currentRunnerAppVersion) return currentRunnerAppVersion;
+      try {
+        const res = await fetch('./runner-version.json', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.version) {
+            currentRunnerAppVersion = String(data.version).replace(/^v/i, "").trim();
+            return currentRunnerAppVersion;
+          }
+        }
+      } catch (_) {}
+      return "";
+    }
+
+    let pendingUpdateUrl = "";
+    let isDownloadingUpdate = false;
+    function dismissUpdateBanner() {
+      sessionStorage.setItem('runner_dismissed_update', 'true');
+      const banner = document.getElementById('updateBanner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    async function checkForUpdates() {
+      try {
+        if (sessionStorage.getItem('runner_dismissed_update') === 'true') {
+          return;
+        }
+        const updateEndpoints = [
+          'https://cinema-dwh.pages.dev/runner-version.json',
+          './runner-version.json',
+          `${COORDINATOR_BASE}/runner-version.json`,
+          'https://api.github.com/repos/HarshSharma20050924/cinema/releases/latest'
+        ];
+
+        let updateData = null;
+        for (const ep of updateEndpoints) {
+          try {
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), 4000);
+            const res = await fetch(ep, { cache: 'no-store', signal: ctrl.signal });
+            clearTimeout(tid);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && (data.version || data.tag_name)) {
+                updateData = data;
+                break;
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (!updateData) return;
+
+        let remoteVer = (updateData.version || updateData.tag_name || "").replace(/^v/i, "").trim();
+        let downloadUrl = updateData.downloadUrl;
+
+        if (!downloadUrl && updateData.assets && updateData.assets.length > 0) {
+          const apkAsset = updateData.assets.find(a => a.name && a.name.toLowerCase().endsWith('.apk'));
+          if (apkAsset) downloadUrl = apkAsset.browser_download_url;
+        }
+
+        if (!downloadUrl) {
+          downloadUrl = 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk';
+        }
+
+        const localVer = await getLocalRunnerVersion();
+        if (remoteVer && localVer && isNewerVersion(remoteVer, localVer)) {
+          pendingUpdateUrl = downloadUrl;
+          document.getElementById('updateVersionText').innerText = `Version ${remoteVer} is ready`;
+          document.getElementById('updateBanner').style.display = 'block';
+        }
+      } catch (err) {
+        console.warn('Update check failed:', err);
+      }
+    }
+
+    function isNewerVersion(remote, local) {
+      const r = remote.split('.').map(n => parseInt(n, 10) || 0);
+      const l = local.split('.').map(n => parseInt(n, 10) || 0);
+      for (let i = 0; i < Math.max(r.length, l.length); i++) {
+        const rPart = r[i] || 0;
+        const lPart = l[i] || 0;
+        if (rPart > lPart) return true;
+        if (rPart < lPart) return false;
+      }
+      return false;
+    }
+
+    async function handleDownloadUpdate() {
+      if (isDownloadingUpdate) return;
+      if (downloadedApkBase64) {
+        triggerInstall();
+        return;
+      }
+
+      if (!pendingUpdateUrl) {
+        pendingUpdateUrl = 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk';
+      }
+
+      isDownloadingUpdate = true;
+      const btn = document.getElementById('updateBtn');
+      const progressContainer = document.getElementById('updateProgressContainer');
+      const progressBar = document.getElementById('updateProgressBar');
+      const progressPercent = document.getElementById('updateProgressPercent');
+      const progressStatus = document.getElementById('updateProgressStatus');
+
+      btn.disabled = true;
+      btn.innerText = 'Downloading...';
+      btn.style.opacity = '0.7';
+      progressContainer.style.display = 'block';
+      progressBar.style.width = '5%';
+      progressPercent.innerText = '5%';
+      progressStatus.innerText = 'Connecting to download server...';
+
+      // 1. Native background stream download via CinemaPlugin if available
+      if (window.Capacitor?.Plugins?.Cinema?.downloadAndInstall) {
+        try {
+          if (window.Capacitor.Plugins.Cinema.addListener) {
+            window.Capacitor.Plugins.Cinema.addListener('updateProgress', (data) => {
+              if (data && data.progress !== undefined) {
+                progressBar.style.width = `${data.progress}%`;
+                progressPercent.innerText = `${data.progress}%`;
+                if (data.bytes && data.total) {
+                  progressStatus.innerText = `Downloading (${(data.bytes / 1048576).toFixed(1)} / ${(data.total / 1048576).toFixed(1)} MB)...`;
+                }
+              }
+            });
+          }
+          await window.Capacitor.Plugins.Cinema.downloadAndInstall({ url: pendingUpdateUrl });
+          progressBar.style.width = '100%';
+          progressPercent.innerText = '100%';
+          progressStatus.innerText = 'Installer opened! Ready to install.';
+          btn.disabled = false;
+          btn.innerText = 'Install Now';
+          btn.style.opacity = '1';
+          btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+          isDownloadingUpdate = false;
+          return;
+        } catch (nativeErr) {
+          console.warn('Native downloadAndInstall failed, trying web fallback:', nativeErr);
+        }
+      }
+
+      // 2. Web fetch fallback
+      try {
+        const response = await fetch(pendingUpdateUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const contentLength = response.headers.get('content-length');
+        const total = contentLength ? parseInt(contentLength, 10) : 0;
+        let loaded = 0;
+
+        const reader = response.body ? response.body.getReader() : null;
+        const chunks = [];
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            loaded += value.length;
+            if (total > 0) {
+              const pct = Math.min(99, Math.round((loaded / total) * 100));
+              progressBar.style.width = `${pct}%`;
+              progressPercent.innerText = `${pct}%`;
+              progressStatus.innerText = `Downloading in background (${(loaded / 1048576).toFixed(1)} MB)...`;
+            }
+          }
+        } else {
+          const blob = await response.blob();
+          chunks.push(new Uint8Array(await blob.arrayBuffer()));
+        }
+
+        const blob = new Blob(chunks, { type: 'application/vnd.android.package-archive' });
+        progressBar.style.width = '100%';
+        progressPercent.innerText = '100%';
+        progressStatus.innerText = 'Download complete! Ready to install.';
+
+        const readerB64 = new FileReader();
+        readerB64.onloadend = async () => {
+          const base64Data = readerB64.result.split(',')[1];
+          downloadedApkBase64 = base64Data;
+          btn.disabled = false;
+          btn.innerText = 'Install Now';
+          btn.style.opacity = '1';
+          btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+          isDownloadingUpdate = false;
+          triggerInstall();
+        };
+        readerB64.readAsDataURL(blob);
+
+      } catch (err) {
+        console.error('Update download error:', err);
+        btn.disabled = false;
+        btn.innerText = 'Retry Download';
+        btn.style.opacity = '1';
+        progressStatus.innerText = 'Download failed. Tap to retry.';
+        isDownloadingUpdate = false;
+      }
+    }
+
+    async function triggerInstall() {
+      if (!downloadedApkBase64) return;
+      if (window.Capacitor?.Plugins?.Cinema?.installApk) {
+        try {
+          await window.Capacitor.Plugins.Cinema.installApk({ base64: downloadedApkBase64 });
+          return;
+        } catch (e) {
+          console.warn('Native installApk error:', e);
+        }
+      }
+
+      try {
+        const byteCharacters = atob(downloadedApkBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/vnd.android.package-archive' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Cinema-Runner-Update.apk';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (e) {
+        console.error('Blob fallback error:', e);
+      }
+    }
+
+    renderUI();
+    syncRealStatus();
+    setInterval(syncRealStatus, 500);
+    measurePing();
+    setInterval(measurePing, 5000);
+    requestWakeLock();
+    checkForUpdates();
+    setInterval(checkForUpdates, 10 * 60 * 1000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "appId": "com.cinema.streaming",
+  "appName": "Cinema",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

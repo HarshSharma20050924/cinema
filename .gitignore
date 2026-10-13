@@ -37,9 +37,15 @@ mac-builds/
 /cinema-runner*
 
 # Android build artifacts
+**/local.properties
+**/.cxx/
 android/.gradle/
 android/app/build/
 android/build/
+mobile-app/android/.gradle/
+mobile-app/android/app/build/
+mobile-app/android/build/
+mobile-app/dist/
 
 # Server logs
 server.log
