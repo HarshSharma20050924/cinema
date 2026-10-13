@@ -1,184 +1,160 @@
 import React from "react";
-import { ArrowLeftIcon } from "../../icons";
 
 interface TermsPageProps {
   onBack: () => void;
 }
 
-export const TermsPage: React.FC<TermsPageProps> = ({ onBack }) => {
+export const TermsPage: React.FC<TermsPageProps> = () => {
   return (
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "#090c13",
-        color: "#e2e8f0",
-        paddingBottom: "80px",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        backgroundColor: "#000000",
+        color: "#ffffff",
+        paddingTop: "90px",
+        paddingBottom: "100px",
+        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      {/* Top Header */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 24px",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-          background: "rgba(9, 12, 19, 0.9)",
-          backdropFilter: "blur(12px)",
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
-        }}
-      >
-        <button
-          onClick={onBack}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            background: "rgba(255, 255, 255, 0.06)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "#e2e8f0",
-            padding: "8px 14px",
-            borderRadius: "10px",
-            fontSize: "13px",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-          }}
-        >
-          <ArrowLeftIcon size={16} />
-          <span>Back to Cinema</span>
-        </button>
-
-        <span
-          style={{
-            fontSize: "11px",
-            fontWeight: 800,
-            color: "#e50914",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-          }}
-        >
-          Legal & Compliance
-        </span>
-      </div>
-
-      <div
-        style={{
-          maxWidth: "840px",
+          maxWidth: "880px",
           margin: "0 auto",
-          padding: "40px 24px 0 24px",
+          padding: "0 24px",
         }}
       >
-        <div style={{ marginBottom: "32px" }}>
+        <div style={{ marginBottom: "36px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 800,
+                color: "#e50914",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              Legal & Compliance
+            </span>
+            <span style={{ fontSize: "12px", color: "#737373" }}>• Updated October 2026</span>
+          </div>
+
           <h1
             style={{
-              fontSize: "clamp(26px, 4vw, 36px)",
+              fontSize: "clamp(30px, 4vw, 42px)",
               fontWeight: 900,
               letterSpacing: "-0.03em",
-              margin: "0 0 10px 0",
+              margin: "0 0 12px 0",
               color: "#ffffff",
             }}
           >
             Terms of Service
           </h1>
-          <p style={{ fontSize: "14px", color: "#94a3b8", margin: 0 }}>
-            Last revised: October 2026
+
+          <p style={{ fontSize: "15px", color: "#a3a3a3", margin: 0, lineHeight: 1.6 }}>
+            Architecture guidelines, community provider usage, and decentralized software terms for Cinema.
           </p>
         </div>
 
         <div
           style={{
-            background: "rgba(18, 23, 34, 0.6)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            borderRadius: "18px",
-            padding: "32px",
             display: "flex",
             flexDirection: "column",
-            gap: "28px",
-            lineHeight: 1.7,
-            fontSize: "14px",
-            color: "#cbd5e1",
+            gap: "20px",
           }}
         >
-          <section>
-            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
-              1. Nature of the Application
+          {/* Card 1: Decentralized Architecture */}
+          <div
+            style={{
+              background: "#0d0d10",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "16px",
+              padding: "24px 28px",
+            }}
+          >
+            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", margin: "0 0 10px 0" }}>
+              1. Architecture & Non-Hosting Notice
             </h2>
-            <p style={{ margin: 0 }}>
-              Cinema is an open, client-side media browser, search indexer, and playback interface.
-              Cinema functions strictly as a tool for aggregating publicly accessible metadata and
-              rendering streams resolved via community extensions. Cinema does not host, upload,
-              store, or broadcast any media files, video streams, or copyrighted material on any
-              servers operated by Cinema.
+            <p style={{ fontSize: "14px", color: "#b3b3b3", lineHeight: 1.6, margin: 0 }}>
+              Cinema is an open client-side media browser, search aggregator, and local playback interface.
+              Cinema does not host, upload, broadcast, or store video files or copyrighted multimedia on any servers.
+              Metadata, posters, and stream manifests are resolved dynamically on client hardware through
+              public APIs and community-maintained provider plugins.
             </p>
-          </section>
+          </div>
 
-          <section>
-            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
-              2. User Responsibility & Compliance
+          {/* Card 2: User Responsibility */}
+          <div
+            style={{
+              background: "#0d0d10",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "16px",
+              padding: "24px 28px",
+            }}
+          >
+            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", margin: "0 0 10px 0" }}>
+              2. User Compliance & Applicable Laws
             </h2>
-            <p style={{ margin: 0 }}>
-              By utilizing Cinema, you agree to access content only in accordance with all applicable
-              local, national, and international laws, copyright regulations, and licensing agreements
-              in your jurisdiction. You retain sole responsibility for determining the legality of any
-              streams, scrapers, or downloads accessed through third-party provider plugins.
+            <p style={{ fontSize: "14px", color: "#b3b3b3", lineHeight: 1.6, margin: 0 }}>
+              Users agree to access content strictly in accordance with copyright laws, intellectual property statutes,
+              and licensing regulations in their local jurisdiction. You retain full responsibility for verifying
+              the legal rights to stream or download media fetched via third-party web scrapers.
             </p>
-          </section>
+          </div>
 
-          <section>
-            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
-              3. Community Extensions & Third-Party Endpoints
+          {/* Card 3: Community Extensions */}
+          <div
+            style={{
+              background: "#0d0d10",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "16px",
+              padding: "24px 28px",
+            }}
+          >
+            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", margin: "0 0 10px 0" }}>
+              3. Modular Provider Extensions
             </h2>
-            <p style={{ margin: 0 }}>
-              Cinema incorporates modular provider plugins that query external, third-party web
-              services. Cinema exercises no ownership or control over the accuracy, uptime, legality,
-              or safety of external hosts. Connections initiated by provider extensions communicate
-              directly between your local client machine and third-party servers.
+            <p style={{ fontSize: "14px", color: "#b3b3b3", lineHeight: 1.6, margin: 0 }}>
+              Provider plugins connect directly between your device and external web endpoints. Cinema contributors
+              exercise no control over third-party link reliability, server availability, or external stream content.
             </p>
-          </section>
+          </div>
 
-          <section>
-            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
-              4. Offline Downloads & Runner Nodes
+          {/* Card 4: Local Storage & Downloads */}
+          <div
+            style={{
+              background: "#0d0d10",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "16px",
+              padding: "24px 28px",
+            }}
+          >
+            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", margin: "0 0 10px 0" }}>
+              4. Offline Downloads & Node Daemons
             </h2>
-            <p style={{ margin: 0 }}>
-              The download manager and background runner daemons operate entirely client-side on your
-              hardware. Files downloaded through Cinema are stored exclusively on your local device.
-              You agree not to redistribute, commercially exploit, or misuse content downloaded via
-              the software.
+            <p style={{ fontSize: "14px", color: "#b3b3b3", lineHeight: 1.6, margin: 0 }}>
+              Downloads initiated in Cinema write directly to your local file system. Offline files and background
+              runner processes remain private on your personal device and are not uploaded to external networks.
             </p>
-          </section>
+          </div>
 
-          <section>
-            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
-              5. Disclaimer of Warranties
+          {/* Card 5: Warranty & Disclaimer */}
+          <div
+            style={{
+              background: "#0d0d10",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "16px",
+              padding: "24px 28px",
+            }}
+          >
+            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", margin: "0 0 10px 0" }}>
+              5. Software Disclaimer
             </h2>
-            <p style={{ margin: 0 }}>
-              Cinema is provided "as is" and "as available", without warranties of any kind, either
-              express or implied. The developers do not guarantee uninterrupted access, error-free
-              playback, or persistent availability of third-party sources.
+            <p style={{ fontSize: "14px", color: "#b3b3b3", lineHeight: 1.6, margin: 0 }}>
+              Cinema is provided "as-is" without warranty of any kind. The contributors are not liable for any
+              damages, network issues, or service interruptions resulting from the operation of third-party scrapers.
             </p>
-          </section>
-
-          <section>
-            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
-              6. Limitation of Liability
-            </h2>
-            <p style={{ margin: 0 }}>
-              To the fullest extent permissible under applicable law, the contributors of Cinema
-              shall not be liable for any direct, indirect, incidental, or consequential damages
-              arising out of the use or inability to use the software.
-            </p>
-          </section>
+          </div>
         </div>
       </div>
     </div>

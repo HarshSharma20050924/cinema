@@ -4,12 +4,11 @@ import {
   GithubIcon,
   ServerIcon,
   FilmIcon,
-  ArrowLeftIcon,
   CheckIcon,
 } from "../../icons";
 import packageJson from "../../../package.json";
 
-interface DownloadAsset {
+interface ReleaseAsset {
   name: string;
   size: number;
   downloadUrl: string;
@@ -20,36 +19,19 @@ interface ReleaseData {
   version: string;
   publishedAt: string;
   htmlUrl: string;
-  assets: DownloadAsset[];
+  assets: ReleaseAsset[];
 }
 
 interface DownloadPageProps {
   onBack: () => void;
 }
 
-export const DownloadPage: React.FC<DownloadPageProps> = ({ onBack }) => {
+export const DownloadPage: React.FC<DownloadPageProps> = () => {
   const [release, setRelease] = useState<ReleaseData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [detectedOs, setDetectedOs] = useState<string>("Android");
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"all" | "app" | "runner">("all");
 
-  // Auto-detect visitor operating system
-  useEffect(() => {
-    const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes("android")) {
-      setDetectedOs("Android");
-    } else if (ua.includes("win")) {
-      setDetectedOs("Windows");
-    } else if (ua.includes("linux")) {
-      setDetectedOs("Linux");
-    } else if (ua.includes("mac")) {
-      setDetectedOs("macOS");
-    } else if (/iphone|ipad|ipod/.test(ua)) {
-      setDetectedOs("iOS");
-    }
-  }, []);
-
-  // Fetch release assets dynamically from GitHub API without hardcoding versions
+  // Fetch release dynamically from GitHub API
   useEffect(() => {
     let isMounted = true;
     const fetchLatestRelease = async () => {
@@ -68,9 +50,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBack }) => {
               publishedAt: data.published_at
                 ? new Date(data.published_at).toLocaleDateString()
                 : "",
-              htmlUrl:
-                data.html_url ||
-                "https://github.com/HarshSharma20050924/cinema/releases/latest",
+              htmlUrl: data.html_url || "https://github.com/HarshSharma20050924/cinema/releases/latest",
               assets: Array.isArray(data.assets)
                 ? data.assets.map((a: any) => ({
                     name: a.name || "",
@@ -79,13 +59,11 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBack }) => {
                   }))
                 : [],
             });
-            setLoading(false);
             return;
           }
         }
       } catch (_) {}
 
-      // Fallback release metadata derived from package.json
       if (isMounted) {
         const fallbackVer = (packageJson.version || "4.1.0").replace(/^v/i, "");
         setRelease({
@@ -95,7 +73,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBack }) => {
           htmlUrl: "https://github.com/HarshSharma20050924/cinema/releases/latest",
           assets: [],
         });
-        setLoading(false);
       }
     };
 
@@ -111,62 +88,28 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBack }) => {
     return `${mb.toFixed(1)} MB`;
   };
 
-  // Find dynamic download URL matching filename, or fall back to GitHub direct release raw download
-  const resolveDownloadUrl = (fileName: string): string => {
-    if (release && release.assets && release.assets.length > 0) {
-      const matched = release.assets.find(
-        (a) => a.name.toLowerCase() === fileName.toLowerCase()
-      );
-      if (matched && matched.downloadUrl) return matched.downloadUrl;
-
-      // Partial pattern match (e.g. *.deb, *.AppImage, *.exe)
-      const ext = fileName.split(".").pop()?.toLowerCase();
-      if (ext) {
-        const patternMatch = release.assets.find(
-          (a) =>
-            a.name.toLowerCase().endsWith(`.${ext}`) &&
-            (fileName.toLowerCase().includes("runner")
-              ? a.name.toLowerCase().includes("runner")
-              : !a.name.toLowerCase().includes("runner"))
-        );
-        if (patternMatch && patternMatch.downloadUrl) {
-          return patternMatch.downloadUrl;
-        }
-      }
-    }
-    return `https://github.com/HarshSharma20050924/cinema/releases/latest/download/${fileName}`;
+  const findMatchingAsset = (pattern: RegExp) => {
+    if (!release?.assets) return null;
+    return release.assets.find((a) => pattern.test(a.name));
   };
 
-  const getAssetSize = (fileName: string): string => {
-    if (release && release.assets && release.assets.length > 0) {
-      const matched = release.assets.find(
-        (a) => a.name.toLowerCase() === fileName.toLowerCase()
-      );
-      if (matched && matched.size > 0) return formatSize(matched.size);
+  const resolveDownloadUrl = (fileNameFallback: string, pattern: RegExp): string => {
+    const match = findMatchingAsset(pattern);
+    if (match && match.downloadUrl) return match.downloadUrl;
+    return `https://github.com/HarshSharma20050924/cinema/releases/latest/download/${fileNameFallback}`;
+  };
 
-      const ext = fileName.split(".").pop()?.toLowerCase();
-      if (ext) {
-        const patternMatch = release.assets.find(
-          (a) =>
-            a.name.toLowerCase().endsWith(`.${ext}`) &&
-            (fileName.toLowerCase().includes("runner")
-              ? a.name.toLowerCase().includes("runner")
-              : !a.name.toLowerCase().includes("runner"))
-        );
-        if (patternMatch && patternMatch.size > 0) {
-          return formatSize(patternMatch.size);
-        }
-      }
-    }
+  const getAssetSize = (pattern: RegExp): string => {
+    const match = findMatchingAsset(pattern);
+    if (match && match.size > 0) return formatSize(match.size);
     return "";
   };
 
-  // Trigger direct browser download without redirecting the page
-  const handleDirectDownload = (fileName: string) => {
-    const url = resolveDownloadUrl(fileName);
+  const handleDirectDownload = (fileNameFallback: string, pattern: RegExp) => {
+    const url = resolveDownloadUrl(fileNameFallback, pattern);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", fileName);
+    link.setAttribute("download", fileNameFallback);
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     document.body.appendChild(link);
@@ -174,947 +117,962 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onBack }) => {
     document.body.removeChild(link);
   };
 
-  const handleCopyLink = (fileName: string) => {
-    const url = resolveDownloadUrl(fileName);
+  const handleCopy = (key: string, url: string) => {
     navigator.clipboard.writeText(url);
-    setCopiedLink(fileName);
+    setCopiedLink(key);
     setTimeout(() => setCopiedLink(null), 2000);
   };
 
   const currentVersion = release?.version || packageJson.version || "4.1.0";
 
+  // Dynamic asset mapping
+  const apkAppUrl = resolveDownloadUrl("Cinema-Web.apk", /cinema.*web.*\.apk$|^cinema.*\.apk$/i);
+  const apkAppSize = getAssetSize(/cinema.*web.*\.apk$|^cinema.*\.apk$/i);
+
+  const apkRunnerUrl = resolveDownloadUrl("Cinema-Runner.apk", /runner.*\.apk$/i);
+  const apkRunnerSize = getAssetSize(/runner.*\.apk$/i);
+
+  const debAppUrl = resolveDownloadUrl(`cinema-desktop_${currentVersion}_amd64.deb`, /cinema-desktop.*\.deb$/i);
+  const debAppSize = getAssetSize(/cinema-desktop.*\.deb$/i);
+
+  const appImageAppUrl = resolveDownloadUrl(`Cinema-${currentVersion}.AppImage`, /^cinema-[0-9].*\.appimage$/i);
+  const appImageAppSize = getAssetSize(/^cinema-[0-9].*\.appimage$/i);
+
+  const exeAppUrl = resolveDownloadUrl(`Cinema.Setup.${currentVersion}.exe`, /^cinema.*setup.*\.exe$|^cinema\.[0-9].*\.exe$/i);
+  const exeAppSize = getAssetSize(/^cinema.*setup.*\.exe$|^cinema\.[0-9].*\.exe$/i);
+
+  const dmgAppUrl = resolveDownloadUrl(`Cinema-${currentVersion}-arm64.dmg`, /^cinema-[0-9].*\.dmg$/i);
+  const dmgAppSize = getAssetSize(/^cinema-[0-9].*\.dmg$/i);
+
+  const runnerAppImageUrl = resolveDownloadUrl("Cinema.Node.Runner.AppImage", /runner.*\.appimage$/i);
+  const runnerAppImageSize = getAssetSize(/runner.*\.appimage$/i);
+
+  const runnerExeUrl = resolveDownloadUrl("Cinema.Node.Runner.Setup.exe", /runner.*\.exe$/i);
+  const runnerExeSize = getAssetSize(/runner.*\.exe$/i);
+
+  const runnerDmgUrl = resolveDownloadUrl("Cinema.Node.Runner.dmg", /runner.*\.dmg$/i);
+  const runnerDmgSize = getAssetSize(/runner.*\.dmg$/i);
+
   return (
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "#090c13",
-        color: "#f8fafc",
-        paddingBottom: "80px",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        backgroundColor: "#000000",
+        color: "#ffffff",
+        paddingTop: "90px",
+        paddingBottom: "100px",
+        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+        position: "relative",
       }}
     >
-      {/* Top Navigation Bar */}
+      {/* Background ambient lighting */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 24px",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-          background: "rgba(9, 12, 19, 0.9)",
-          backdropFilter: "blur(12px)",
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
+          position: "absolute",
+          top: "40px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "900px",
+          height: "360px",
+          background: "radial-gradient(circle, rgba(229, 9, 20, 0.15) 0%, transparent 70%)",
+          filter: "blur(80px)",
+          pointerEvents: "none",
+          zIndex: 0,
         }}
-      >
-        <button
-          onClick={onBack}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            background: "rgba(255, 255, 255, 0.06)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "#e2e8f0",
-            padding: "8px 14px",
-            borderRadius: "10px",
-            fontSize: "13px",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-          }}
-        >
-          <ArrowLeftIcon size={16} />
-          <span>Back to Cinema</span>
-        </button>
+      />
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span
-            style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              color: "#94a3b8",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Latest Version:
-          </span>
-          <span
-            style={{
-              fontSize: "12px",
-              fontWeight: 800,
-              color: "#e50914",
-              background: "rgba(229, 9, 20, 0.12)",
-              border: "1px solid rgba(229, 9, 20, 0.3)",
-              padding: "3px 10px",
-              borderRadius: "999px",
-            }}
-          >
-            v{currentVersion}
-          </span>
-        </div>
-      </div>
-
-      {/* Main Container */}
       <div
         style={{
-          maxWidth: "1160px",
+          maxWidth: "1280px",
           margin: "0 auto",
-          padding: "36px 20px 0 20px",
+          padding: "0 24px",
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        {/* Hero Header */}
-        <div style={{ textAlign: "center", marginBottom: "44px" }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "5px 14px",
-              borderRadius: "999px",
-              background: "rgba(229, 9, 20, 0.15)",
-              border: "1px solid rgba(229, 9, 20, 0.35)",
-              color: "#e50914",
-              fontSize: "12px",
-              fontWeight: 800,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginBottom: "16px",
-            }}
-          >
-            <span>Cinema Multi-Platform Ecosystem</span>
+        {/* Header Title Section */}
+        <div style={{ marginBottom: "40px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 800,
+                color: "#e50914",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+              }}
+            >
+              Releases & Downloads
+            </span>
+            <span
+              style={{
+                fontSize: "12px",
+                color: "#737373",
+                fontWeight: 600,
+              }}
+            >
+              • v{currentVersion}
+            </span>
           </div>
 
           <h1
             style={{
-              fontSize: "clamp(28px, 4.5vw, 44px)",
+              fontSize: "clamp(30px, 4vw, 44px)",
               fontWeight: 900,
               letterSpacing: "-0.03em",
-              margin: "0 0 14px 0",
-              lineHeight: 1.15,
+              margin: "0 0 12px 0",
+              color: "#ffffff",
             }}
           >
-            Download Cinema for Any Device
+            Download Cinema
           </h1>
 
           <p
             style={{
-              maxWidth: "680px",
-              margin: "0 auto",
-              fontSize: "clamp(14px, 1.6vw, 16px)",
-              color: "#94a3b8",
+              fontSize: "15px",
+              color: "#a3a3a3",
+              margin: "0 0 24px 0",
+              maxWidth: "650px",
               lineHeight: 1.6,
             }}
           >
-            Decentralized media aggregation, local multi-threaded downloads, and
-            distributed scraper nodes. Experience true zero-redirect streaming with
-            complete privacy on your terms.
+            Direct release binaries for streaming, local playback, and independent background nodes.
           </p>
 
-          {/* OS Detection Banner */}
+          {/* Clean Section Navigation Filter */}
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: "8px",
-              marginTop: "20px",
-              padding: "7px 16px",
+              gap: "6px",
+              background: "#0d0d10",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              padding: "4px",
               borderRadius: "12px",
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.09)",
-              fontSize: "12px",
-              color: "#cbd5e1",
             }}
           >
-            <span style={{ color: "#10b981", fontWeight: 700 }}>Active Platform:</span>
-            <span>Detected {detectedOs}</span>
+            <button
+              onClick={() => setActiveTab("all")}
+              style={{
+                padding: "8px 18px",
+                borderRadius: "8px",
+                border: "none",
+                background: activeTab === "all" ? "#e50914" : "transparent",
+                color: "#ffffff",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              All Releases
+            </button>
+
+            <button
+              onClick={() => setActiveTab("app")}
+              style={{
+                padding: "8px 18px",
+                borderRadius: "8px",
+                border: "none",
+                background: activeTab === "app" ? "#e50914" : "transparent",
+                color: "#ffffff",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              Cinema Application
+            </button>
+
+            <button
+              onClick={() => setActiveTab("runner")}
+              style={{
+                padding: "8px 18px",
+                borderRadius: "8px",
+                border: "none",
+                background: activeTab === "runner" ? "#e50914" : "transparent",
+                color: "#ffffff",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              Runner App
+            </button>
           </div>
         </div>
 
-        {/* Downloads Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: "22px",
-            marginBottom: "50px",
-          }}
-        >
-          {/* 1. Android Mobile App Card */}
-          <div
-            style={{
-              background: "rgba(18, 23, 34, 0.75)",
-              border:
-                detectedOs === "Android"
-                  ? "1px solid rgba(229, 9, 20, 0.5)"
-                  : "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "18px",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow:
-                detectedOs === "Android"
-                  ? "0 10px 30px rgba(229, 9, 20, 0.15)"
-                  : "0 10px 25px rgba(0, 0, 0, 0.4)",
-              position: "relative",
-            }}
-          >
-            {detectedOs === "Android" && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: "14px",
-                  right: "14px",
-                  background: "#e50914",
-                  color: "#ffffff",
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  padding: "3px 8px",
-                  borderRadius: "999px",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Recommended
-              </span>
-            )}
-
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+        {/* SECTION 1: CINEMA APPLICATION */}
+        {(activeTab === "all" || activeTab === "app") && (
+          <div style={{ marginBottom: "60px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
               <div
                 style={{
-                  width: "46px",
-                  height: "46px",
-                  borderRadius: "12px",
-                  background: "rgba(229, 9, 20, 0.15)",
-                  border: "1px solid rgba(229, 9, 20, 0.3)",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(229, 9, 20, 0.12)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   color: "#e50914",
-                  flexShrink: 0,
                 }}
               >
-                <FilmIcon size={24} />
+                <FilmIcon size={20} />
               </div>
               <div>
-                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 3px 0" }}>
-                  Cinema Android App
-                </h3>
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                  Mobile & Tablet Streaming Client
+                <h2 style={{ fontSize: "20px", fontWeight: 800, margin: 0 }}>
+                  Cinema Application
+                </h2>
+                <span style={{ fontSize: "13px", color: "#737373" }}>
+                  Client player for Android phones, TV boxes, Linux, Windows, and macOS.
                 </span>
               </div>
             </div>
-
-            <p style={{ fontSize: "13px", color: "#94a3b8", lineHeight: 1.5, flexGrow: 1, margin: "0 0 18px 0" }}>
-              The flagship Cinema mobile experience for Android phones and TV devices. Includes
-              integrated player with subtitles, multi-provider extensions, offline file downloads,
-              and external player support (VLC, MPV, MX Player).
-            </p>
 
             <div
               style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-                marginBottom: "18px",
-                fontSize: "11px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: "18px",
               }}
             >
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                Android 7.0+
-              </span>
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                APK Package
-              </span>
-              {getAssetSize("Cinema-Web.apk") && (
-                <span style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10b981", padding: "3px 8px", borderRadius: "6px", fontWeight: 700 }}>
-                  {getAssetSize("Cinema-Web.apk")}
-                </span>
-              )}
-            </div>
-
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={() => handleDirectDownload("Cinema-Web.apk")}
-                style={{
-                  flex: 1,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  background: "linear-gradient(135deg, #e50914, #b80710)",
-                  border: "none",
-                  color: "#ffffff",
-                  padding: "12px 16px",
-                  borderRadius: "12px",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  boxShadow: "0 4px 16px rgba(229, 9, 20, 0.35)",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                <DownloadIcon size={16} />
-                <span>Direct Download APK</span>
-              </button>
-
-              <button
-                onClick={() => handleCopyLink("Cinema-Web.apk")}
-                title="Copy Direct Download Link"
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  color: copiedLink === "Cinema-Web.apk" ? "#10b981" : "#94a3b8",
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                {copiedLink === "Cinema-Web.apk" ? <CheckIcon size={16} /> : <DownloadIcon size={16} />}
-              </button>
-            </div>
-          </div>
-
-          {/* 2. Android Node Runner App Card */}
-          <div
-            style={{
-              background: "rgba(18, 23, 34, 0.75)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "18px",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 10px 25px rgba(0, 0, 0, 0.4)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+              {/* Android Client */}
               <div
                 style={{
-                  width: "46px",
-                  height: "46px",
-                  borderRadius: "12px",
-                  background: "rgba(59, 130, 246, 0.15)",
-                  border: "1px solid rgba(59, 130, 246, 0.3)",
+                  background: "#0d0d10",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "16px",
+                  padding: "22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  transition: "border-color 0.2s ease",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                    Android
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8a8a8a", marginBottom: "16px" }}>
+                    Universal APK • Phones, Tablets & Android TV
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#b3b3b3", lineHeight: 1.5, marginBottom: "20px" }}>
+                    Native media player with subtitles, provider extensions, offline downloads, and external player support.
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", fontSize: "12px" }}>
+                    <span style={{ color: "#737373" }}>Cinema-Web.apk</span>
+                    {apkAppSize && <span style={{ color: "#10b981", fontWeight: 600 }}>{apkAppSize}</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => handleDirectDownload("Cinema-Web.apk", /cinema.*web.*\.apk$|^cinema.*\.apk$/i)}
+                      style={{
+                        flex: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "#e50914",
+                        border: "none",
+                        color: "#ffffff",
+                        padding: "11px 14px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        transition: "background 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f40612")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "#e50914")}
+                    >
+                      <DownloadIcon size={15} />
+                      <span>Download APK</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopy("apkApp", apkAppUrl)}
+                      title="Copy Direct Link"
+                      style={{
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        background: "rgba(255, 255, 255, 0.06)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        color: copiedLink === "apkApp" ? "#10b981" : "#a3a3a3",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedLink === "apkApp" ? <CheckIcon size={15} /> : <DownloadIcon size={15} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Linux Client */}
+              <div
+                style={{
+                  background: "#0d0d10",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "16px",
+                  padding: "22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  transition: "border-color 0.2s ease",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                    Linux
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8a8a8a", marginBottom: "16px" }}>
+                    Debian, Ubuntu, Mint & Universal AppImage
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#b3b3b3", lineHeight: 1.5, marginBottom: "20px" }}>
+                    Desktop client with hardware GPU rendering, tray support, and multi-thread download management.
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", fontSize: "12px" }}>
+                    <span style={{ color: "#737373" }}>64-bit AMD64</span>
+                    {debAppSize && <span style={{ color: "#10b981", fontWeight: 600 }}>{debAppSize}</span>}
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    <button
+                      onClick={() => handleDirectDownload(`cinema-desktop_${currentVersion}_amd64.deb`, /cinema-desktop.*\.deb$/i)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "#e50914",
+                        border: "none",
+                        color: "#ffffff",
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <DownloadIcon size={14} />
+                      <span>.deb</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDirectDownload(`Cinema-${currentVersion}.AppImage`, /^cinema-[0-9].*\.appimage$/i)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "rgba(255, 255, 255, 0.08)",
+                        border: "1px solid rgba(255, 255, 255, 0.12)",
+                        color: "#ffffff",
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <DownloadIcon size={14} />
+                      <span>.AppImage</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Windows Client */}
+              <div
+                style={{
+                  background: "#0d0d10",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "16px",
+                  padding: "22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  transition: "border-color 0.2s ease",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                    Windows
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8a8a8a", marginBottom: "16px" }}>
+                    Windows 10 / 11 (64-bit)
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#b3b3b3", lineHeight: 1.5, marginBottom: "20px" }}>
+                    Desktop executable installer with automatic update checking and high-speed streaming engine.
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", fontSize: "12px" }}>
+                    <span style={{ color: "#737373" }}>Installer (.exe)</span>
+                    {exeAppSize && <span style={{ color: "#10b981", fontWeight: 600 }}>{exeAppSize}</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => handleDirectDownload(`Cinema.Setup.${currentVersion}.exe`, /^cinema.*setup.*\.exe$|^cinema\.[0-9].*\.exe$/i)}
+                      style={{
+                        flex: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "#e50914",
+                        border: "none",
+                        color: "#ffffff",
+                        padding: "11px 14px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <DownloadIcon size={15} />
+                      <span>Download .exe</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopy("exeApp", exeAppUrl)}
+                      title="Copy Direct Link"
+                      style={{
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        background: "rgba(255, 255, 255, 0.06)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        color: copiedLink === "exeApp" ? "#10b981" : "#a3a3a3",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedLink === "exeApp" ? <CheckIcon size={15} /> : <DownloadIcon size={15} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* macOS Client */}
+              <div
+                style={{
+                  background: "#0d0d10",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "16px",
+                  padding: "22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  transition: "border-color 0.2s ease",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                    macOS
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8a8a8a", marginBottom: "16px" }}>
+                    Apple Silicon & Intel (macOS 11+)
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#b3b3b3", lineHeight: 1.5, marginBottom: "20px" }}>
+                    Native Metal hardware decoding, Picture-in-Picture playback, and macOS menu integration.
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", fontSize: "12px" }}>
+                    <span style={{ color: "#737373" }}>DMG Image</span>
+                    {dmgAppSize && <span style={{ color: "#10b981", fontWeight: 600 }}>{dmgAppSize}</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => handleDirectDownload(`Cinema-${currentVersion}-arm64.dmg`, /^cinema-[0-9].*\.dmg$/i)}
+                      style={{
+                        flex: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "#e50914",
+                        border: "none",
+                        color: "#ffffff",
+                        padding: "11px 14px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <DownloadIcon size={15} />
+                      <span>Download .dmg</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopy("dmgApp", dmgAppUrl)}
+                      title="Copy Direct Link"
+                      style={{
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        background: "rgba(255, 255, 255, 0.06)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        color: copiedLink === "dmgApp" ? "#10b981" : "#a3a3a3",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedLink === "dmgApp" ? <CheckIcon size={15} /> : <DownloadIcon size={15} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 2: RUNNER APP (SEPARATE THEME & CATEGORY) */}
+        {(activeTab === "all" || activeTab === "runner") && (
+          <div style={{ marginBottom: "60px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(255, 255, 255, 0.08)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#60a5fa",
-                  flexShrink: 0,
+                  color: "#ffffff",
                 }}
               >
-                <ServerIcon size={24} />
+                <ServerIcon size={20} />
               </div>
               <div>
-                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 3px 0" }}>
-                  Cinema Node Runner
-                </h3>
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                  Android Scraper & Daemon Node
+                <h2 style={{ fontSize: "20px", fontWeight: 800, margin: 0 }}>
+                  Cinema Runner
+                </h2>
+                <span style={{ fontSize: "13px", color: "#737373" }}>
+                  Autonomous daemon for scrapers, background extraction, and local tunnel coordination.
                 </span>
               </div>
             </div>
-
-            <p style={{ fontSize: "13px", color: "#94a3b8", lineHeight: 1.5, flexGrow: 1, margin: "0 0 18px 0" }}>
-              Automated background daemon for Android. Turns your spare phone into a high-speed
-              scraping node with native Node.js runtime, zero root requirement, automatic
-              Cloudflare tunnels, and coordinator sync.
-            </p>
 
             <div
               style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-                marginBottom: "18px",
-                fontSize: "11px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: "18px",
               }}
             >
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                ARM64 Android
-              </span>
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                Daemon Service
-              </span>
-              {getAssetSize("Cinema-Runner.apk") && (
-                <span style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10b981", padding: "3px 8px", borderRadius: "6px", fontWeight: 700 }}>
-                  {getAssetSize("Cinema-Runner.apk")}
-                </span>
-              )}
-            </div>
-
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={() => handleDirectDownload("Cinema-Runner.apk")}
-                style={{
-                  flex: 1,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                  border: "none",
-                  color: "#ffffff",
-                  padding: "12px 16px",
-                  borderRadius: "12px",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  boxShadow: "0 4px 16px rgba(37, 99, 235, 0.35)",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                <DownloadIcon size={16} />
-                <span>Direct Download Runner APK</span>
-              </button>
-
-              <button
-                onClick={() => handleCopyLink("Cinema-Runner.apk")}
-                title="Copy Direct Download Link"
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  color: copiedLink === "Cinema-Runner.apk" ? "#10b981" : "#94a3b8",
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                {copiedLink === "Cinema-Runner.apk" ? <CheckIcon size={16} /> : <DownloadIcon size={16} />}
-              </button>
-            </div>
-          </div>
-
-          {/* 3. Linux Desktop App Card */}
-          <div
-            style={{
-              background: "rgba(18, 23, 34, 0.75)",
-              border:
-                detectedOs === "Linux"
-                  ? "1px solid rgba(229, 9, 20, 0.5)"
-                  : "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "18px",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow:
-                detectedOs === "Linux"
-                  ? "0 10px 30px rgba(229, 9, 20, 0.15)"
-                  : "0 10px 25px rgba(0, 0, 0, 0.4)",
-              position: "relative",
-            }}
-          >
-            {detectedOs === "Linux" && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: "14px",
-                  right: "14px",
-                  background: "#e50914",
-                  color: "#ffffff",
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  padding: "3px 8px",
-                  borderRadius: "999px",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Recommended
-              </span>
-            )}
-
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+              {/* Android Runner APK */}
               <div
                 style={{
-                  width: "46px",
-                  height: "46px",
-                  borderRadius: "12px",
-                  background: "rgba(245, 158, 11, 0.15)",
-                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  background: "#0d0d10",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "16px",
+                  padding: "22px",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fbbf24",
-                  flexShrink: 0,
+                  flexDirection: "column",
+                  justifyContent: "space-between",
                 }}
               >
-                <ServerIcon size={24} />
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                    Android Runner
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8a8a8a", marginBottom: "16px" }}>
+                    ARM64 Android 8.0+ Daemon
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#b3b3b3", lineHeight: 1.5, marginBottom: "20px" }}>
+                    Runs node scrapers and coordinator tunnels as a persistent foreground service on mobile hardware.
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", fontSize: "12px" }}>
+                    <span style={{ color: "#737373" }}>Cinema-Runner.apk</span>
+                    {apkRunnerSize && <span style={{ color: "#10b981", fontWeight: 600 }}>{apkRunnerSize}</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => handleDirectDownload("Cinema-Runner.apk", /runner.*\.apk$/i)}
+                      style={{
+                        flex: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "#1f1f23",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        color: "#ffffff",
+                        padding: "11px 14px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)")}
+                    >
+                      <DownloadIcon size={15} />
+                      <span>Download Runner APK</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopy("apkRunner", apkRunnerUrl)}
+                      title="Copy Direct Link"
+                      style={{
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        background: "rgba(255, 255, 255, 0.06)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        color: copiedLink === "apkRunner" ? "#10b981" : "#a3a3a3",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedLink === "apkRunner" ? <CheckIcon size={15} /> : <DownloadIcon size={15} />}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 3px 0" }}>
-                  Cinema Desktop (Linux)
-                </h3>
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                  Debian / Ubuntu (.deb) & Universal (.AppImage)
-                </span>
-              </div>
-            </div>
 
-            <p style={{ fontSize: "13px", color: "#94a3b8", lineHeight: 1.5, flexGrow: 1, margin: "0 0 18px 0" }}>
-              Direct installation for Linux workstations. Native performance with GPU hardware
-              acceleration, integrated multi-threaded aria2-compatible downloader, and background
-              runner.
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-                marginBottom: "18px",
-                fontSize: "11px",
-              }}
-            >
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                64-bit AMD64
-              </span>
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                Debian / Ubuntu / Mint / Arch
-              </span>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  onClick={() => handleDirectDownload(`cinema-desktop_${currentVersion}_amd64.deb`)}
-                  style={{
-                    flex: 1,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    background: "rgba(255, 255, 255, 0.08)",
-                    border: "1px solid rgba(255, 255, 255, 0.16)",
-                    color: "#ffffff",
-                    padding: "11px 14px",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                  }}
-                >
-                  <DownloadIcon size={15} />
-                  <span>Download .deb Package</span>
-                </button>
-
-                <button
-                  onClick={() => handleDirectDownload(`Cinema-${currentVersion}.AppImage`)}
-                  style={{
-                    flex: 1,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    background: "rgba(255, 255, 255, 0.08)",
-                    border: "1px solid rgba(255, 255, 255, 0.16)",
-                    color: "#ffffff",
-                    padding: "11px 14px",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                  }}
-                >
-                  <DownloadIcon size={15} />
-                  <span>Download .AppImage</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Windows Desktop App Card */}
-          <div
-            style={{
-              background: "rgba(18, 23, 34, 0.75)",
-              border:
-                detectedOs === "Windows"
-                  ? "1px solid rgba(229, 9, 20, 0.5)"
-                  : "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "18px",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow:
-                detectedOs === "Windows"
-                  ? "0 10px 30px rgba(229, 9, 20, 0.15)"
-                  : "0 10px 25px rgba(0, 0, 0, 0.4)",
-              position: "relative",
-            }}
-          >
-            {detectedOs === "Windows" && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: "14px",
-                  right: "14px",
-                  background: "#e50914",
-                  color: "#ffffff",
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  padding: "3px 8px",
-                  borderRadius: "999px",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Recommended
-              </span>
-            )}
-
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+              {/* Linux / Server Runner */}
               <div
                 style={{
-                  width: "46px",
-                  height: "46px",
-                  borderRadius: "12px",
-                  background: "rgba(14, 165, 233, 0.15)",
-                  border: "1px solid rgba(14, 165, 233, 0.3)",
+                  background: "#0d0d10",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "16px",
+                  padding: "22px",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#38bdf8",
-                  flexShrink: 0,
+                  flexDirection: "column",
+                  justifyContent: "space-between",
                 }}
               >
-                <FilmIcon size={24} />
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                    Linux Runner
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8a8a8a", marginBottom: "16px" }}>
+                    Headless Node Daemon • x64 AMD64
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#b3b3b3", lineHeight: 1.5, marginBottom: "20px" }}>
+                    Universal AppImage and headless executable for servers, NAS, and homelab workstations.
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", fontSize: "12px" }}>
+                    <span style={{ color: "#737373" }}>AppImage Build</span>
+                    {runnerAppImageSize && <span style={{ color: "#10b981", fontWeight: 600 }}>{runnerAppImageSize}</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => handleDirectDownload("Cinema.Node.Runner.AppImage", /runner.*\.appimage$/i)}
+                      style={{
+                        flex: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "#1f1f23",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        color: "#ffffff",
+                        padding: "11px 14px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)")}
+                    >
+                      <DownloadIcon size={15} />
+                      <span>Download AppImage</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopy("runnerAppImage", runnerAppImageUrl)}
+                      title="Copy Direct Link"
+                      style={{
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        background: "rgba(255, 255, 255, 0.06)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        color: copiedLink === "runnerAppImage" ? "#10b981" : "#a3a3a3",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedLink === "runnerAppImage" ? <CheckIcon size={15} /> : <DownloadIcon size={15} />}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 3px 0" }}>
-                  Cinema Desktop (Windows)
-                </h3>
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                  Windows 10 / 11 Installer (.exe)
-                </span>
-              </div>
-            </div>
 
-            <p style={{ fontSize: "13px", color: "#94a3b8", lineHeight: 1.5, flexGrow: 1, margin: "0 0 18px 0" }}>
-              Native 64-bit Windows setup package with automatic system integration, custom
-              window frame, auto-updater daemon, and hardware playback engine.
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-                marginBottom: "18px",
-                fontSize: "11px",
-              }}
-            >
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                Windows 10 / 11 (x64)
-              </span>
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                EXE Setup
-              </span>
-            </div>
-
-            <button
-              onClick={() => handleDirectDownload(`Cinema-Setup-${currentVersion}.exe`)}
-              style={{
-                width: "100%",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                background: "linear-gradient(135deg, #0284c7, #0369a1)",
-                border: "none",
-                color: "#ffffff",
-                padding: "12px 16px",
-                borderRadius: "12px",
-                fontSize: "13px",
-                fontWeight: 800,
-                cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(2, 132, 199, 0.35)",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <DownloadIcon size={16} />
-              <span>Direct Download for Windows</span>
-            </button>
-          </div>
-
-          {/* 5. macOS Desktop App Card */}
-          <div
-            style={{
-              background: "rgba(18, 23, 34, 0.75)",
-              border:
-                detectedOs === "macOS"
-                  ? "1px solid rgba(229, 9, 20, 0.5)"
-                  : "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "18px",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow:
-                detectedOs === "macOS"
-                  ? "0 10px 30px rgba(229, 9, 20, 0.15)"
-                  : "0 10px 25px rgba(0, 0, 0, 0.4)",
-              position: "relative",
-            }}
-          >
-            {detectedOs === "macOS" && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: "14px",
-                  right: "14px",
-                  background: "#e50914",
-                  color: "#ffffff",
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  padding: "3px 8px",
-                  borderRadius: "999px",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Recommended
-              </span>
-            )}
-
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+              {/* Windows Runner */}
               <div
                 style={{
-                  width: "46px",
-                  height: "46px",
-                  borderRadius: "12px",
-                  background: "rgba(168, 85, 247, 0.15)",
-                  border: "1px solid rgba(168, 85, 247, 0.3)",
+                  background: "#0d0d10",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "16px",
+                  padding: "22px",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#c084fc",
-                  flexShrink: 0,
+                  flexDirection: "column",
+                  justifyContent: "space-between",
                 }}
               >
-                <FilmIcon size={24} />
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                    Windows Runner
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8a8a8a", marginBottom: "16px" }}>
+                    Background Service • Windows 10 & 11
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#b3b3b3", lineHeight: 1.5, marginBottom: "20px" }}>
+                    Standalone Windows daemon for background link scraping and proxy host dispatching.
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", fontSize: "12px" }}>
+                    <span style={{ color: "#737373" }}>Runner Installer (.exe)</span>
+                    {runnerExeSize && <span style={{ color: "#10b981", fontWeight: 600 }}>{runnerExeSize}</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => handleDirectDownload("Cinema.Node.Runner.Setup.exe", /runner.*\.exe$/i)}
+                      style={{
+                        flex: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "#1f1f23",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        color: "#ffffff",
+                        padding: "11px 14px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)")}
+                    >
+                      <DownloadIcon size={15} />
+                      <span>Download .exe</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopy("runnerExe", runnerExeUrl)}
+                      title="Copy Direct Link"
+                      style={{
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        background: "rgba(255, 255, 255, 0.06)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        color: copiedLink === "runnerExe" ? "#10b981" : "#a3a3a3",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedLink === "runnerExe" ? <CheckIcon size={15} /> : <DownloadIcon size={15} />}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 3px 0" }}>
-                  Cinema Desktop (macOS)
-                </h3>
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                  Apple Silicon & Intel (.dmg)
-                </span>
-              </div>
-            </div>
 
-            <p style={{ fontSize: "13px", color: "#94a3b8", lineHeight: 1.5, flexGrow: 1, margin: "0 0 18px 0" }}>
-              Optimized for macOS with native metal acceleration, smooth gestures, Picture in
-              Picture support, and system media key controls.
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-                marginBottom: "18px",
-                fontSize: "11px",
-              }}
-            >
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                macOS 11.0+
-              </span>
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                DMG Disk Image
-              </span>
-            </div>
-
-            <button
-              onClick={() => handleDirectDownload(`Cinema-${currentVersion}.dmg`)}
-              style={{
-                width: "100%",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                border: "none",
-                color: "#ffffff",
-                padding: "12px 16px",
-                borderRadius: "12px",
-                fontSize: "13px",
-                fontWeight: 800,
-                cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(124, 58, 237, 0.35)",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <DownloadIcon size={16} />
-              <span>Direct Download for macOS</span>
-            </button>
-          </div>
-
-          {/* 6. Cinema Desktop Runner (Daemon) Card */}
-          <div
-            style={{
-              background: "rgba(18, 23, 34, 0.75)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "18px",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 10px 25px rgba(0, 0, 0, 0.4)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px" }}>
+              {/* macOS Runner */}
               <div
                 style={{
-                  width: "46px",
-                  height: "46px",
-                  borderRadius: "12px",
-                  background: "rgba(16, 185, 129, 0.15)",
-                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  background: "#0d0d10",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: "16px",
+                  padding: "22px",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#34d399",
-                  flexShrink: 0,
+                  flexDirection: "column",
+                  justifyContent: "space-between",
                 }}
               >
-                <ServerIcon size={24} />
-              </div>
-              <div>
-                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 3px 0" }}>
-                  Cinema Desktop Runner
-                </h3>
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                  Server & Headless Daemon
-                </span>
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                    macOS Runner
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8a8a8a", marginBottom: "16px" }}>
+                    Daemon Image • Apple Silicon & Intel
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#b3b3b3", lineHeight: 1.5, marginBottom: "20px" }}>
+                    macOS daemon binary packaged for automated continuous provider indexing.
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", fontSize: "12px" }}>
+                    <span style={{ color: "#737373" }}>Runner DMG</span>
+                    {runnerDmgSize && <span style={{ color: "#10b981", fontWeight: 600 }}>{runnerDmgSize}</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => handleDirectDownload("Cinema.Node.Runner.dmg", /runner.*\.dmg$/i)}
+                      style={{
+                        flex: 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "#1f1f23",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        color: "#ffffff",
+                        padding: "11px 14px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)")}
+                    >
+                      <DownloadIcon size={15} />
+                      <span>Download .dmg</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopy("runnerDmg", runnerDmgUrl)}
+                      title="Copy Direct Link"
+                      style={{
+                        padding: "11px 12px",
+                        borderRadius: "10px",
+                        background: "rgba(255, 255, 255, 0.06)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        color: copiedLink === "runnerDmg" ? "#10b981" : "#a3a3a3",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {copiedLink === "runnerDmg" ? <CheckIcon size={15} /> : <DownloadIcon size={15} />}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <p style={{ fontSize: "13px", color: "#94a3b8", lineHeight: 1.5, flexGrow: 1, margin: "0 0 18px 0" }}>
-              Standalone daemon binary for home servers, NAS, and headless Linux/Windows
-              workstations. Provides dedicated scraper pipelines without opening full GUI.
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-                marginBottom: "18px",
-                fontSize: "11px",
-              }}
-            >
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                Headless Mode
-              </span>
-              <span style={{ background: "rgba(255, 255, 255, 0.06)", padding: "3px 8px", borderRadius: "6px", color: "#cbd5e1" }}>
-                Auto-Reconnect
-              </span>
-            </div>
-
-            <button
-              onClick={() => handleDirectDownload(`cinema-desktop-runner_${currentVersion}_amd64.deb`)}
-              style={{
-                width: "100%",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                background: "linear-gradient(135deg, #059669, #047857)",
-                border: "none",
-                color: "#ffffff",
-                padding: "12px 16px",
-                borderRadius: "12px",
-                fontSize: "13px",
-                fontWeight: 800,
-                cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(5, 150, 105, 0.35)",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <DownloadIcon size={16} />
-              <span>Direct Download Desktop Runner</span>
-            </button>
           </div>
-        </div>
+        )}
 
-        {/* GitHub Releases Transparency Section */}
+        {/* SECTION 3: DIRECT RELEASE ASSET LINKS & SOURCE REPOSITORY */}
         <div
           style={{
-            background: "rgba(18, 23, 34, 0.5)",
+            background: "#0a0a0c",
             border: "1px solid rgba(255, 255, 255, 0.08)",
-            borderRadius: "20px",
-            padding: "28px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "20px",
+            borderRadius: "18px",
+            padding: "24px 28px",
           }}
         >
-          <div>
-            <h3 style={{ fontSize: "17px", fontWeight: 800, margin: "0 0 6px 0" }}>
-              GitHub Releases & Source Code
-            </h3>
-            <p style={{ fontSize: "13px", color: "#94a3b8", margin: 0, maxWidth: "600px", lineHeight: 1.5 }}>
-              All builds are compiled via automated GitHub Actions CI/CD with public checksums.
-              You can verify source code, download raw build artifacts, or view changelogs
-              directly on GitHub.
-            </p>
-          </div>
-
-          <a
-            href={release?.htmlUrl || "https://github.com/HarshSharma20050924/cinema/releases"}
-            target="_blank"
-            rel="noopener noreferrer"
+          <div
             style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              gap: "10px",
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-              color: "#ffffff",
-              padding: "12px 20px",
-              borderRadius: "12px",
-              fontSize: "13px",
-              fontWeight: 700,
-              textDecoration: "none",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.3)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "16px",
+              marginBottom: release?.assets && release.assets.length > 0 ? "20px" : "0",
             }}
           >
-            <GithubIcon size={18} />
-            <span>View GitHub Releases & Checksums</span>
-          </a>
+            <div>
+              <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", margin: "0 0 4px 0" }}>
+                Release Assets Archive
+              </h3>
+              <p style={{ fontSize: "13px", color: "#8a8a8a", margin: 0 }}>
+                Direct URLs to all compiled binary assets for this release tag.
+              </p>
+            </div>
+
+            <a
+              href={release?.htmlUrl || "https://github.com/HarshSharma20050924/cinema/releases"}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                color: "#ffffff",
+                padding: "8px 16px",
+                borderRadius: "10px",
+                fontSize: "12px",
+                fontWeight: 700,
+                textDecoration: "none",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <GithubIcon size={16} />
+              <span>View on GitHub</span>
+            </a>
+          </div>
+
+          {release?.assets && release.assets.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                paddingTop: "16px",
+              }}
+            >
+              {release.assets.map((asset) => (
+                <div
+                  key={asset.name}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    background: "rgba(255, 255, 255, 0.02)",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                    <span style={{ color: "#e50914" }}>•</span>
+                    <span style={{ color: "#ffffff", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {asset.name}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px", flexShrink: 0 }}>
+                    <span style={{ color: "#737373", fontSize: "12px" }}>
+                      {formatSize(asset.size)}
+                    </span>
+                    <a
+                      href={asset.downloadUrl}
+                      download={asset.name}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "#e50914",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Download
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
