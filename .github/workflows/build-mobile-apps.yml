@@ -59,7 +59,6 @@ jobs:
           ./gradlew assembleRelease
           APK_FOUND=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
           if [ -n "$APK_FOUND" ]; then
-            cp "$APK_FOUND" ../../Cinema-Web.apk
             cp "$APK_FOUND" ../../Cinema.apk
           fi
 
@@ -76,7 +75,7 @@ jobs:
             cp "$RUNNER_APK" ../Cinema-Runner.apk
           fi
 
-      # 3. Build Cinema Alternative Native Mobile App
+      # 3. Build Cinema Alternative Native Mobile App (Vega Standalone App)
       - name: Build Cinema Alternative Native App
         run: |
           if [ -d "vega-app" ] && [ -f "vega-app/package.json" ]; then
@@ -87,10 +86,10 @@ jobs:
             ./gradlew assembleRelease
             UNIVERSAL_APK=$(find app/build/outputs/apk/release -name "*universal*.apk" | head -n 1)
             if [ -n "$UNIVERSAL_APK" ]; then
-              cp "$UNIVERSAL_APK" ../../Cinema.apk
+              cp "$UNIVERSAL_APK" ../../Cinema-Vega.apk
             else
               ANY_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
-              [ -n "$ANY_APK" ] && cp "$ANY_APK" ../../Cinema.apk || true
+              [ -n "$ANY_APK" ] && cp "$ANY_APK" ../../Cinema-Vega.apk || true
             fi
           else
             echo "Alternative app source not present, skipping."
@@ -110,9 +109,9 @@ jobs:
         with:
           name: cinema-mobile-apks
           path: |
-            Cinema-Web.apk
+            Cinema-Vega.apk
             Cinema-Runner.apk
-            Cinema*.apk
+            Cinema.apk
           if-no-files-found: warn
 
       - name: Upload to GitHub Release
@@ -120,9 +119,9 @@ jobs:
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           files: |
-            Cinema-Web.apk
+            Cinema-Vega.apk
             Cinema-Runner.apk
-            Cinema*.apk
+            Cinema.apk
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

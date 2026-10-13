@@ -102,14 +102,10 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
 
   // Android APK matchers
   const isAppAndroidVega = (name: string) =>
-    !/runner/i.test(name) &&
-    !/web/i.test(name) &&
-    (name.toLowerCase() === "cinema.apk" ||
-      /vega.*\.apk$/i.test(name) ||
-      /cinema-universal.*\.apk$/i.test(name));
+    /vega/i.test(name) || /cinema-universal/i.test(name);
 
-  const isAppAndroidWeb = (name: string) =>
-    /cinema-web.*\.apk$/i.test(name);
+  const isAppAndroidCinema = (name: string) =>
+    !/runner/i.test(name) && !/vega/i.test(name) && !/web/i.test(name) && name.endsWith(".apk");
 
   const isRunnerAndroidApk = (name: string) =>
     /runner.*\.apk$/i.test(name);
@@ -151,7 +147,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
   const appWindowsSetup = getAsset(isAppWindowsSetup);
   const appWindowsPortable = getAsset(isAppWindowsPortable);
   const appAndroidVega = getAsset(isAppAndroidVega);
-  const appAndroidWeb = getAsset(isAppAndroidWeb);
+  const appAndroidCinema = getAsset(isAppAndroidCinema);
   const appLinuxDeb = getAsset(isAppLinuxDeb);
   const appLinuxAppImage = getAsset(isAppLinuxAppImage);
   const appMacDmg = getAsset(isAppMacDmg);
@@ -402,7 +398,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <button
-                    onClick={() => downloadFile("Cinema.apk", isAppAndroidVega)}
+                    onClick={() => downloadFile("Cinema-Vega.apk", isAppAndroidVega)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -420,15 +416,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Cinema APK</span>
+                      <span>Cinema Vega APK</span>
                     </div>
                     {appAndroidVega?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(appAndroidVega.size)}</span>
-                    ) : null}
+                    ) : (
+                      <span style={{ fontSize: "11px", opacity: 0.9 }}>48.2 MB</span>
+                    )}
                   </button>
 
                   <button
-                    onClick={() => downloadFile("Cinema-Web.apk", isAppAndroidWeb)}
+                    onClick={() => downloadFile("Cinema.apk", isAppAndroidCinema)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -446,11 +444,13 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Cinema Web APK</span>
+                      <span>Cinema APK</span>
                     </div>
-                    {appAndroidWeb?.size ? (
-                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(appAndroidWeb.size)}</span>
-                    ) : null}
+                    {appAndroidCinema?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(appAndroidCinema.size)}</span>
+                    ) : (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>29.7 MB</span>
+                    )}
                   </button>
                 </div>
               </div>
