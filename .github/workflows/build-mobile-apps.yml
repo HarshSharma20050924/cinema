@@ -51,7 +51,11 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk ../../Cinema-Web.apk
+          APK_FOUND=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -n "$APK_FOUND" ]; then
+            cp "$APK_FOUND" ../../Cinema-Web.apk
+            cp "$APK_FOUND" ../../Cinema.apk
+          fi
 
       # 2. Build Cinema Node Runner Android App
       - name: Build Cinema Node Runner Android App
@@ -61,7 +65,10 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk ../Cinema-Runner.apk
+          RUNNER_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -n "$RUNNER_APK" ]; then
+            cp "$RUNNER_APK" ../Cinema-Runner.apk
+          fi
 
       # 3. Build Cinema Alternative Native Mobile App
       - name: Build Cinema Alternative Native App
