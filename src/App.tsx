@@ -626,7 +626,7 @@ export default function App() {
     }
   };
 
-  const handleCloseDetails = (triggerHistoryBack = true) => {
+  const handleCloseDetails = (triggerHistoryBack = false) => {
     if (detailsHistoryStackRef.current.length > 0) {
       const prev = detailsHistoryStackRef.current.pop()!;
       handleSelectPost(prev, true);
@@ -646,6 +646,8 @@ export default function App() {
 
     if (triggerHistoryBack && window.history.state?.modal === "details") {
       window.history.back();
+    } else if (window.history.state?.modal === "details") {
+      window.history.replaceState(null, "", window.location.pathname);
     }
   };
 
@@ -662,8 +664,15 @@ export default function App() {
 
   const heroPost = posts.length > 0 ? posts[0] : null;
 
-  // Back to multi-row home
+  // Back to multi-row home from anywhere (Navbar, logo, details modal)
   const handleBackToHome = () => {
+    detailsHistoryStackRef.current = [];
+    setSelectedPost(null);
+    setDetails(null);
+    setStreams([]);
+    clearOverlayState();
+    document.body.style.overflow = "";
+
     setActiveCustomPage(null);
     setViewAllCategory(null);
     setIsBrowsingCategories(false);
@@ -673,6 +682,14 @@ export default function App() {
     setIsMergedFilter(false);
     setSearchQuery("");
     setPage(1);
+
+    if (window.history.state?.modal === "details") {
+      window.history.replaceState(null, "", "/");
+    }
+
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   };
 
   // Helper to resolve category filter

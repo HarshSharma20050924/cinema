@@ -352,13 +352,10 @@ const TrailerPage = ({
   const [activeTrailerIndex, setActiveTrailerIndex] = useState(0);
   const activeVideo = trailers[activeTrailerIndex] ?? trailers[0];
 
-  const youtubeOrigin = 'https://vega.app';
   const trailerUrl = activeVideo?.youtubeKey
-    ? `https://www.youtube.com/embed/${encodeURIComponent(
+    ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(
       activeVideo.youtubeKey,
-    )}?playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(
-      youtubeOrigin,
-    )}`
+    )}?playsinline=1&rel=0&modestbranding=1`
     : '';
   const youtubeUrl = activeVideo?.youtubeKey
     ? `https://www.youtube.com/watch?v=${encodeURIComponent(
@@ -392,8 +389,8 @@ const TrailerPage = ({
     <iframe
       src="${trailerUrl}"
       title="Trailer"
-      allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      referrerpolicy="strict-origin-when-cross-origin"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      referrerpolicy="no-referrer-when-downgrade"
       allowfullscreen>
     </iframe>
   </body>
@@ -494,7 +491,8 @@ const TrailerPage = ({
             mediaPlaybackRequiresUserAction
             originWhitelist={['https://*', 'http://*']}
             setSupportMultipleWindows={false}
-            source={{ baseUrl: `${youtubeOrigin}/`, html: playerHtml }}
+            source={{ baseUrl: 'https://www.youtube.com/', html: playerHtml }}
+            userAgent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
             style={{ backgroundColor: '#000000', flex: 1 }}
             thirdPartyCookiesEnabled
           />

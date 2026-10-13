@@ -188,7 +188,7 @@ export async function fetchTMDBDetails(
       vids.find((v: any) => v.type === "Trailer" && v.site === "YouTube") ||
       vids.find((v: any) => (v.type === "Teaser" || v.type === "Clip") && v.site === "YouTube");
     if (trailerItem && trailerItem.key) {
-      trailerEmbed = `https://www.youtube.com/embed/${trailerItem.key}?rel=0&modestbranding=1`;
+      trailerEmbed = `https://www.youtube-nocookie.com/embed/${trailerItem.key}?rel=0&modestbranding=1&playsinline=1`;
       trailerUrl = `https://www.youtube.com/watch?v=${trailerItem.key}`;
     }
 

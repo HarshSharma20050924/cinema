@@ -97,9 +97,10 @@ export const DetailsTrailer: React.FC<DetailsTrailerProps> = ({
         }}
       >
         <iframe
-          src={trailerEmbed}
+          src={trailerEmbed.replace("www.youtube.com", "www.youtube-nocookie.com")}
           title="Official Trailer"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="no-referrer-when-downgrade"
           allowFullScreen
           style={{
             position: "absolute",
