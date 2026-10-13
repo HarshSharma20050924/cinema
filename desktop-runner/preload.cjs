@@ -13,7 +13,9 @@ contextBridge.exposeInMainWorld('Capacitor', {
       getDeviceInfo: () => ipcRenderer.invoke('cinema:getDeviceInfo'),
       getAutoStart: () => ipcRenderer.invoke('cinema:getAutoStart'),
       toggleAutoStart: (val) => ipcRenderer.invoke('cinema:toggleAutoStart', val),
+      downloadAndInstall: (data) => ipcRenderer.invoke('cinema:downloadAndInstall', data),
       windowAction: (action) => ipcRenderer.invoke('cinema:windowAction', action),
+      onRevoked: (cb) => ipcRenderer.on('cinema:revoked', (_, data) => cb(data)),
     },
   },
 });

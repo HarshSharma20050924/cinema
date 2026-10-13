@@ -1,18 +1,7 @@
 {
-  "extends": "@react-native/typescript-config",
-  "compilerOptions": {
-    "jsx": "react-native",
-    "module": "es2020",
-    "types": ["jest", "node", "react"],
-    "skipLibCheck": true
-  },
-  "exclude": [
-    "src/lib/sandbox/runtime",
-    "scripts",
-    "__tests__",
-    "node_modules",
-    "android",
-    "ios",
-    ".expo"
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
   ]
 }

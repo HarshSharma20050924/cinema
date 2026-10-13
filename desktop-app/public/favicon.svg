@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="hc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff1e27"/>
+      <stop offset="100%" stop-color="#a8060e"/>
+    </linearGradient>
+    <linearGradient id="hc-glass" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Background badge -->
+  <rect width="64" height="64" rx="16" fill="url(#hc-grad)"/>
+  <!-- Glass reflection highlight -->
+  <path d="M0 16 C0 7.16 7.16 0 16 0 L48 0 C56.84 0 64 7.16 64 16 L64 24 L0 24 Z" fill="url(#hc-glass)"/>
+  <!-- Border outline -->
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="none" stroke="rgba(255, 255, 255, 0.25)" stroke-width="2"/>
+  <!-- HC Monogram Text -->
+  <text x="32" y="34" text-anchor="middle" dominant-baseline="central" font-family="'Space Grotesk', system-ui, -apple-system, sans-serif" font-weight="900" font-size="30" letter-spacing="-1.2" fill="#ffffff">HC</text>
+</svg>

@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -32,7 +32,8 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build Web App
+      # 1. Build Cinema Web and Mobile Wrapper (Cinema Main)
+      - name: Build Web App Dist
         run: |
           npm ci || npm install
           npm run build
@@ -49,12 +50,29 @@ jobs:
           ./gradlew assembleRelease
           cp app/build/outputs/apk/release/app-release.apk ../../Cinema-Web.apk
 
+      # 2. Build Cinema Node Runner Android App
       - name: Build Cinema Node Runner Android App
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
           cp app/build/outputs/apk/release/app-release.apk ../Cinema-Runner.apk
+
+      # 3. Build Cinema Alternative Native Mobile App
+      - name: Build Cinema Alternative Native App
+        working-directory: vega-app
+        run: |
+          npm ci || npm install
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+          UNIVERSAL_APK=$(find app/build/outputs/apk/release -name "*universal*.apk" | head -n 1)
+          if [ -n "$UNIVERSAL_APK" ]; then
+            cp "$UNIVERSAL_APK" ../../Cinema.apk
+          else
+            ANY_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+            cp "$ANY_APK" ../../Cinema.apk
+          fi
 
       - name: Upload Artifacts (Actions tab)
         uses: actions/upload-artifact@v4
@@ -63,6 +81,7 @@ jobs:
           path: |
             Cinema-Web.apk
             Cinema-Runner.apk
+            Cinema.apk
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -71,5 +90,6 @@ jobs:
           files: |
             Cinema-Web.apk
             Cinema-Runner.apk
+            Cinema.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

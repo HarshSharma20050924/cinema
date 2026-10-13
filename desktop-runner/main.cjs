@@ -86,9 +86,14 @@ async function syncCoordinator(tunnelUrl) {
       }),
     });
     const data = await res.json();
-    if (data && data.allowed === false) {
-      console.warn('[Admin] Runner disabled remotely by Admin.');
+    if (data && (data.allowed === false || data.command === 'STOP_SERVER')) {
+      console.warn('⛔ [Admin] Access remotely REVOKED by Administrator! Halting engine.');
+      statusMessage = data.message || 'Access revoked by Administrator';
       stopEngine();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('cinema:revoked', { message: statusMessage });
+      }
+      return;
     }
   } catch (err) {
     console.warn('[Admin] Dashboard heartbeat error:', err.message);
@@ -113,6 +118,25 @@ async function notifyOffline() {
 // Engine Orchestration
 async function startEngine() {
   if (isRunning) return true;
+
+  // Check admin authorization first
+  try {
+    const chk = await fetch(`https://cinema-admin.pages.dev/api/runner/check?deviceId=${encodeURIComponent(config.deviceId)}&deviceName=${encodeURIComponent(config.deviceName)}`, {
+      signal: AbortSignal.timeout(4000)
+    });
+    if (chk.ok) {
+      const chkData = await chk.json();
+      if (chkData && chkData.allowed === false) {
+        console.warn('⛔ [Admin] Cannot start: Access is revoked by Administrator.');
+        statusMessage = chkData.message || 'Access revoked by Administrator';
+        updateTray();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('cinema:revoked', { message: statusMessage });
+        }
+        return false;
+      }
+    }
+  } catch (_) {}
 
   statusMessage = 'Starting local server...';
   updateTray();
@@ -256,14 +280,15 @@ async function reconnectEngine() {
 // Window & Tray Creation
 function createWindow() {
   const iconPath = path.join(__dirname, 'public', 'icon.png');
+  const appIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : undefined;
 
   mainWindow = new BrowserWindow({
     width: 440,
     height: 780,
     minWidth: 380,
     minHeight: 620,
-    backgroundColor: '#090c13',
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    backgroundColor: '#070709',
+    icon: appIcon,
     autoHideMenuBar: true,
     title: 'Cinema Node Runner',
     webPreferences: {
@@ -272,6 +297,10 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+
+  if (appIcon && process.platform === 'linux') {
+    mainWindow.setIcon(appIcon);
+  }
 
   mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'));
 
@@ -429,6 +458,12 @@ ipcMain.handle('cinema:toggleAutoStart', async (_, enabled) => {
   app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
   updateTray();
   return app.getLoginItemSettings().openAtLogin;
+});
+
+ipcMain.handle('cinema:downloadAndInstall', async (_, data) => {
+  const url = data?.url || 'https://github.com/HarshSharma20050924/cinema/releases/latest';
+  shell.openExternal(url);
+  return { success: true };
 });
 
 ipcMain.handle('cinema:windowAction', async (_, action) => {

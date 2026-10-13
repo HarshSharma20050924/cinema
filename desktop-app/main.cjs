@@ -279,9 +279,13 @@ ipcMain.handle('cinema:apply-update', async () => {
       fs.chmodSync(downloadedUpdatePath, 0o755);
       const currentAppImage = process.env.APPIMAGE;
       if (currentAppImage && fs.existsSync(currentAppImage)) {
-        // Atomic replace running AppImage file
+        // Atomic replace running AppImage using temp file and rename (bypasses ETXTBSY)
         try {
-          fs.copyFileSync(downloadedUpdatePath, currentAppImage);
+          const tempTarget = `${currentAppImage}.new`;
+          fs.copyFileSync(downloadedUpdatePath, tempTarget);
+          fs.chmodSync(tempTarget, 0o755);
+          fs.renameSync(tempTarget, currentAppImage);
+          downloadedUpdatePath = null;
           app.relaunch({ execPath: currentAppImage });
           app.exit(0);
           return { success: true };
@@ -289,6 +293,7 @@ ipcMain.handle('cinema:apply-update', async () => {
       }
       // If portable or fallback, spawn downloaded AppImage
       spawn(downloadedUpdatePath, ['--no-sandbox'], { detached: true, stdio: 'ignore' }).unref();
+      downloadedUpdatePath = null;
       app.exit(0);
       return { success: true };
     }
@@ -296,17 +301,257 @@ ipcMain.handle('cinema:apply-update', async () => {
     if (platform === 'win32') {
       // Execute NSIS installer silently or run updated executable
       spawn(downloadedUpdatePath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
+      downloadedUpdatePath = null;
       app.exit(0);
       return { success: true };
     }
 
     if (platform === 'darwin') {
       shell.openPath(downloadedUpdatePath);
+      downloadedUpdatePath = null;
       app.exit(0);
       return { success: true };
     }
   } catch (err) {
     return { success: false, error: err.message };
+  }
+});
+
+// Direct Cross-Platform VLC Playback without Location Errors
+ipcMain.handle('cinema:play-vlc', async (_, { streamUrl, title, isMovieBox }) => {
+  try {
+    if (!streamUrl) return { success: false, error: 'No stream URL provided' };
+
+    const cleanTitle = (title || 'Cinema Stream').replace(/[\r\n]/g, ' ').trim() || 'stream';
+    let targetUrl = streamUrl.trim();
+    let host = '';
+    try {
+      host = new URL(targetUrl).hostname.toLowerCase();
+    } catch (_) {}
+
+    const movieboxCheck =
+      Boolean(isMovieBox) ||
+      host.includes('hakunaymatata') ||
+      host.includes('moviebox') ||
+      host.includes('inmoviebox') ||
+      host.includes('aoneroom');
+
+    const needsProxy =
+      movieboxCheck ||
+      host.includes('kisskh') ||
+      host.includes('krussdomi') ||
+      host.includes('habibikun');
+
+    // Route anti-hotlinking streams through local engine proxy to spoof required Origin/Referer
+    let playableUrl = targetUrl;
+    if (needsProxy && !targetUrl.includes('/api/proxy')) {
+      playableUrl = `http://127.0.0.1:${serverPort}/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+      if (movieboxCheck) {
+        playableUrl += `&referer=${encodeURIComponent('https://officialmoviebox.com/')}`;
+        playableUrl += `&origin=${encodeURIComponent('https://officialmoviebox.com')}`;
+      }
+    }
+
+    // Ensure media extension exists so media players recognize stream container
+    if (!/\.(mkv|mp4|m3u8|webm|avi|mov|flv|ts)(\?|$)/i.test(playableUrl)) {
+      playableUrl += playableUrl.includes('?') ? '&file=video.mp4' : '?file=video.mp4';
+    }
+
+    // Build .m3u playlist file with VLC headers
+    let m3u = `#EXTM3U\n#EXTINF:-1,${cleanTitle}\n`;
+    if (movieboxCheck) {
+      m3u += '#EXTVLCOPT:http-referrer=https://officialmoviebox.com/\n';
+      m3u += '#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\n';
+    }
+    m3u += `${playableUrl}\n`;
+
+    const tempDir = app.getPath('temp');
+    const safeFileName = `${cleanTitle.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)}.m3u`;
+    const m3uPath = path.join(tempDir, safeFileName);
+    fs.writeFileSync(m3uPath, m3u, 'utf-8');
+
+    const platform = process.platform;
+    let launched = false;
+
+    // 1. Launch VLC executable directly
+    if (platform === 'linux') {
+      const candidates = ['/usr/bin/vlc', '/snap/bin/vlc', '/usr/local/bin/vlc', 'vlc'];
+      for (const bin of candidates) {
+        try {
+          const p = spawn(bin, [m3uPath], { detached: true, stdio: 'ignore' });
+          p.unref();
+          launched = true;
+          break;
+        } catch (_) {}
+      }
+    } else if (platform === 'win32') {
+      const winCandidates = [
+        'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
+        'C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe',
+        'vlc.exe',
+        'vlc',
+      ];
+      for (const bin of winCandidates) {
+        if (fs.existsSync(bin) || bin.endsWith('.exe')) {
+          try {
+            const p = spawn(bin, [m3uPath], { detached: true, stdio: 'ignore' });
+            p.unref();
+            launched = true;
+            break;
+          } catch (_) {}
+        }
+      }
+    } else if (platform === 'darwin') {
+      const macVlc = '/Applications/VLC.app/Contents/MacOS/VLC';
+      if (fs.existsSync(macVlc)) {
+        try {
+          spawn(macVlc, [m3uPath], { detached: true, stdio: 'ignore' }).unref();
+          launched = true;
+        } catch (_) {}
+      }
+      if (!launched) {
+        try {
+          spawn('open', ['-a', 'VLC', m3uPath], { detached: true, stdio: 'ignore' }).unref();
+          launched = true;
+        } catch (_) {}
+      }
+    }
+
+    // 2. Fallback: shell.openPath opens default handler for .m3u
+    if (!launched) {
+      await shell.openPath(m3uPath);
+    }
+
+    return { success: true, m3uPath, playableUrl };
+  } catch (err) {
+    console.error('[VLC] Launch error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Background Downloads Manager with Real-time Progress Tracking
+const activeDownloads = new Map();
+
+function pipeDownloadStream(id, res, fileStream, filePath) {
+  const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+  let receivedBytes = 0;
+  let lastTime = Date.now();
+  let lastBytes = 0;
+
+  res.on('data', (chunk) => {
+    receivedBytes += chunk.length;
+    fileStream.write(chunk);
+
+    const now = Date.now();
+    if (now - lastTime >= 400 && mainWindow) {
+      const elapsed = (now - lastTime) / 1000;
+      const speedBytes = (receivedBytes - lastBytes) / elapsed;
+      const speed =
+        speedBytes >= 1024 * 1024
+          ? `${(speedBytes / (1024 * 1024)).toFixed(1)} MB/s`
+          : `${Math.round(speedBytes / 1024)} KB/s`;
+      const percent = totalBytes > 0 ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100)) : 50;
+
+      mainWindow.webContents.send('cinema:download-progress', {
+        id,
+        receivedBytes,
+        totalBytes,
+        percent,
+        speed,
+        status: 'downloading',
+        filePath,
+      });
+
+      lastTime = now;
+      lastBytes = receivedBytes;
+    }
+  });
+
+  res.on('end', () => {
+    fileStream.end();
+    activeDownloads.delete(id);
+    if (mainWindow) {
+      mainWindow.webContents.send('cinema:download-progress', {
+        id,
+        receivedBytes,
+        totalBytes,
+        percent: 100,
+        speed: 'Done',
+        status: 'completed',
+        filePath,
+      });
+    }
+  });
+
+  res.on('error', (err) => {
+    fileStream.end();
+    activeDownloads.delete(id);
+    if (mainWindow) {
+      mainWindow.webContents.send('cinema:download-progress', {
+        id,
+        status: 'error',
+        error: err.message,
+        filePath,
+      });
+    }
+  });
+}
+
+ipcMain.handle('cinema:start-download', async (_, { id, url, title, filename }) => {
+  try {
+    const downloadsDir = app.getPath('downloads');
+    const safeName = (filename || `${title || 'video'}.mp4`).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = path.join(downloadsDir, safeName);
+    const fileStream = fs.createWriteStream(filePath);
+
+    const client = url.startsWith('https') ? https : http;
+
+    const req = client.get(
+      url,
+      { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } },
+      (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          client.get(
+            res.headers.location,
+            { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } },
+            (redirRes) => {
+              pipeDownloadStream(id, redirRes, fileStream, filePath);
+            }
+          );
+          return;
+        }
+        pipeDownloadStream(id, res, fileStream, filePath);
+      }
+    );
+
+    req.on('error', (err) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('cinema:download-progress', { id, status: 'error', error: err.message });
+      }
+    });
+
+    activeDownloads.set(id, { req, fileStream, filePath });
+    return { success: true, filePath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('cinema:cancel-download', (_, id) => {
+  const dl = activeDownloads.get(id);
+  if (dl) {
+    try { dl.req.destroy(); } catch (_) {}
+    try { dl.fileStream.destroy(); } catch (_) {}
+    activeDownloads.delete(id);
+  }
+  return { success: true };
+});
+
+ipcMain.handle('cinema:open-download-file', (_, filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    shell.showItemInFolder(filePath);
+  } else {
+    shell.openPath(app.getPath('downloads'));
   }
 });
 

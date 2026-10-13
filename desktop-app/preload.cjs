@@ -3,7 +3,20 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('CinemaDesktop', {
   isDesktop: true,
   platform: process.platform,
-  version: '4.0.8',
+  version: '4.1.0',
+
+  // Direct VLC Playback (Cross-Platform)
+  playInVlc: (streamData) => ipcRenderer.invoke('cinema:play-vlc', streamData),
+
+  // Background Download Manager with Live Progress
+  startDownload: (data) => ipcRenderer.invoke('cinema:start-download', data),
+  cancelDownload: (id) => ipcRenderer.invoke('cinema:cancel-download', id),
+  openDownloadFile: (filePath) => ipcRenderer.invoke('cinema:open-download-file', filePath),
+  onDownloadProgress: (cb) => {
+    const listener = (_, data) => cb(data);
+    ipcRenderer.on('cinema:download-progress', listener);
+    return () => ipcRenderer.removeListener('cinema:download-progress', listener);
+  },
 
   // Direct In-App Auto-Updater
   checkForUpdates: () => ipcRenderer.invoke('cinema:check-update'),

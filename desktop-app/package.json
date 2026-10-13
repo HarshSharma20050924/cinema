@@ -1,7 +1,7 @@
 {
   "name": "cinema-desktop",
   "productName": "Cinema",
-  "version": "4.0.8",
+  "version": "4.1.0",
   "description": "High-Performance Standalone Desktop Cinema Streaming App",
   "author": "Harsh Sharma",
   "repository": {
@@ -11,7 +11,7 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "dist:linux": "electron-builder --linux AppImage --publish never",
+    "dist:linux": "electron-builder --linux AppImage deb --publish never",
     "dist:win": "electron-builder --win nsis portable --publish never",
     "dist:mac": "electron-builder --mac dmg --publish never",
     "dist:all": "electron-builder -wlm --publish never"
@@ -68,6 +68,10 @@
       "target": [
         {
           "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
           "arch": ["x64"]
         }
       ],

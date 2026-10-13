@@ -27,20 +27,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Build Frontend Web Bundle
-        run: |
-          npm ci || npm install
-          npm run build
-
-      - name: Prepare Desktop App Assets
-        run: |
-          mkdir -p desktop-app/dist desktop-app/server desktop-app/public
-          cp -r dist/* desktop-app/dist/
-          cp -r server/* desktop-app/server/
-          cp -r public/* desktop-app/public/
-        shell: bash
-
-      - name: Install Dependencies
+      - name: Install Desktop Dependencies
         working-directory: desktop-app
         run: npm ci || npm install
 
@@ -65,16 +52,18 @@ jobs:
           path: |
             desktop-app/release/*.exe
             desktop-app/release/*.AppImage
+            desktop-app/release/*.deb
             desktop-app/release/*.dmg
             desktop-app/release/*.zip
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v4.0.9' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v4.1.0' }}
           files: |
             desktop-app/release/*.exe
             desktop-app/release/*.AppImage
+            desktop-app/release/*.deb
             desktop-app/release/*.dmg
             desktop-app/release/*.zip
         env:

@@ -18,9 +18,10 @@ import { MediaGrid } from "./components/media/MediaGrid";
 import { Footer } from "./components/layout/Footer";
 import { DetailsModal } from "./components/details/DetailsModal";
 import { PersonDetailsModal } from "./components/person/PersonDetailsModal";
-import { VideoPlayerModal } from "./components/player/VideoPlayerModal";
+import { DownloadManagerModal } from "./components/downloads/DownloadManagerModal";
 import { OnboardingModal } from "./components/setup/OnboardingModal";
 import { SettingsModal } from "./components/settings/SettingsModal";
+import { UpdateModal } from "./components/updater/UpdateModal";
 import { api } from "./api/client";
 import { appCache } from "./utils/cache";
 import {
@@ -282,10 +283,11 @@ export default function App() {
   );
   const [loadingStreams, setLoadingStreams] = useState(false);
 
-  // Video Playback State
+  // Video Playback & Download Manager State
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(
     initialNavState?.playbackUrl || null
   );
+  const [downloadManagerOpen, setDownloadManagerOpen] = useState(false);
 
   // Cast / Person Details State & URL Hash Synchronization (e.g. #!/person/3223)
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
@@ -569,10 +571,10 @@ export default function App() {
     saveNavigationState({ playbackUrl: null });
   };
 
-  // External Player launcher (VLC / MPV / MX Player)
-  const handlePlayExternal = (url: string, player: ExternalPlayerType = "vlc") => {
+  // External Player launcher (Direct VLC)
+  const handlePlayExternal = (url: string, player: ExternalPlayerType = "vlc", title?: string) => {
     const finalPlayer = player || settings.defaultPlayer || "vlc";
-    launchExternalPlayer(url, finalPlayer, settings.customPlayerScheme);
+    launchExternalPlayer(url, finalPlayer, settings.customPlayerScheme, title);
   };
 
   const heroPost = posts.length > 0 ? posts[0] : null;
@@ -902,6 +904,7 @@ export default function App() {
         isGlobalSearch={isGlobalSearch}
         onToggleGlobalSearch={() => setIsGlobalSearch(!isGlobalSearch)}
         onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenDownloads={() => setDownloadManagerOpen(true)}
         onGoHome={handleBackToHome}
         onSelectCategoryNav={handleSelectCategoryNav}
         activeNavTab={activeNavTab}
@@ -1218,7 +1221,7 @@ export default function App() {
           activeNavTab={activeNavTab}
           defaultPlayer={settings.defaultPlayer}
           onClose={handleCloseDetails}
-          onPlayStream={(url) => setPlaybackUrl(url)}
+          onPlayStream={(url, title) => handlePlayExternal(url, "vlc", title)}
           onPlayExternal={handlePlayExternal}
           onSelectRecommended={(p) => handleSelectPost(p)}
           onSelectPerson={handleOpenPerson}
@@ -1262,10 +1265,10 @@ export default function App() {
         />
       )}
 
-      {/* 6. Video Player Modal */}
-      <VideoPlayerModal
-        playbackUrl={playbackUrl}
-        onClose={handleClosePlayer}
+      {/* 6. Download Manager Modal */}
+      <DownloadManagerModal
+        isOpen={downloadManagerOpen}
+        onClose={() => setDownloadManagerOpen(false)}
       />
 
       {/* 7. Settings Modal */}
@@ -1282,6 +1285,9 @@ export default function App() {
           onClose={() => setSettingsModalOpen(false)}
         />
       )}
+
+      {/* 8. Direct In-App Auto-Updater Modal (Zero Redirects) */}
+      <UpdateModal />
     </div>
   );
 }
