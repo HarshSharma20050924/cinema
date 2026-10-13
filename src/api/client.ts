@@ -1,7 +1,27 @@
 import { appCache } from "../utils/cache";
 import type { Provider, CatalogFilter, CatalogData, Post, MediaDetails, StreamItem } from "../types";
 
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
+export function getBackendUrl(): string {
+  const envUrl = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
+  if (envUrl) return envUrl;
+
+  if (typeof window !== "undefined") {
+    const isCapacitor =
+      Boolean((window as any).Capacitor) ||
+      window.location.protocol === "capacitor:" ||
+      window.location.protocol === "file:" ||
+      (window.location.hostname === "localhost" &&
+        window.location.port !== "5173" &&
+        window.location.port !== "3000" &&
+        window.location.port !== "7777");
+    if (isCapacitor) {
+      return "https://cinema-dwh.pages.dev";
+    }
+  }
+  return "";
+}
+
+const BACKEND_URL = getBackendUrl();
 
 const TTL = {
   PROVIDERS: 30 * 60 * 1000,

@@ -14,7 +14,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   onComplete,
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
-  const [providerSource, setProviderSource] = useState("");
+  const [providerSource, setProviderSource] = useState("Cinema");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Helper to get auto-selected providers (hdhub4u only by default)
@@ -41,9 +41,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   const handleNextStep = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanInput = providerSource.trim().toLowerCase();
-    if (cleanInput !== REQUIRED_PROVIDER_NAME) {
-      setErrorMessage("Access denied. Please enter the exact provider name.");
+    const cleanInput = providerSource.trim();
+    if (!cleanInput) {
+      setErrorMessage("Please enter a provider name.");
       return;
     }
     setErrorMessage(null);

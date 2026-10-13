@@ -47,6 +47,12 @@ jobs:
           npm ci || npm install
           rm -rf dist
           cp -r ../dist ./dist
+          for m in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p android/app/src/main/res/mipmap-$m
+            cp ../public/logo.png android/app/src/main/res/mipmap-$m/ic_launcher.png
+            cp ../public/logo.png android/app/src/main/res/mipmap-$m/ic_launcher_round.png
+            cp ../public/logo.png android/app/src/main/res/mipmap-$m/ic_launcher_foreground.png
+          done
           npx cap sync android
           cd android
           chmod +x gradlew

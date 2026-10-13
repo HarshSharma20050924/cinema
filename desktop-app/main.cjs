@@ -385,21 +385,53 @@ ipcMain.handle('cinema:play-vlc', async (_, { streamUrl, title, isMovieBox }) =>
         } catch (_) {}
       }
     } else if (platform === 'win32') {
+      const progFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+      const progFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+      const localAppData = process.env['LOCALAPPDATA'] || '';
+
       const winCandidates = [
+        path.join(progFiles, 'VideoLAN', 'VLC', 'vlc.exe'),
+        path.join(progFilesX86, 'VideoLAN', 'VLC', 'vlc.exe'),
+        localAppData ? path.join(localAppData, 'Programs', 'VideoLAN', 'VLC', 'vlc.exe') : '',
         'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
         'C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe',
-        'vlc.exe',
-        'vlc',
-      ];
+        'D:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
+        'D:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe',
+      ].filter(Boolean);
+
+      // Query Windows Registry for VLC executable path
+      try {
+        const { execSync } = require('child_process');
+        const regOut = execSync('reg query "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\vlc.exe" /ve', { encoding: 'utf8', windowsHide: true });
+        const match = regOut.match(/REG_SZ\s+(.+)$/m);
+        if (match && match[1]) {
+          const regPath = match[1].trim().replace(/^"|"$/g, '');
+          if (regPath && !winCandidates.includes(regPath)) {
+            winCandidates.unshift(regPath);
+          }
+        }
+      } catch (_) {}
+
       for (const bin of winCandidates) {
-        if (fs.existsSync(bin) || bin.endsWith('.exe')) {
+        if (fs.existsSync(bin)) {
           try {
             const p = spawn(bin, [m3uPath], { detached: true, stdio: 'ignore' });
+            p.on('error', () => {});
             p.unref();
             launched = true;
             break;
           } catch (_) {}
         }
+      }
+
+      if (!launched) {
+        // Try spawning vlc directly if on system PATH
+        try {
+          const p = spawn('vlc', [m3uPath], { shell: true, detached: true, stdio: 'ignore' });
+          p.on('error', () => {});
+          p.unref();
+          launched = true;
+        } catch (_) {}
       }
     } else if (platform === 'darwin') {
       const macVlc = '/Applications/VLC.app/Contents/MacOS/VLC';

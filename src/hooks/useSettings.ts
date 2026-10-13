@@ -9,7 +9,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   installedExtensions: ["hdhub4u", "vega", "4khdhub", "olamovies", "gramcinema", "drive", "mod", "movieBoxWeb", "1cinevood", "autoEmbed", "katmovies", "world4u"],
   defaultPlayer: "vlc",
   customPlayerScheme: "vlc://",
-  isConfigured: true,
+  isConfigured: false,
 };
 
 export const launchExternalPlayer = (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { fetchTMDBDetails, type TMDBDetails } from "../../api/tmdb";
-import { api } from "../../api/client";
+import { api, getBackendUrl } from "../../api/client";
 import { parseTitleAndYear } from "../media/MediaCard";
 import { Navbar } from "../layout/Navbar";
 import { appCache } from "../../utils/cache";
@@ -261,7 +261,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     setResolvingKey(key);
     setResolvingKeys((prev) => ({ ...prev, [key]: true }));
     try {
-      const backendUrl = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
+      const backendUrl = getBackendUrl();
       const titleParam = encodeURIComponent(displayTitle || details?.title || post?.title || "");
       const seasonParam = activeSeason?.season || 1;
       const res = await fetch(
@@ -325,7 +325,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       return;
     }
 
-    const backendUrl = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
+    const backendUrl = getBackendUrl();
     const downloadUrl = `${backendUrl}/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFileName)}`;
     downloadManager.startDownload(downloadUrl, displayTitle, cleanFileName);
     if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
