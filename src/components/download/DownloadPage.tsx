@@ -58,7 +58,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
             return;
           }
         }
-      } catch (_) {}
+      } catch {}
 
       if (isMounted) {
         const fallbackVer = (packageJson.version || "4.1.0").replace(/^v/i, "");
@@ -118,7 +118,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
     /runner/i.test(name) && !/setup/i.test(name) && name.endsWith(".exe");
 
   const isRunnerLinuxDeb = (name: string) =>
-    /runner/i.test(name) && name.endsWith(".deb");
+    (/runner/i.test(name) || /node-runner/i.test(name)) && name.endsWith(".deb");
 
   const isRunnerLinuxAppImage = (name: string) =>
     /runner/i.test(name) && (name.endsWith(".AppImage") || name.endsWith(".appimage"));
@@ -145,6 +145,9 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
   };
 
   const currentVersion = release?.version || packageJson.version || "4.1.0";
+  const runnerAsset = release?.assets?.find((a) => /runner/i.test(a.name) && /\d+\.\d+\.\d+/.test(a.name));
+  const runnerVersionMatch = runnerAsset?.name.match(/(\d+\.\d+\.\d+)/);
+  const runnerVersion = runnerVersionMatch ? runnerVersionMatch[1] : "2.2.0";
 
   // Match Cinema App files
   const appWindowsSetup = getAsset(isAppWindowsSetup);
@@ -239,7 +242,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "8px 20px",
                   borderRadius: "24px",
                   border: "none",
-                  background: activeTab === tab.id ? "#e50914" : "transparent",
+                  background:
+                    activeTab === tab.id
+                      ? tab.id === "runner"
+                        ? "#2563eb"
+                        : "#e50914"
+                      : "transparent",
                   color: activeTab === tab.id ? "#ffffff" : "#a3a3a3",
                   fontSize: "13px",
                   fontWeight: 700,
@@ -632,7 +640,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   height: "42px",
                   borderRadius: "14px",
                   objectFit: "cover",
-                  boxShadow: "0 4px 14px rgba(255, 255, 255, 0.15)",
+                  boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
                 }}
               />
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -640,16 +648,33 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   style={{
                     width: "4px",
                     height: "22px",
-                    backgroundColor: "#e50914",
+                    backgroundColor: "#2563eb",
                     borderRadius: "2px",
                   }}
                 />
                 <div>
-                  <ShadedHeading
-                    text="Cinema Runner"
-                    tag="h2"
-                    style={{ fontSize: "21px", fontWeight: 800 }}
-                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <ShadedHeading
+                      text="Cinema Runner"
+                      tag="h2"
+                      style={{ fontSize: "21px", fontWeight: 800 }}
+                    />
+                    {runnerVersion && (
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          backgroundColor: "rgba(37, 99, 235, 0.18)",
+                          color: "#60a5fa",
+                          border: "1px solid rgba(37, 99, 235, 0.35)",
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                        }}
+                      >
+                        v{runnerVersion}
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: "12px", color: "#888888", marginTop: "2px" }}>
                     Background scraping engine and proxy helper daemon.
                   </div>
@@ -689,12 +714,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <button
-                    onClick={() => downloadFile(`Cinema-Runner.Setup.${currentVersion}.exe`, isRunnerWindowsSetup)}
+                    onClick={() => downloadFile(`Cinema.Node.Runner.Setup.${runnerVersion}.exe`, isRunnerWindowsSetup)}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      background: "#e50914",
+                      background: "#2563eb",
                       border: "none",
                       color: "#ffffff",
                       padding: "11px 14px",
@@ -703,6 +728,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
+                      boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
@@ -715,7 +741,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   </button>
 
                   <button
-                    onClick={() => downloadFile(`Cinema-Runner.${currentVersion}.exe`, isRunnerWindowsPortable)}
+                    onClick={() => downloadFile(`Cinema.Node.Runner.${runnerVersion}.exe`, isRunnerWindowsPortable)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -772,7 +798,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      background: "#e50914",
+                      background: "#2563eb",
                       border: "none",
                       color: "#ffffff",
                       padding: "11px 14px",
@@ -781,6 +807,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
+                      boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
@@ -812,16 +839,19 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
                     Linux Runner
                   </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Ubuntu, Debian, Mint & all distros
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <button
-                    onClick={() => downloadFile(`cinema-runner_${currentVersion}_amd64.deb`, isRunnerLinuxDeb)}
+                    onClick={() => downloadFile(`cinema-node-runner_${runnerVersion}_amd64.deb`, isRunnerLinuxDeb)}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      background: "#e50914",
+                      background: "#2563eb",
                       border: "none",
                       color: "#ffffff",
                       padding: "11px 14px",
@@ -830,6 +860,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
+                      boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
@@ -842,7 +873,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   </button>
 
                   <button
-                    onClick={() => downloadFile(`Cinema-Runner-${currentVersion}.AppImage`, isRunnerLinuxAppImage)}
+                    onClick={() => downloadFile(`Cinema.Node.Runner-${runnerVersion}.AppImage`, isRunnerLinuxAppImage)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -894,12 +925,12 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <button
-                    onClick={() => downloadFile(`Cinema-Runner-${currentVersion}.dmg`, isRunnerMacDmg)}
+                    onClick={() => downloadFile(`Cinema.Node.Runner-${runnerVersion}-arm64.dmg`, isRunnerMacDmg)}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      background: "#e50914",
+                      background: "#2563eb",
                       border: "none",
                       color: "#ffffff",
                       padding: "11px 14px",
@@ -908,6 +939,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
+                      boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
@@ -920,7 +952,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   </button>
 
                   <button
-                    onClick={() => downloadFile(`Cinema-Runner-${currentVersion}.dmg`, isRunnerMacDmg)}
+                    onClick={() => downloadFile(`Cinema.Node.Runner-${runnerVersion}-arm64.dmg`, isRunnerMacDmg)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -1054,7 +1086,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        color: "#e50914",
+                        color: /runner/i.test(asset.name) ? "#3b82f6" : "#e50914",
                         fontSize: "12px",
                         fontWeight: 700,
                         textDecoration: "none",

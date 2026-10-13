@@ -100,6 +100,7 @@ All precompiled binaries and installation packages are published on the [GitHub 
 | Android | Android Runner Service | `.apk` (~31 MB) | [Download Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk) |
 | Windows | Runner Setup Installer | `.exe` (~80 MB) | [Download Runner Setup (.exe)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
 | Windows | Runner Portable | `.exe` (~80 MB) | [Download Runner Portable (.exe)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Linux / Ubuntu / Debian | Runner Debian Package | `.deb` (~72 MB) | [Download Runner Debian (.deb)](https://github.com/HarshSharma20050924/cinema/releases/latest/download/cinema-node-runner_2.2.0_amd64.deb) |
 | Linux / Server | Standalone Runner | `.AppImage` (~105 MB) | [Download Runner AppImage](https://github.com/HarshSharma20050924/cinema/releases/latest) |
 | macOS | macOS Runner | `.dmg` (~96 MB) | [Download Runner Disk Image (.dmg)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
 
