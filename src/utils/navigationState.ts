@@ -13,7 +13,8 @@ export interface NavigationState {
   streams?: StreamItem[];
   playbackUrl?: string | null;
   scrollY?: number;
-  activeNavTab?: "home" | "movies" | "tv" | "categories";
+  activeNavTab?: "home" | "movies" | "tv" | "categories" | "downloads";
+  activeCustomPage?: "downloads" | "terms" | "privacy" | "disclaimer" | null;
   isBrowsingCategories?: boolean;
   viewAllCategory?: { filter: string; title: string } | null;
   selectedNicheId?: string | null;

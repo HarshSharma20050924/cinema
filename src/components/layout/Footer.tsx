@@ -1,10 +1,76 @@
-import React from "react";
+import React, { useState } from "react";
 import { GithubIcon, InstagramIcon } from "../../icons";
 
 interface FooterProps {
   onNavigateTab?: (tab: "movies" | "tv" | "categories" | "downloads" | "terms" | "privacy" | "disclaimer") => void;
   onExploreNiches?: () => void;
 }
+
+const FooterNavFlipButton: React.FC<{ text: string; onClick: () => void }> = ({ text, onClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        onClick();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        background: "none",
+        border: "none",
+        padding: "4px 8px",
+        cursor: "pointer",
+        position: "relative",
+        overflow: "hidden",
+        height: "22px",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        outline: "none",
+      }}
+    >
+      <span
+        style={{
+          position: "relative",
+          display: "inline-block",
+          overflow: "hidden",
+          height: "20px",
+          lineHeight: "20px",
+          fontSize: "12px",
+          fontWeight: 800,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+        }}
+      >
+        {/* Top Text - rolls up */}
+        <span
+          style={{
+            display: "block",
+            color: "#ffffff",
+            transform: isHovered ? "translateY(-100%)" : "translateY(0%)",
+            transition: "transform 0.45s cubic-bezier(0.76, 0, 0.24, 1)",
+          }}
+        >
+          {text}
+        </span>
+        {/* Bottom Text - rolls in from below in Cinema Red */}
+        <span
+          style={{
+            display: "block",
+            position: "absolute",
+            inset: 0,
+            color: "#e50914",
+            transform: isHovered ? "translateY(0%)" : "translateY(100%)",
+            transition: "transform 0.45s cubic-bezier(0.76, 0, 0.24, 1)",
+          }}
+        >
+          {text}
+        </span>
+      </span>
+    </button>
+  );
+};
 
 export const Footer: React.FC<FooterProps> = ({ onNavigateTab, onExploreNiches }) => {
   return (
@@ -60,17 +126,17 @@ export const Footer: React.FC<FooterProps> = ({ onNavigateTab, onExploreNiches }
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: "16px",
+            gap: "14px",
             position: "relative",
             zIndex: 3,
           }}
         >
-          {/* Navigation Pill */}
+          {/* Navigation Pill with Rolling Flip on Hover */}
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: "28px",
+              gap: "20px",
               padding: "4px 8px",
               background: "transparent",
               border: "none",
@@ -79,286 +145,174 @@ export const Footer: React.FC<FooterProps> = ({ onNavigateTab, onExploreNiches }
               justifyContent: "center",
             }}
           >
-            <button
-              onClick={() => {
-                if (onNavigateTab) onNavigateTab("movies");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#ffffff",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-                textTransform: "uppercase",
-                textShadow: "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textShadow = "0 0 16px rgba(229, 9, 20, 1), 0 0 30px rgba(255, 50, 70, 0.8)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textShadow = "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              Movies
-            </button>
-
-            <button
-              onClick={() => {
-                if (onNavigateTab) onNavigateTab("tv");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#ffffff",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-                textTransform: "uppercase",
-                textShadow: "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textShadow = "0 0 16px rgba(229, 9, 20, 1), 0 0 30px rgba(255, 50, 70, 0.8)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textShadow = "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              TV Shows
-            </button>
-
-            <button
-              onClick={() => {
-                if (onExploreNiches) onExploreNiches();
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#ffffff",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-                textTransform: "uppercase",
-                textShadow: "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textShadow = "0 0 16px rgba(229, 9, 20, 1), 0 0 30px rgba(255, 50, 70, 0.8)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textShadow = "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              Anime
-            </button>
-
-            <button
-              onClick={() => {
-                if (onExploreNiches) onExploreNiches();
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#ffffff",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-                textTransform: "uppercase",
-                textShadow: "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textShadow = "0 0 16px rgba(229, 9, 20, 1), 0 0 30px rgba(255, 50, 70, 0.8)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textShadow = "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              Categories
-            </button>
-
-            <button
-              onClick={() => {
-                if (onNavigateTab) onNavigateTab("downloads");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#ffffff",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-                textTransform: "uppercase",
-                textShadow: "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textShadow = "0 0 16px rgba(229, 9, 20, 1), 0 0 30px rgba(255, 50, 70, 0.8)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textShadow = "0 0 10px rgba(229, 9, 20, 0.75), 0 0 20px rgba(229, 9, 20, 0.4), 0 2px 6px rgba(0, 0, 0, 0.9)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              Downloads
-            </button>
+            <FooterNavFlipButton
+              text="Movies"
+              onClick={() => onNavigateTab && onNavigateTab("movies")}
+            />
+            <FooterNavFlipButton
+              text="TV Shows"
+              onClick={() => onNavigateTab && onNavigateTab("tv")}
+            />
+            <FooterNavFlipButton
+              text="Anime"
+              onClick={() => onExploreNiches && onExploreNiches()}
+            />
+            <FooterNavFlipButton
+              text="Categories"
+              onClick={() => onExploreNiches && onExploreNiches()}
+            />
+            <FooterNavFlipButton
+              text="Downloads"
+              onClick={() => onNavigateTab && onNavigateTab("downloads")}
+            />
           </div>
 
-          {/* Shaded Red Tagline */}
+          {/* Tagline in normal case with original shaded red gradient styling and larger size */}
           <div
             style={{
-              fontSize: "clamp(12px, 1.4vw, 15px)",
+              fontSize: "clamp(16px, 2.2vw, 22px)",
               fontWeight: 800,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              textTransform: "none",
               fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
               background: "linear-gradient(90deg, #d6131e 0%, #ff2040 45%, #ff5266 85%, #ff7888 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
-              filter: "drop-shadow(0 2px 12px rgba(229, 9, 20, 0.55))",
+              filter: "drop-shadow(0 2px 14px rgba(229, 9, 20, 0.6))",
               textAlign: "center",
+              marginTop: "2px",
+              marginBottom: "8px",
             }}
           >
             Cinema is cheaper than therapy
           </div>
 
-          {/* Legal and Compliance Links */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexWrap: "wrap",
-              gap: "18px",
-              fontSize: "12px",
-              color: "rgba(255, 255, 255, 0.7)",
-            }}
-          >
-            <button
-              onClick={() => {
-                if (onNavigateTab) onNavigateTab("terms");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "rgba(255, 255, 255, 0.75)",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: "2px 6px",
-                transition: "color 0.2s ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.75)")}
-            >
-              Terms of Service
-            </button>
-            <span style={{ opacity: 0.3 }}>•</span>
-            <button
-              onClick={() => {
-                if (onNavigateTab) onNavigateTab("privacy");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "rgba(255, 255, 255, 0.75)",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: "2px 6px",
-                transition: "color 0.2s ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.75)")}
-            >
-              Privacy Policy
-            </button>
-            <span style={{ opacity: 0.3 }}>•</span>
-            <button
-              onClick={() => {
-                if (onNavigateTab) onNavigateTab("disclaimer");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "rgba(255, 255, 255, 0.75)",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: "2px 6px",
-                transition: "color 0.2s ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.75)")}
-            >
-              DMCA Disclaimer
-            </button>
-          </div>
-
-          {/* Transparent Strip with Original Cinema Logo on left of Harsh Sharma */}
+          {/* Transparent Strip with Original Cinema Logo on left of Harsh Sharma & Legal links */}
           <div
             style={{
               width: "100%",
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "space-between",
               flexWrap: "wrap",
-              gap: "14px",
+              gap: "20px",
               padding: "4px 8px",
               background: "transparent",
               border: "none",
             }}
           >
-            {/* Previous Logo + Created by Harsh Sharma */}
+            {/* Previous Logo + Created by Harsh + Legal Links directly beneath it */}
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                textShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
+                flexDirection: "column",
+                gap: "10px",
+                alignItems: "flex-start",
               }}
             >
-              <img
-                src="/logo.png"
-                alt="Cinema Logo"
+              <div
                 style={{
-                  width: "24px",
-                  height: "24px",
-                  borderRadius: "6px",
-                  objectFit: "cover",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.6)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  textShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
                 }}
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = "none";
+              >
+                <img
+                  src="/logo.png"
+                  alt="Cinema Logo"
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "6px",
+                    objectFit: "cover",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.6)",
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                  }}
+                />
+                <div style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.9)" }}>
+                  Created by{" "}
+                  <strong style={{ color: "#ffffff", fontWeight: 700 }}>Harsh</strong>
+                </div>
+              </div>
+
+              {/* Three Legal and Compliance Links, stacked one below the other */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px",
+                  alignItems: "flex-start",
+                  paddingLeft: "4px",
                 }}
-              />
-              <div style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.9)" }}>
-                Created by{" "}
-                <strong style={{ color: "#ffffff", fontWeight: 700 }}>Harsh</strong>
+              >
+                <button
+                  onClick={() => {
+                    if (onNavigateTab) onNavigateTab("terms");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "rgba(255, 255, 255, 0.7)",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: "0",
+                    transition: "color 0.2s ease",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)")}
+                >
+                  Terms of Service
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (onNavigateTab) onNavigateTab("privacy");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "rgba(255, 255, 255, 0.7)",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: "0",
+                    transition: "color 0.2s ease",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)")}
+                >
+                  Privacy Policy
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (onNavigateTab) onNavigateTab("disclaimer");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "rgba(255, 255, 255, 0.7)",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: "0",
+                    transition: "color 0.2s ease",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)")}
+                >
+                  DMCA Disclaimer
+                </button>
               </div>
             </div>
 

@@ -268,20 +268,19 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
+                  gap: "14px",
                 }}
               >
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
                     Windows
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
                     Windows 10 and 11
                   </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {/* Setup Installer Button */}
                   <button
                     onClick={() => downloadFile(`Cinema.Setup.${currentVersion}.exe`, /cinema.*setup.*\.exe/i)}
                     style={{
@@ -307,7 +306,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                     ) : null}
                   </button>
 
-                  {/* Portable Executable Button */}
                   <button
                     onClick={() => downloadFile(`Cinema.${currentVersion}.exe`, /^cinema\.[0-9].*\.exe$/i)}
                     style={{
@@ -335,7 +333,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                 </div>
               </div>
 
-              {/* Android Card (Shows Web APK & Universal APK) */}
+              {/* Android Card (Shows Cinema APK 30MB Primary & Cinema Web APK 3.2MB Secondary) */}
               <div
                 style={{
                   background: "#0e0e11",
@@ -344,21 +342,21 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
+                  gap: "14px",
                 }}
               >
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
                     Android
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
                     Phones, Tablets and Android TV
                   </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <button
-                    onClick={() => downloadFile("Cinema-Web.apk", /cinema-web\.apk$/i)}
+                    onClick={() => downloadFile("Cinema.apk", /^cinema\.apk$/i)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -375,15 +373,15 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       <DownloadIcon size={14} />
-                      <span>Cinema Web APK</span>
+                      <span>Cinema APK</span>
                     </div>
-                    {appAndroidWeb?.size ? (
-                      <span style={{ fontSize: "11px", opacity: 0.85 }}>{formatSize(appAndroidWeb.size)}</span>
+                    {appAndroidUniversal?.size ? (
+                      <span style={{ fontSize: "11px", opacity: 0.85 }}>{formatSize(appAndroidUniversal.size)}</span>
                     ) : null}
                   </button>
 
                   <button
-                    onClick={() => downloadFile("Cinema.apk", /^cinema\.apk$/i)}
+                    onClick={() => downloadFile("Cinema-Web.apk", /cinema-web\.apk$/i)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -400,10 +398,10 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       <DownloadIcon size={14} />
-                      <span>Cinema APK</span>
+                      <span>Cinema Web APK</span>
                     </div>
-                    {appAndroidUniversal?.size ? (
-                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(appAndroidUniversal.size)}</span>
+                    {appAndroidWeb?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(appAndroidWeb.size)}</span>
                     ) : null}
                   </button>
                 </div>
@@ -418,14 +416,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
+                  gap: "14px",
                 }}
               >
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
                     Linux
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
                     Ubuntu, Debian, Mint & all distros
                   </div>
                 </div>
@@ -483,7 +481,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                 </div>
               </div>
 
-              {/* macOS Card */}
+              {/* macOS Card (Shows Apple Silicon & Universal DMG) */}
               <div
                 style={{
                   background: "#0e0e11",
@@ -492,23 +490,22 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
+                  gap: "14px",
                 }}
               >
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
                     macOS
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
                     Apple Silicon and Intel
                   </div>
                 </div>
 
-                <div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <button
                     onClick={() => downloadFile(`Cinema-${currentVersion}-arm64.dmg`, /^cinema-[0-9].*\.dmg$/i)}
                     style={{
-                      width: "100%",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
@@ -524,10 +521,35 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       <DownloadIcon size={14} />
-                      <span>Disk Image (.dmg)</span>
+                      <span>Apple Silicon (.dmg)</span>
                     </div>
                     {appMacDmg?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.85 }}>{formatSize(appMacDmg.size)}</span>
+                    ) : null}
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile(`Cinema-${currentVersion}-arm64.dmg`, /^cinema-[0-9].*\.dmg$/i)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      color: "#ffffff",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Universal / Intel (.dmg)</span>
+                    </div>
+                    {appMacDmg?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(appMacDmg.size)}</span>
                     ) : null}
                   </button>
                 </div>
@@ -580,45 +602,79 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
+                  gap: "14px",
                 }}
               >
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
                     Android Runner
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
                     Runs in the background on your Android phone
                   </div>
                 </div>
 
-                <button
-                  onClick={() => downloadFile("Cinema-Runner.apk", /runner.*\.apk$/i)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "#18181c",
-                    border: "1px solid rgba(255, 255, 255, 0.14)",
-                    color: "#ffffff",
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <DownloadIcon size={14} />
-                    <span>Download Runner APK</span>
-                  </div>
-                  {runnerAndroidApk?.size ? (
-                    <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerAndroidApk.size)}</span>
-                  ) : null}
-                </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <button
+                    onClick={() => downloadFile("Cinema-Runner.apk", /runner.*\.apk$/i)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.14)",
+                      color: "#ffffff",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Download Runner APK</span>
+                    </div>
+                    {runnerAndroidApk?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerAndroidApk.size)}</span>
+                    ) : null}
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile("Cinema-Runner.apk", /runner.*\.apk$/i)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#111114",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      color: "#a3a3a3",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "#ffffff";
+                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "#a3a3a3";
+                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Direct APK Download</span>
+                    </div>
+                    {runnerAndroidApk?.size ? (
+                      <span style={{ fontSize: "11px", color: "#777777" }}>{formatSize(runnerAndroidApk.size)}</span>
+                    ) : null}
+                  </button>
+                </div>
               </div>
 
               {/* Windows Runner (Shows Setup & Portable) */}
@@ -630,14 +686,14 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
+                  gap: "14px",
                 }}
               >
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
                     Windows Runner
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
                     Windows 10 and 11
                   </div>
                 </div>
@@ -708,45 +764,79 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
+                  gap: "14px",
                 }}
               >
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
                     Linux Runner
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
                     Servers and desktops
                   </div>
                 </div>
 
-                <button
-                  onClick={() => downloadFile("Cinema.Node.Runner.AppImage", /runner.*\.appimage$/i)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "#18181c",
-                    border: "1px solid rgba(255, 255, 255, 0.14)",
-                    color: "#ffffff",
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <DownloadIcon size={14} />
-                    <span>Runner AppImage</span>
-                  </div>
-                  {runnerLinuxAppImage?.size ? (
-                    <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerLinuxAppImage.size)}</span>
-                  ) : null}
-                </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <button
+                    onClick={() => downloadFile("Cinema.Node.Runner.AppImage", /runner.*\.appimage$/i)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.14)",
+                      color: "#ffffff",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Runner AppImage</span>
+                    </div>
+                    {runnerLinuxAppImage?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerLinuxAppImage.size)}</span>
+                    ) : null}
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile("Cinema.Node.Runner.AppImage", /runner.*\.appimage$/i)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#111114",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      color: "#a3a3a3",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "#ffffff";
+                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "#a3a3a3";
+                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Direct AppImage Download</span>
+                    </div>
+                    {runnerLinuxAppImage?.size ? (
+                      <span style={{ fontSize: "11px", color: "#777777" }}>{formatSize(runnerLinuxAppImage.size)}</span>
+                    ) : null}
+                  </button>
+                </div>
               </div>
 
               {/* macOS Runner */}
@@ -758,45 +848,79 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
+                  gap: "14px",
                 }}
               >
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
                     macOS Runner
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
                     Apple Silicon and Intel
                   </div>
                 </div>
 
-                <button
-                  onClick={() => downloadFile("Cinema.Node.Runner.dmg", /runner.*\.dmg$/i)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "#18181c",
-                    border: "1px solid rgba(255, 255, 255, 0.14)",
-                    color: "#ffffff",
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <DownloadIcon size={14} />
-                    <span>Runner .dmg</span>
-                  </div>
-                  {runnerMacDmg?.size ? (
-                    <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerMacDmg.size)}</span>
-                  ) : null}
-                </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <button
+                    onClick={() => downloadFile("Cinema.Node.Runner.dmg", /runner.*\.dmg$/i)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.14)",
+                      color: "#ffffff",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#e50914")}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)")}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Runner .dmg</span>
+                    </div>
+                    {runnerMacDmg?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerMacDmg.size)}</span>
+                    ) : null}
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile("Cinema.Node.Runner.dmg", /runner.*\.dmg$/i)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#111114",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      color: "#a3a3a3",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "#ffffff";
+                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "#a3a3a3";
+                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Direct .dmg Download</span>
+                    </div>
+                    {runnerMacDmg?.size ? (
+                      <span style={{ fontSize: "11px", color: "#777777" }}>{formatSize(runnerMacDmg.size)}</span>
+                    ) : null}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

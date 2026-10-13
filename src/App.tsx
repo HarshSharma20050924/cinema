@@ -41,7 +41,17 @@ const initialNavState: NavigationState | null = loadNavigationState();
 
 function getInitialRouteState(saved: NavigationState | null) {
   const urlParams = new URLSearchParams(window.location.search);
-  const tab = urlParams.get("tab");
+  let tab = urlParams.get("tab");
+  if (!tab && window.location.hash) {
+    const hash = window.location.hash.replace(/^#\/?/, "").toLowerCase();
+    if (hash) tab = hash;
+  }
+  if (!tab && saved?.activeCustomPage) {
+    tab = saved.activeCustomPage;
+  }
+  if (!tab && saved?.activeNavTab) {
+    tab = saved.activeNavTab;
+  }
   const q = urlParams.get("q");
   const filter = urlParams.get("filter");
   const title = urlParams.get("title");
@@ -400,6 +410,7 @@ export default function App() {
       streams,
       playbackUrl,
       activeNavTab,
+      activeCustomPage,
       isBrowsingCategories,
       viewAllCategory,
       selectedNicheId,
@@ -415,6 +426,7 @@ export default function App() {
     streams,
     playbackUrl,
     activeNavTab,
+    activeCustomPage,
     isBrowsingCategories,
     viewAllCategory,
     selectedNicheId,
@@ -423,7 +435,9 @@ export default function App() {
   // Synchronize browser URL query parameters so page reload retains exact view, filter and niche
   useEffect(() => {
     const params = new URLSearchParams();
-    if (searchQuery) {
+    if (activeCustomPage) {
+      params.set("tab", activeCustomPage);
+    } else if (searchQuery) {
       params.set("q", searchQuery);
       if (isGlobalSearch) params.set("global", "1");
     } else if (isBrowsingCategories) {
@@ -433,6 +447,8 @@ export default function App() {
       params.set("tab", tab);
       if (viewAllCategory.filter) params.set("filter", viewAllCategory.filter);
       if (viewAllCategory.title) params.set("title", viewAllCategory.title);
+    } else if (activeNavTab && activeNavTab !== "home") {
+      params.set("tab", activeNavTab);
     } else {
       if (selectedNicheId) {
         params.set("tab", "home");
@@ -453,6 +469,7 @@ export default function App() {
       window.history.replaceState(null, "", newUrl);
     }
   }, [
+    activeCustomPage,
     searchQuery,
     isGlobalSearch,
     isBrowsingCategories,
@@ -501,6 +518,7 @@ export default function App() {
 
       // 4. Default: catalog route popstate
       const route = getInitialRouteState(loadNavigationState());
+      setActiveCustomPage((route as any).customPage || null);
       setIsBrowsingCategories(route.isBrowsingCategories);
       setViewAllCategory(route.viewAllCategory);
       setSearchQuery(route.searchQuery);
