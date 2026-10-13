@@ -137,6 +137,11 @@ input {
   padding-top: 76px;
 }
 
+/* Media Card Title: Desktop shows title ONLY on hover inside overlay (no static title) */
+.media-card-static-info {
+  display: none;
+}
+
 /* Responsive Rules */
 @media (max-width: 768px) {
   .cinema-navbar {
@@ -178,11 +183,12 @@ input {
     padding: 10px 12px !important;
   }
 
-  /* Always visible title, rating and gradient on mobile media cards */
+  /* Media Cards on Mobile: keep static title below card, hide hover overlay */
+  .media-card-static-info {
+    display: block !important;
+  }
   .media-card-hover-overlay {
-    opacity: 1 !important;
-    transform: translateY(0) !important;
-    padding: 32px 8px 8px 8px !important;
+    display: none !important;
   }
 
   /* Catalog Sections on Mobile */
@@ -341,6 +347,16 @@ input {
     display: flex !important;
   }
   .mobile-only {
+    display: none !important;
+  }
+}
+
+/* Touch devices (tablets/phones where hover is not supported): keep static title below card */
+@media (hover: none) {
+  .media-card-static-info {
+    display: block !important;
+  }
+  .media-card-hover-overlay {
     display: none !important;
   }
 }

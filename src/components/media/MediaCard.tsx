@@ -437,7 +437,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       </div>
 
       {/* Title & Metadata below card - directly displays what provider provides */}
-      <div style={{ marginTop: "7px", padding: "0 2px" }}>
+      <div className="media-card-static-info" style={{ marginTop: "7px", padding: "0 2px" }}>
         <div
           title={post.title}
           style={{
