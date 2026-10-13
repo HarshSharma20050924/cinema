@@ -1,185 +1,124 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&height=220&text=CINEMA&fontAlign=50&fontAlignY=40&color=0:E50914,50:B81D24,100:141414&fontColor=ffffff&fontSize=52"/>
+# CINEMA
 
-### Unified Streaming & Downloading Ecosystem
+**Decentralized Theater-Grade Streaming & Autonomous Node Ecosystem**
 
-Building a distraction-free, theater-grade experience for Movies & TV Series.
+A client-side media browser, search indexer, and playback environment for high-definition movies and television series.
 
-<br>
+<br/>
 
-[![Live Web App](https://img.shields.io/badge/Live%20Web%20App-E50914?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=0d1117)](https://cinema-dwh.pages.dev/)
-[![Release](https://img.shields.io/badge/Release-v4.0.9-B81D24?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1117)](https://github.com/HarshSharma20050924/cinema/releases/latest)
-[![License](https://img.shields.io/badge/License-Apache%202.0-E50914?style=for-the-badge&logo=opensourceinitiative&logoColor=white&labelColor=0d1117)](https://github.com/HarshSharma20050924/cinema)
+[![Live Web App](https://img.shields.io/badge/Web_App-cinema--dwh.pages.dev-E50914?style=flat-square&logo=googlechrome&logoColor=white)](https://cinema-dwh.pages.dev/)
+[![Latest Release](https://img.shields.io/github/v/release/HarshSharma20050924/cinema?color=E50914&label=Latest%20Release&style=flat-square&logo=github)](https://github.com/HarshSharma20050924/cinema/releases/latest)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Linux%20%7C%20Windows%20%7C%20macOS-111111?style=flat-square)](https://github.com/HarshSharma20050924/cinema/releases/latest)
+[![License](https://img.shields.io/badge/License-Apache%202.0-111111?style=flat-square)](LICENSE)
 
-<br><br>
+<br/>
 
-[![Developer](https://img.shields.io/badge/Developer-Harsh%20Sharma-E50914?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1117)](https://github.com/HarshSharma20050924)
-[![Portfolio](https://img.shields.io/badge/Website-harshsharma.runs--on.dev-B81D24?style=for-the-badge&logo=globe&logoColor=white&labelColor=0d1117)](https://harshsharma.runs-on.dev/)
-
-<br><br>
-
-<img src="docs/preview.png" alt="Cinema Web App Interface" width="100%" />
+<img src="docs/preview.png" alt="Cinema Interface" width="100%" />
 
 </div>
 
 ---
 
-## The Story
+## Overview
 
-The modern streaming landscape is cluttered. Countless subscription tiers, intrusive advertisements, broken links, and frustrating redirects have made watching a simple movie an exhausting chore.
-
-**Cinema** was built to restore simplicity. 
-
-It is designed as an all-in-one entertainment ecosystem that eliminates noise, bypasses ads, and brings high-definition movies and television series straight to your screen. Whether you are browsing from a desktop browser, casting to a television, or streaming on your smartphone during a commute, Cinema provides a smooth, theater-grade experience without compromises.
+Cinema is engineered to eliminate intrusive advertisements, redirect loops, and fragmented subscription catalogs. By separating media indexing from decentralized stream resolvers, Cinema delivers a smooth, theater-grade viewing experience across mobile phones, desktop workstations, and smart television displays.
 
 ---
 
-## The Three Pillars
+## Ecosystem Architecture
 
-Cinema is built as a cohesive triad, connecting your screen directly to decentralized media sources:
+The Cinema ecosystem comprises two distinct, interoperable products:
 
-```
-                  +-----------------------------------+
-                  |         Cinema Web App            |
-                  |     (cinema-dwh.pages.dev)        |
-                  +-----------------+-----------------+
-                                    |
-                    Streams via Encrypted Tunnels
-                                    |
-                  +-----------------+-----------------+
-                  |       Cinema Node Runner          |
-                  |  (Autonomous Android Background)  |
-                  +-----------------+-----------------+
-                                    |
-                  +-----------------+-----------------+
-                  |      Cinema Android Client        |
-                  |   (Native Player & Downloader)    |
-                  +-----------------------------------+
-```
+### 1. Cinema Application (Player & Streaming Client)
+The primary client application available for Web, Android, Linux, Windows, and macOS.
+* **Adaptive Streaming**: HLS streaming engine with multi-track audio selection, custom subtitle tracks, and resolutions from 480p up to 4K.
+* **External Player Forwarding**: Instant 1-click launching into external decoders including VLC, MPV, and MX Player.
+* **Offline Download Manager**: Multi-connection stream downloading directly into local file storage.
+* **Resilient Poster Proxy**: Built-in image proxying to prevent browser privacy shields and ad-blockers from dropping media artwork.
 
-### 1. Cinema Web
-The flagship streaming destination. Built for speed, responsiveness, and fluid navigation across all screen sizes.
-* **Fluid Playback**: Full support for multi-track audio switching, adaptive resolution selection (from 480p up to 4K), and custom subtitle tracks.
-* **Smart Navigation**: Remembers your exact search terms and scroll positions when navigating between titles.
-* **Shield Protection**: Intelligent proxy routing ensures artwork and posters load flawlessly without being blocked by browser shields.
-
-### 2. Cinema Desktop App
-Dedicated standalone desktop application for macOS, Windows, and Linux. Built with embedded player optimization, hardware acceleration, and background cache persistence.
-* macOS: Native Apple Silicon (arm64) DMG package.
-* Windows: Official Setup Installer and Portable executable.
-* Linux: Universal AppImage executable for all distributions.
-
-### 3. Cinema Node Runner
-High-performance background server runner available on Android, macOS, Windows, and Linux. Runs automated Cloudflare tunnel coordination to power media scrapers.
-
-### 4. Cinema Android Client
-Standalone mobile player for on-the-go streaming and media management with external player forwarding (VLC, MX Player) and offline downloads.
+### 2. Cinema Runner (Autonomous Scraper Daemon)
+A background headless daemon and tunnel coordinator available for Android, Linux servers, Windows, and macOS.
+* **Persistent Node Host**: Executes provider scrapers and resolves stream manifests locally.
+* **Zero Root Android Daemon**: Runs persistently as an Android foreground service with automatic coordinator syncing.
+* **Encrypted Edge Tunnels**: Creates local Cloudflare proxy tunnels to route stream queries securely.
 
 ---
 
-## First-Time Setup
+## Downloads & Release Assets
 
-When launching Cinema for the first time, you will be prompted to verify your media directory.
+Direct links to compiled releases from the latest stable release tag:
 
-> **Access Key:** `harsh cinema`
+### Cinema Application (Player)
 
-Enter this key in the provider setup prompt to unlock the complete streaming library.
-
----
-
-## Downloads and Access
-
-### Web Application
-Access the platform instantly from any modern web browser:
-**[cinema-dwh.pages.dev](https://cinema-dwh.pages.dev/)**
-
-### Application Versions
-
-* **Cinema Web & Desktop Client**: v4.0.8
-* **Cinema Web Mobile APK (Cinema Main)**: v4.0.8 (`Cinema-Web.apk`)
-* **Cinema Native Mobile App (Alternative Client)**: v4.0.8 (`Cinema.apk`)
-* **Cinema Node Runner (Desktop & Android APK)**: v2.2.0 (`Cinema-Runner.apk`)
-
-### Desktop and Mobile Downloads (Release v4.0.9)
-
-| Platform | Cinema Streaming App (v4.0.8) | Cinema Node Runner (v2.2.0) |
+| Platform | Format | Direct Download |
 | :--- | :--- | :--- |
-| macOS (Apple Silicon / M-series) | [Cinema-4.0.8-arm64.dmg](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8-arm64.dmg) (v4.0.8) | [Cinema.Node.Runner-2.2.0-arm64.dmg](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0-arm64.dmg) (v2.2.0) |
-| Windows (Installer) | [Cinema.Setup.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Setup.4.0.8.exe) (v4.0.8) | [Cinema.Node.Runner.Setup.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.Setup.2.2.0.exe) (v2.2.0) |
-| Windows (Portable) | [Cinema.4.0.8.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.4.0.8.exe) (v4.0.8) | [Cinema.Node.Runner.2.2.0.exe](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.2.2.0.exe) (v2.2.0) |
-| Linux (Universal AppImage) | [Cinema-4.0.8.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-4.0.8.AppImage) (v4.0.8) | [Cinema.Node.Runner-2.2.0.AppImage](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0.AppImage) (v2.2.0) |
-| Android: Cinema Web App | [Cinema-Web.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-Web.apk) (Cinema Main v4.0.8) | - |
-| Android: Native App (Alternative) | [Cinema.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.apk) (Native Client v4.0.8) | - |
-| Android: Node Runner | - | [Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema-Runner.apk) (Runner v2.2.0) |
+| Android (Mobile & TV) | Universal APK | [Download Cinema-Web.apk](https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Web.apk) |
+| Linux (Debian / Ubuntu / Mint) | .deb Package | [Download .deb](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Linux (Universal) | Standalone .AppImage | [Download .AppImage](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Windows 10 / 11 | Setup Installer (.exe) | [Download Setup.exe](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Windows 10 / 11 | Portable Executable (.exe) | [Download Portable.exe](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| macOS (Apple Silicon & Intel) | DMG Disk Image | [Download .dmg](https://github.com/HarshSharma20050924/cinema/releases/latest) |
 
-#### Running on Linux (Ubuntu / Debian / Fedora / Arch)
-Make the downloaded AppImage executable:
-```bash
-chmod +x Cinema-4.0.8.AppImage
-./Cinema-4.0.8.AppImage --no-sandbox
-```
+### Cinema Runner (Node Daemon)
 
-### Local Development
-To run the project locally on your machine:
+| Platform | Format | Direct Download |
+| :--- | :--- | :--- |
+| Android | Background Daemon APK | [Download Cinema-Runner.apk](https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk) |
+| Linux / Server | Standalone .AppImage | [Download Runner AppImage](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Windows | Setup Installer (.exe) | [Download Runner Setup.exe](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| Windows | Portable Executable (.exe) | [Download Runner Portable.exe](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+| macOS | DMG Disk Image | [Download Runner .dmg](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+
+> Complete binary manifests, release notes, and SHA-256 checksums are published on the [GitHub Releases Page](https://github.com/HarshSharma20050924/cinema/releases/latest).
+
+---
+
+## Getting Started Locally
+
+### Prerequisites
+* Node.js 22 or higher
+* npm 10 or higher
+
+### Installation & Run
 
 ```bash
 # Clone the repository
 git clone https://github.com/HarshSharma20050924/cinema.git
 cd cinema
 
-# Install dependencies and start
+# Install web application dependencies
 npm install
-npm start
+
+# Start development server and API runner
+npm run dev
 ```
 
-Your local instance will be live at `http://localhost:5174`.
+The web client will be available at `http://localhost:5173`.
+
+### Desktop Build
+
+```bash
+cd desktop-app
+npm install
+
+# Build for current operating system
+npm run dist:linux    # on Linux (.deb & .AppImage)
+npm run dist:win      # on Windows (.exe Setup & Portable)
+npm run dist:mac      # on macOS (.dmg)
+```
 
 ---
 
-## Architecture & Technologies
+## Privacy & Decentralization
 
-<div align="center">
-
-<p>
-<img src="https://skillicons.dev/icons?i=react,ts,vite,nodejs,express,kotlin,android,cloudflare&theme=dark" />
-</p>
-
-</div>
-
-<div align="center">
-
-| Component | Role | Core Technologies |
-| :--- | :--- | :--- |
-| **Interface** | Responsive Web App | React 19, TypeScript, Artplayer, HLS.js |
-| **Node Host** | Background Tunnel & Engine | Capacitor, Node.js Mobile, Android Services |
-| **Mobile App** | Native Player & Downloader | React Native, Kotlin, MMKV |
-| **Infrastructure** | Edge Delivery & Routing | Cloudflare Pages, Cloudflare Tunnels |
-
-</div>
+* **Local-First Storage**: User preferences, watch history, bookmarks, and installed extensions reside strictly on the user's device via local storage.
+* **Zero Telemetry**: No third-party analytics SDKs, session recorders, tracking cookies, or user identifiers are included.
+* **Non-Hosting Policy**: Cinema does not host, upload, or transmit video files. Media references are indexed client-side through public community scrapers.
 
 ---
 
-<div align="center">
+## License
 
-## Author & Maintainer
-
-Cinema is designed and maintained by **[Harsh Sharma](https://github.com/HarshSharma20050924)**.
-
-<br/>
-
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white&labelColor=0d1117)](https://linkedin.com/in/harsh-sharma-44476339b)
-[![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1117)](https://github.com/HarshSharma20050924)
-[![Gmail](https://img.shields.io/badge/Gmail-Contact-EA4335?style=for-the-badge&logo=gmail&logoColor=white&labelColor=0d1117)](mailto:harsh20050924@gmail.com)
-
-<br/><br/>
-
-<img src="https://capsule-render.vercel.app/api?type=waving&height=180&section=footer&text=Experience%20Pure%20Cinema&fontSize=32&fontAlignY=70&color=0:E50914,50:B81D24,100:141414&fontColor=ffffff"/>
-
-</div>
-
----
-
-## Disclaimer
-
-Cinema is an open-source research and educational project. It does not host, store, or distribute any media files. All metadata and streams are resolved dynamically from publicly accessible third-party services.
+Distributed under the Apache 2.0 License. See `LICENSE` for details.
