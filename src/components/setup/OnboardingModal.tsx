@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FilmIcon, CheckIcon, ServerIcon, ArrowLeftIcon } from "../../icons";
+import { CheckIcon, ServerIcon, ArrowLeftIcon } from "../../icons";
 import type { Provider } from "../../types";
 
 const REQUIRED_PROVIDER_NAME = "harsh cinema";
@@ -112,31 +112,23 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           padding: "28px 24px",
         }}
       >
-        {/* Header Icon */}
+        {/* Header Logo */}
         <div style={{ textAlign: "center", marginBottom: "22px" }}>
-          <div
+          <img
+            src="/logo.png"
+            alt="Cinema"
             style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #e50914, #ff334b)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 6px 20px rgba(229, 9, 20, 0.45)",
+              width: "56px",
+              height: "56px",
+              borderRadius: "14px",
+              objectFit: "cover",
+              boxShadow: "0 6px 20px rgba(229, 9, 20, 0.4)",
               marginBottom: "12px",
             }}
-          >
-            <FilmIcon size={24} color="#fff" />
-          </div>
-          <h2 style={{ fontSize: "20px", fontWeight: 800, letterSpacing: "0.02em", marginBottom: "6px" }}>
+          />
+          <h2 style={{ fontSize: "20px", fontWeight: 800, letterSpacing: "0.02em", margin: 0 }}>
             {step === 1 ? "Welcome to Cinema" : "Select Movie Sources"}
           </h2>
-          <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-            {step === 1
-              ? "Enter your provider name to get started."
-              : "Choose which movie sources you would like to enable."}
-          </p>
         </div>
 
         {/* STEP 1: Single Provider Name Input - Strict exact name validation */}
