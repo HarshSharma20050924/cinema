@@ -66,6 +66,8 @@
       "shortcutName": "Cinema Node Runner"
     },
     "linux": {
+      "executableName": "cinema-runner",
+      "executableArgs": ["--no-sandbox"],
       "target": [
         {
           "target": "AppImage",
@@ -76,16 +78,12 @@
           "arch": ["x64"]
         }
       ],
-      "executableArgs": ["--no-sandbox"],
       "category": "AudioVideo",
       "icon": "public/icon.png",
       "maintainer": "Cinema Team"
     },
     "deb": {
-      "afterInstall": "build-scripts/after-install.sh",
-      "desktop": {
-        "Exec": "\"/opt/Cinema Node Runner/cinema-runner\" --no-sandbox %U"
-      }
+      "afterInstall": "build-scripts/after-install.sh"
     },
     "mac": {
       "target": [
