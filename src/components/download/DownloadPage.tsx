@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { DownloadIcon, GithubIcon, GlobeIcon, CopyIcon, CheckIcon, ExternalLinkIcon } from "../../icons";
+import { DownloadIcon, GithubIcon } from "../../icons";
 import { ShadedHeading } from "../common/ShadedHeading";
 import packageJson from "../../../package.json";
 
@@ -26,7 +26,6 @@ type TabType = "all" | "desktop" | "android" | "runner" | "web";
 export const DownloadPage: React.FC<DownloadPageProps> = () => {
   const [release, setRelease] = useState<ReleaseData | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("all");
-  const [copiedUrl, setCopiedUrl] = useState(false);
 
   // Fetch latest release dynamically from GitHub API
   useEffect(() => {
@@ -146,15 +145,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
     document.body.removeChild(link);
   };
 
-  const handleCopyWebUrl = () => {
-    const webUrl = "https://cinema-dwh.pages.dev";
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(webUrl);
-      setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
-    }
-  };
-
   const currentVersion = release?.version || packageJson.version || "4.1.0";
 
   // Match Cinema Desktop App files
@@ -196,19 +186,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
         {/* Header Title Area */}
         <div style={{ marginBottom: "36px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#e50914",
-                background: "rgba(229, 9, 20, 0.12)",
-                padding: "3px 10px",
-                borderRadius: "14px",
-                border: "1px solid rgba(229, 9, 20, 0.25)",
-              }}
-            >
-              Cinema Downloads
-            </span>
             <span style={{ fontSize: "12px", color: "#888888" }}>
               Version {currentVersion}
             </span>
@@ -236,7 +213,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
           </div>
 
           <p style={{ fontSize: "15px", color: "#a3a3a3", margin: "0 0 24px 0", maxWidth: "680px" }}>
-            Select your platform below to download Cinema Desktop, standalone Android APKs, background Runner helper, or access Cinema Web.
+            Select your platform below to download Cinema Desktop, standalone Android APKs, or the background Runner helper.
           </p>
 
           {/* Clean Curvy Tab Filter Switcher */}
@@ -257,7 +234,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               { id: "desktop", label: "Cinema Desktop" },
               { id: "android", label: "Android APKs" },
               { id: "runner", label: "Runner Apps" },
-              { id: "web", label: "Web Version" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1139,10 +1115,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* SECTION 4: WEBSITE / WEB VERSION (Completely Separate)                    */}
-        {/* ========================================================================= */}
-        {(activeTab === "all" || activeTab === "web") && (
+        {/* SECTION 4 REMOVED: Cinema Web section removed per user request */}
+        {false && (
           <div style={{ marginBottom: "52px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px" }}>
               <div
