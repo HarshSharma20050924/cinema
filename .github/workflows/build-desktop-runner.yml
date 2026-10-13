@@ -31,7 +31,7 @@ jobs:
         run: |
           mkdir -p desktop-runner/server desktop-runner/public
           cp -r server/* desktop-runner/server/
-          cp -r server.cjs desktop-runner/server.cjs
+          if [ -f server.cjs ]; then cp server.cjs desktop-runner/server.cjs; else cp server/index.cjs desktop-runner/server.cjs; fi
           cp -r public/* desktop-runner/public/
         shell: bash
 

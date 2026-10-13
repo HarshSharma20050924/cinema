@@ -44,6 +44,10 @@ contextBridge.exposeInMainWorld('CinemaDesktop', {
   close: () => ipcRenderer.send('cinema:window-close'),
   isMaximized: () => ipcRenderer.invoke('cinema:window-is-maximized'),
 
+  // User Settings persistence
+  getUserSettings: () => ipcRenderer.invoke('cinema:get-user-settings'),
+  saveUserSettings: (settings) => ipcRenderer.invoke('cinema:save-user-settings', settings),
+
   // Open external links safely if needed
   openExternal: (url) => ipcRenderer.send('cinema:open-external', url),
 });

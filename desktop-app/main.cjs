@@ -564,8 +564,25 @@ ipcMain.on('cinema:window-maximize', () => {
   }
 });
 ipcMain.on('cinema:window-close', () => { if (mainWindow) mainWindow.close(); });
-ipcMain.handle('cinema:window-is-maximized', () => mainWindow ? mainWindow.isMaximized() : false);
-ipcMain.on('cinema:open-external', (_, url) => { shell.openExternal(url); });
+// User Settings Persistence IPC
+ipcMain.handle('cinema:get-user-settings', () => {
+  try {
+    const settingsPath = path.join(app.getPath('userData'), 'user-settings.json');
+    if (fs.existsSync(settingsPath)) {
+      return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    }
+  } catch (_) {}
+  return null;
+});
+
+ipcMain.handle('cinema:save-user-settings', (_, settings) => {
+  try {
+    const settingsPath = path.join(app.getPath('userData'), 'user-settings.json');
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+    return true;
+  } catch (_) {}
+  return false;
+});
 
 // App Lifecycle
 app.whenReady().then(async () => {

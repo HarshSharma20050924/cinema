@@ -82,6 +82,7 @@ export async function fetchTMDBDetails(
         .replace(/[-_.]+/g, " ")
         .trim();
 
+      const targetClean = (cleanTitle || title).trim().toLowerCase();
       const searchRes = await fetch(
         `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(
           cleanTitle || title
@@ -89,12 +90,30 @@ export async function fetchTMDBDetails(
       );
       if (searchRes.ok) {
         const searchData = await searchRes.json();
-        const first = (searchData.results || []).find(
+        const results = (searchData.results || []).filter(
           (r: any) => r.media_type === "movie" || r.media_type === "tv"
         );
-        if (first) {
-          tmdbId = first.id;
-          mediaType = first.media_type === "tv" ? "tv" : "movie";
+
+        // 1. Exact title match (e.g. "I" matches movie named "I")
+        let matched = results.find(
+          (r: any) =>
+            (r.title && r.title.trim().toLowerCase() === targetClean) ||
+            (r.name && r.name.trim().toLowerCase() === targetClean) ||
+            (r.original_title && r.original_title.trim().toLowerCase() === targetClean) ||
+            (r.original_name && r.original_name.trim().toLowerCase() === targetClean)
+        );
+
+        // 2. Fuzzy match only if query has sufficient length (>= 4 characters) to prevent false positives like "I" -> "Insidious"
+        if (!matched && targetClean.length >= 4) {
+          matched = results.find((r: any) => {
+            const rt = (r.title || r.name || "").toLowerCase();
+            return rt.startsWith(targetClean) || rt.includes(targetClean);
+          });
+        }
+
+        if (matched) {
+          tmdbId = matched.id;
+          mediaType = matched.media_type === "tv" ? "tv" : "movie";
         }
       }
     }

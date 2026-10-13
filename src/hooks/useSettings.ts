@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { UserSettings, ExternalPlayerType } from "../types";
 
 const STORAGE_KEY = "cinema_user_settings_v2";
 
 const DEFAULT_SETTINGS: UserSettings = {
   cinemaName: "Cinema",
-  providerSource: "harsh cinema",
+  providerSource: "Cinema",
   installedExtensions: ["hdhub4u", "vega", "4khdhub", "olamovies", "gramcinema", "drive", "mod", "movieBoxWeb", "1cinevood", "autoEmbed", "katmovies", "world4u"],
   defaultPlayer: "vlc",
   customPlayerScheme: "vlc://",
-  isConfigured: false,
+  isConfigured: true,
 };
 
 export const launchExternalPlayer = (
@@ -144,6 +144,7 @@ export function useSettings() {
           defaultPlayer: parsed.defaultPlayer === "web" ? "vlc" : (parsed.defaultPlayer || "vlc"),
           installedExtensions,
           cinemaName: "Cinema",
+          isConfigured: true,
         };
       }
     } catch (e) {
@@ -152,13 +153,32 @@ export function useSettings() {
     return DEFAULT_SETTINGS;
   });
 
+  // Sync with native Desktop settings file if available
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).CinemaDesktop?.getUserSettings) {
+      (window as any).CinemaDesktop.getUserSettings().then((desktopSettings: any) => {
+        if (desktopSettings) {
+          setSettings((prev) => ({
+            ...prev,
+            ...desktopSettings,
+            isConfigured: true,
+            cinemaName: "Cinema",
+          }));
+        }
+      });
+    }
+  }, []);
+
   const saveSettings = (newSettings: Partial<UserSettings>) => {
     setSettings((prev: UserSettings) => {
-      const updated: UserSettings = { ...prev, ...newSettings, cinemaName: "Cinema" };
+      const updated: UserSettings = { ...prev, ...newSettings, isConfigured: true, cinemaName: "Cinema" };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error("Failed to save settings:", e);
+      }
+      if (typeof window !== "undefined" && (window as any).CinemaDesktop?.saveUserSettings) {
+        (window as any).CinemaDesktop.saveUserSettings(updated);
       }
       return updated;
     });
@@ -167,7 +187,7 @@ export function useSettings() {
   const completeSetup = (_ignoredName: string, providerSource: string, installedExtensions: string[]) => {
     saveSettings({
       cinemaName: "Cinema",
-      providerSource: providerSource.trim() || "harsh cinema",
+      providerSource: providerSource.trim() || "Cinema",
       installedExtensions,
       isConfigured: true,
     });

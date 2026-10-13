@@ -199,8 +199,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   const seasonMatch = post.title?.match(/\b(?:season\s*|s0*)(\d+)\b/i);
   const seasonNum = seasonMatch ? seasonMatch[1] : null;
 
-  // Content metadata resolution
-  const baseTitle = tmdb?.title || details?.title || cleanTitle || post.title;
+  // Content metadata resolution: authentic provider title always takes precedence
+  const baseTitle = details?.title || post.title || tmdb?.title || cleanTitle;
   const displayTitle = seasonNum && !baseTitle.toLowerCase().includes(`season ${seasonNum}`)
     ? `${baseTitle} - Season ${seasonNum}`
     : baseTitle;
@@ -365,21 +365,20 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     }
   };
 
-  // Artwork & metadata resolution
+  // Artwork & metadata resolution: provider's authentic artwork prioritized over external lookups
   const backdropImage =
-    (tmdb?.backdropUrl && tmdb.backdropUrl.trim()) ||
     (details?.backdrop && details.backdrop.trim()) ||
+    (tmdb?.backdropUrl && tmdb.backdropUrl.trim()) ||
     (details?.poster && details.poster.trim()) ||
     (details?.image && details.image.trim()) ||
     (post.image && post.image.trim()) ||
     "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1600";
 
   const posterImage =
-    (seasonNum && post.image && post.image.trim()) ||
-    (tmdb?.posterUrl && tmdb.posterUrl.trim()) ||
     (details?.poster && details.poster.trim()) ||
     (details?.image && details.image.trim()) ||
     (post.image && post.image.trim()) ||
+    (tmdb?.posterUrl && tmdb.posterUrl.trim()) ||
     "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600";
 
   const resolvedImdbId =
@@ -486,8 +485,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     null;
 
   const plot =
-    (tmdb?.overview && tmdb.overview.trim().length > 0 && tmdb.overview) ||
     (details?.synopsis && details.synopsis.trim().length > 0 && details.synopsis) ||
+    (tmdb?.overview && tmdb.overview.trim().length > 0 && tmdb.overview) ||
     `Experience the latest release "${displayTitle}" in premium high definition. Choose between high-speed direct cloud streaming or full-resolution offline download mirrors.`;
 
   return (

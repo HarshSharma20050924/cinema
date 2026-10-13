@@ -23,7 +23,20 @@ async function getPoster(req, res) {
         headers: { "User-Agent": "Mozilla/5.0" },
       }
     );
-    let poster = mRes.data?.metas?.[0]?.poster;
+    const qLower = query.toLowerCase();
+    const findBestPoster = (metas = []) => {
+      if (!Array.isArray(metas) || metas.length === 0) return null;
+      const exact = metas.find((m) => m.name && m.name.trim().toLowerCase() === qLower);
+      if (exact?.poster) return exact.poster;
+      if (qLower.length >= 4) {
+        const contains = metas.find((m) => m.name && m.name.toLowerCase().includes(qLower));
+        if (contains?.poster) return contains.poster;
+        return metas[0]?.poster || null;
+      }
+      return null;
+    };
+
+    let poster = findBestPoster(mRes.data?.metas);
     if (!poster) {
       const sRes = await axios.get(
         `https://v3-cinemeta.strem.io/catalog/series/top/search=${encoded}.json`,
@@ -32,7 +45,7 @@ async function getPoster(req, res) {
           headers: { "User-Agent": "Mozilla/5.0" },
         }
       );
-      poster = sRes.data?.metas?.[0]?.poster;
+      poster = findBestPoster(sRes.data?.metas);
     }
 
     if (poster) {
