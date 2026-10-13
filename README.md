@@ -1,6 +1,8 @@
 <div align="center">
 
-# CINEMA
+<img src="https://capsule-render.vercel.app/api?type=transparent&height=80&text=CINEMA&fontAlign=50&fontAlignY=55&color=E50914&fontColor=E50914&fontSize=56" alt="CINEMA" />
+
+<br/>
 
 **Decentralized Theater-Grade Streaming & Autonomous Node Ecosystem**
 
