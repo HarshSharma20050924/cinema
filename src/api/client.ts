@@ -6,14 +6,18 @@ export function getBackendUrl(): string {
   if (envUrl) return envUrl;
 
   if (typeof window !== "undefined") {
+    const isLocalhost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+    if (isLocalhost) {
+      // In local development, always use relative path so Vite proxy forwards to local backend (port 3001)
+      return "";
+    }
+
     const isCapacitor =
       Boolean((window as any).Capacitor) ||
       window.location.protocol === "capacitor:" ||
-      window.location.protocol === "file:" ||
-      (window.location.hostname === "localhost" &&
-        window.location.port !== "5173" &&
-        window.location.port !== "3000" &&
-        window.location.port !== "7777");
+      window.location.protocol === "file:";
     if (isCapacitor) {
       return "https://cinema-dwh.pages.dev";
     }

@@ -29,7 +29,7 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
 
     let isCurrent = true;
 
-    fetchTMDBDetails(cleanTitle)
+    fetchTMDBDetails(cleanTitle, undefined, extractedYear)
       .then((data) => {
         if (isCurrent && data) {
           setTmdb(data);
@@ -40,7 +40,7 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
     return () => {
       isCurrent = false;
     };
-  }, [cleanTitle]);
+  }, [cleanTitle, extractedYear]);
 
   if (!post) return null;
 
@@ -64,10 +64,20 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
     tmdb?.overview ||
     "As war and plague devastate the land, a humble commoner ignites a rebellion, uniting an army to defy the powers that be in a desperate fight for survival.";
 
-  // High-res backdrop from TMDB or original post image
+  // High-res image helper: upgrades any low-res w185/w342 thumbnail to original 4K
+  const upgradeToHighRes = (url: string | null | undefined): string => {
+    if (!url) return "";
+    let clean = url.trim();
+    if (clean.includes("image.tmdb.org/t/p/")) {
+      return clean.replace(/\/w\d+\//, "/original/");
+    }
+    return clean;
+  };
+
+  // High-res backdrop from TMDB or upgraded original post image
   const heroImage =
     (tmdb?.backdropUrl && tmdb.backdropUrl.trim()) ||
-    (post.image && post.image.trim()) ||
+    upgradeToHighRes(post.image) ||
     "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1600";
 
   return (
@@ -155,7 +165,7 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
             margin: 0,
           }}
         >
-          {cleanTitle}
+          {tmdb?.title || cleanTitle}
         </h1>
 
         {/* Meta Line: ★ 7.9  2026  Movie */}

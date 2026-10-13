@@ -11,7 +11,7 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "dist:linux": "electron-builder --linux AppImage --publish never",
+    "dist:linux": "electron-builder --linux AppImage deb --publish never",
     "dist:win": "electron-builder --win nsis portable --publish never",
     "dist:mac": "electron-builder --mac dmg --publish never",
     "dist:all": "electron-builder -wlm --publish never"
@@ -70,11 +70,22 @@
         {
           "target": "AppImage",
           "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
         }
       ],
+      "executableArgs": ["--no-sandbox"],
       "category": "AudioVideo",
       "icon": "public/icon.png",
       "maintainer": "Cinema Team"
+    },
+    "deb": {
+      "afterInstall": "build-scripts/after-install.sh",
+      "desktop": {
+        "Exec": "\"/opt/Cinema Node Runner/cinema-runner\" --no-sandbox %U"
+      }
     },
     "mac": {
       "target": [
@@ -83,6 +94,7 @@
           "arch": ["x64", "arm64"]
         }
       ],
+      "identity": null,
       "category": "public.app-category.entertainment",
       "icon": "public/icon.png",
       "darkModeSupport": true

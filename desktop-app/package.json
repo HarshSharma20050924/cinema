@@ -10,6 +10,10 @@
   },
   "main": "main.cjs",
   "scripts": {
+    "prepare-assets": "node ../scripts/prepare-desktop.cjs",
+    "predist:linux": "npm run prepare-assets",
+    "predist:win": "npm run prepare-assets",
+    "predist:mac": "npm run prepare-assets",
     "start": "electron .",
     "dist:linux": "electron-builder --linux AppImage deb --publish never",
     "dist:win": "electron-builder --win nsis portable --publish never",
@@ -64,6 +68,9 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Cinema"
     },
+    "portable": {
+      "artifactName": "${productName}-${version}-win-portable.${ext}"
+    },
     "linux": {
       "target": [
         {
@@ -80,6 +87,12 @@
       "icon": "public/logo.png",
       "maintainer": "Cinema Team"
     },
+    "deb": {
+      "afterInstall": "build-scripts/after-install.sh",
+      "desktop": {
+        "Exec": "/opt/Cinema/cinema-desktop --no-sandbox %U"
+      }
+    },
     "mac": {
       "target": [
         {
@@ -87,6 +100,7 @@
           "arch": ["x64", "arm64"]
         }
       ],
+      "identity": null,
       "category": "public.app-category.entertainment",
       "icon": "public/logo.png",
       "darkModeSupport": true

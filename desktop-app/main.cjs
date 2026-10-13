@@ -1,7 +1,3 @@
-try {
-  process.chdir(require('os').homedir());
-} catch (_) {}
-
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -45,7 +41,7 @@ async function startLocalServer() {
 
     // Mount Cinema Scraper Backend Routes
     try {
-      const apiRoutes = require('./server/routes/index.cjs');
+      const apiRoutes = require(path.join(__dirname, 'server', 'routes', 'index.cjs'));
       localApp.use('/api', apiRoutes);
       console.log('✅ [Engine] Modular Cinema Scraping Routes mounted at /api');
     } catch (err) {
@@ -75,8 +71,21 @@ async function startLocalServer() {
     });
 
     server.on('error', (err) => {
-      console.error('[Engine] Server error:', err);
-      resolve(serverPort);
+      console.error('[Engine] Dynamic port 0 error, falling back to 3001:', err.message);
+      try {
+        const fallbackServer = localApp.listen(3001, '127.0.0.1', () => {
+          serverPort = 3001;
+          serverInstance = fallbackServer;
+          console.log(`🎬 [Engine] Standalone Cinema Engine running on fallback http://127.0.0.1:3001`);
+          resolve(3001);
+        });
+        fallbackServer.on('error', (fErr) => {
+          console.error('[Engine] Fallback port 3001 error:', fErr.message);
+          resolve(serverPort);
+        });
+      } catch (_) {
+        resolve(serverPort);
+      }
     });
   });
 }
@@ -596,6 +605,12 @@ ipcMain.on('cinema:window-maximize', () => {
   }
 });
 ipcMain.on('cinema:window-close', () => { if (mainWindow) mainWindow.close(); });
+ipcMain.handle('cinema:window-is-maximized', () => (mainWindow ? mainWindow.isMaximized() : false));
+ipcMain.on('cinema:open-external', (_, url) => {
+  if (url) {
+    shell.openExternal(url).catch(() => {});
+  }
+});
 // User Settings Persistence IPC
 ipcMain.handle('cinema:get-user-settings', () => {
   try {

@@ -27,6 +27,7 @@ import { TermsPage } from "./components/legal/TermsPage";
 import { PrivacyPage } from "./components/legal/PrivacyPage";
 import { DisclaimerPage } from "./components/legal/DisclaimerPage";
 import { ServerIcon, DownloadIcon, RefreshIcon } from "./icons";
+import { TopProgressBar } from "./components/common/TopProgressBar";
 import { api } from "./api/client";
 import { appCache } from "./utils/cache";
 import {
@@ -982,10 +983,10 @@ export default function App() {
         position: "relative",
       }}
     >
-      {/* Top Animated Loader Bar */}
-      {(loadingProviders || loadingPosts || loadingDetails || loadingStreams) && (
-        <div className="top-loader-bar" />
-      )}
+      {/* Top GitHub/YouTube-style single-pass Progress Bar */}
+      <TopProgressBar
+        isLoading={Boolean(loadingProviders || loadingPosts || loadingDetails || loadingStreams)}
+      />
 
       {/* 0. ONBOARDING GATE */}
       {!settings.isConfigured && (

@@ -45,9 +45,44 @@ const IMG_BASE_W500 = "https://image.tmdb.org/t/p/w500";
 const IMG_BASE_ORIGINAL = "https://image.tmdb.org/t/p/original";
 const IMG_BASE_W185 = "https://image.tmdb.org/t/p/w185";
 
+/**
+ * Robust TMDB JSON fetcher with automated proxy fallback.
+ * Bypasses ISP blocks (common in India where api.themoviedb.org is TCP reset)
+ */
+async function fetchTMDBJson(url: string): Promise<any> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+
+  // 1. Direct fetch
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) return await res.json();
+  } catch (_) {
+    clearTimeout(timer);
+  }
+
+  // 2. Local / Cloudflare proxy fallback
+  try {
+    const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxyUrl);
+    if (res.ok) return await res.json();
+  } catch (_) {}
+
+  // 3. Cloudflare Pages edge proxy fallback
+  try {
+    const cfUrl = `https://cinema-dwh.pages.dev/api/proxy?url=${encodeURIComponent(url)}`;
+    const res = await fetch(cfUrl);
+    if (res.ok) return await res.json();
+  } catch (_) {}
+
+  return null;
+}
+
 export async function fetchTMDBDetails(
   title: string,
-  imdbId?: string
+  imdbId?: string,
+  year?: string
 ): Promise<TMDBDetails | null> {
   try {
     let tmdbId: number | null = null;
@@ -55,11 +90,10 @@ export async function fetchTMDBDetails(
 
     // 1. Try finding by IMDB ID if present
     if (imdbId && /^tt\d+$/.test(imdbId)) {
-      const findRes = await fetch(
+      const findData = await fetchTMDBJson(
         `${BASE_URL}/find/${imdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`
       );
-      if (findRes.ok) {
-        const findData = await findRes.json();
+      if (findData) {
         if (findData.movie_results && findData.movie_results.length > 0) {
           tmdbId = findData.movie_results[0].id;
           mediaType = "movie";
@@ -80,17 +114,27 @@ export async function fetchTMDBDetails(
           /\b(480p|720p|1080p|2160p|4k|hd|web-dl|webrip|bluray|x264|x265|hevc|dual audio|hindi|english|season\s*\d+|s\d+|episodes?)\b/gi,
           ""
         )
-        .replace(/[-_.]+/g, " ")
+        .replace(/&amp;/gi, " ")
+        .replace(/[-_.:]+/g, " ")
+        .replace(/\s*&\s*$/, "")
+        .replace(/^\s*&\s*/, "")
         .trim();
 
       const targetClean = (cleanTitle || title).trim().toLowerCase();
-      const searchRes = await fetch(
-        `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(
-          cleanTitle || title
-        )}`
-      );
-      if (searchRes.ok) {
-        const searchData = await searchRes.json();
+      const searchQuery = encodeURIComponent(cleanTitle || title);
+      const searchUrl = year
+        ? `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${searchQuery}&year=${year}`
+        : `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${searchQuery}`;
+
+      let searchData = await fetchTMDBJson(searchUrl);
+      if (!searchData || !searchData.results || searchData.results.length === 0) {
+        // Retry without year if year-filtered search had no results
+        searchData = await fetchTMDBJson(
+          `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${searchQuery}`
+        );
+      }
+
+      if (searchData && searchData.results) {
         const results = (searchData.results || []).filter(
           (r: any) => r.media_type === "movie" || r.media_type === "tv"
         );
@@ -104,7 +148,7 @@ export async function fetchTMDBDetails(
             (r.original_name && r.original_name.trim().toLowerCase() === targetClean)
         );
 
-        // 2. Fuzzy match only if query has sufficient length (>= 4 characters) to prevent false positives like "I" -> "Insidious"
+        // 2. Fuzzy match only if query has sufficient length (>= 4 characters)
         if (!matched && targetClean.length >= 4) {
           matched = results.find((r: any) => {
             const rt = (r.title || r.name || "").toLowerCase();
@@ -122,12 +166,10 @@ export async function fetchTMDBDetails(
     if (!tmdbId) return null;
 
     // 3. Fetch full details with credits, recommendations, similar, videos, images, external_ids in ONE request
-    const detailRes = await fetch(
+    const data = await fetchTMDBJson(
       `${BASE_URL}/${mediaType}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=credits,recommendations,similar,videos,images,external_ids`
     );
-    if (!detailRes.ok) return null;
-
-    const data = await detailRes.json();
+    if (!data) return null;
 
     // Parse runtime
     let runtimeStr = "";

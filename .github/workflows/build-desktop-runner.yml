@@ -60,6 +60,7 @@ jobs:
           path: |
             desktop-runner/release/*.exe
             desktop-runner/release/*.AppImage
+            desktop-runner/release/*.deb
             desktop-runner/release/*.dmg
             desktop-runner/release/*.zip
 
@@ -80,6 +81,7 @@ jobs:
           files: |
             desktop-runner/release/*.exe
             desktop-runner/release/*.AppImage
+            desktop-runner/release/*.deb
             desktop-runner/release/*.dmg
             desktop-runner/release/*.zip
           fail_on_unmatched_files: false

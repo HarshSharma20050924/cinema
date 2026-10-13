@@ -117,6 +117,9 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
   const isRunnerWindowsPortable = (name: string) =>
     /runner/i.test(name) && !/setup/i.test(name) && name.endsWith(".exe");
 
+  const isRunnerLinuxDeb = (name: string) =>
+    /runner/i.test(name) && name.endsWith(".deb");
+
   const isRunnerLinuxAppImage = (name: string) =>
     /runner/i.test(name) && (name.endsWith(".AppImage") || name.endsWith(".appimage"));
 
@@ -156,6 +159,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
   const runnerWindowsSetup = getAsset(isRunnerWindowsSetup);
   const runnerWindowsPortable = getAsset(isRunnerWindowsPortable);
   const runnerAndroidApk = getAsset(isRunnerAndroidApk);
+  const runnerLinuxDeb = getAsset(isRunnerLinuxDeb);
   const runnerLinuxAppImage = getAsset(isRunnerLinuxAppImage);
   const runnerMacDmg = getAsset(isRunnerMacDmg);
 
@@ -808,14 +812,11 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
                     Linux Runner
                   </div>
-                  <div style={{ fontSize: "12px", color: "#888888" }}>
-                    Servers and desktops
-                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <button
-                    onClick={() => downloadFile(`Cinema-Runner-${currentVersion}.AppImage`, isRunnerLinuxAppImage)}
+                    onClick={() => downloadFile(`cinema-runner_${currentVersion}_amd64.deb`, isRunnerLinuxDeb)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -833,10 +834,10 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Runner AppImage</span>
+                      <span>Runner Debian (.deb)</span>
                     </div>
-                    {runnerLinuxAppImage?.size ? (
-                      <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(runnerLinuxAppImage.size)}</span>
+                    {runnerLinuxDeb?.size ? (
+                      <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(runnerLinuxDeb.size)}</span>
                     ) : null}
                   </button>
 
@@ -859,7 +860,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Direct AppImage Download</span>
+                      <span>Runner AppImage</span>
                     </div>
                     {runnerLinuxAppImage?.size ? (
                       <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerLinuxAppImage.size)}</span>

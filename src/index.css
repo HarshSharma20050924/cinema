@@ -85,34 +85,7 @@ input {
   animation: shimmer 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes loaderProgress {
-  0% { transform: translateX(-100%); }
-  50% { transform: translateX(0%); }
-  100% { transform: translateX(100%); }
-}
 
-/* Linear Top Loading Bar */
-.top-loader-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: transparent;
-  z-index: 999;
-  overflow: hidden;
-}
-.top-loader-bar::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(90deg, #e50914, #ff334b);
-  animation: loaderProgress 1.2s infinite ease-in-out;
-  box-shadow: 0 0 10px #e50914;
-}
 
 .skeleton {
   background: linear-gradient(

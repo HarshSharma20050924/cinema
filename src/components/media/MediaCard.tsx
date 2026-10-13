@@ -36,10 +36,15 @@ export function parseTitleAndYear(raw: string) {
       /\b(480p|720p|1080p|2160p|4k|hd|web-dl|webrip|bluray|x264|x265|hevc|dual audio|hindi|english|tamil|telugu|esub|multi audio|clean|uncut|complete|full movie|all episodes|series|season\s*\d+|s\d+|durban|phd|ac|lc|gs|cftd|unrated|extended)\b/gi,
       ""
     )
-    .replace(/[@&|]+$/g, "")
+    .replace(/&amp;/gi, " ")
     .replace(/[-_.:]+/g, " ")
+    .replace(/[@&|\-]+$/g, "")
+    .replace(/^[@&|\-]+/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  // If still ends with '&' or special char
+  clean = clean.replace(/\s*&\s*$/, "").replace(/^\s*&\s*/, "").trim();
 
   if (!clean) clean = str.split(/[-|[(]/)[0].trim();
   return { title: clean, year, language };
