@@ -309,12 +309,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "18px",
+                  gap: "16px",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff" }}>
-                  Windows Desktop
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
+                    Windows Desktop
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Windows 10 and 11
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -382,12 +387,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "18px",
+                  gap: "16px",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff" }}>
-                  Android
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
+                    Android
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Phones, Tablets and Android TV
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -410,7 +420,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Cinema APK (.apk)</span>
+                      <span>Cinema APK</span>
                     </div>
                     {appAndroidVega?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(appAndroidVega.size)}</span>
@@ -436,7 +446,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Cinema Web APK (.apk)</span>
+                      <span>Cinema Web APK</span>
                     </div>
                     {appAndroidWeb?.size ? (
                       <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(appAndroidWeb.size)}</span>
@@ -455,12 +465,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "18px",
+                  gap: "16px",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff" }}>
-                  Linux Desktop
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
+                    Linux Desktop
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Ubuntu, Debian, Mint & all distros
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -528,12 +543,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "18px",
+                  gap: "16px",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff" }}>
-                  macOS Desktop
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
+                    macOS Desktop
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Apple Silicon and Intel
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -556,10 +576,36 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Disk Image (.dmg)</span>
+                      <span>Apple Silicon (.dmg)</span>
                     </div>
                     {appMacDmg?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(appMacDmg.size)}</span>
+                    ) : null}
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile(`Cinema-${currentVersion}.dmg`, isAppMacDmg)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      color: "#ffffff",
+                      padding: "11px 14px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Universal / Intel (.dmg)</span>
+                    </div>
+                    {appMacDmg?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(appMacDmg.size)}</span>
                     ) : null}
                   </button>
                 </div>
@@ -624,12 +670,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "18px",
+                  gap: "16px",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff" }}>
-                  Windows Runner
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
+                    Windows Runner
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Windows 10 and 11
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -652,7 +703,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Setup Installer (.exe)</span>
+                      <span>Runner Setup (.exe)</span>
                     </div>
                     {runnerWindowsSetup?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(runnerWindowsSetup.size)}</span>
@@ -678,7 +729,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Portable (.exe)</span>
+                      <span>Runner Portable (.exe)</span>
                     </div>
                     {runnerWindowsPortable?.size ? (
                       <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerWindowsPortable.size)}</span>
@@ -697,12 +748,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "18px",
+                  gap: "16px",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff" }}>
-                  Android Runner
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
+                    Android Runner
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Runs in the background on your Android phone
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -725,10 +781,36 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Download APK (.apk)</span>
+                      <span>Download Runner APK</span>
                     </div>
                     {runnerAndroidApk?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(runnerAndroidApk.size)}</span>
+                    ) : null}
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile("Cinema-Runner.apk", isRunnerAndroidApk)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      color: "#ffffff",
+                      padding: "11px 14px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Direct APK Download</span>
+                    </div>
+                    {runnerAndroidApk?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerAndroidApk.size)}</span>
                     ) : null}
                   </button>
                 </div>
@@ -744,12 +826,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "18px",
+                  gap: "16px",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff" }}>
-                  Linux Runner
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
+                    Linux Runner
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Servers and desktops
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -772,10 +859,36 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Universal AppImage</span>
+                      <span>Runner AppImage</span>
                     </div>
                     {runnerLinuxAppImage?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(runnerLinuxAppImage.size)}</span>
+                    ) : null}
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile(`Cinema-Runner-${currentVersion}.AppImage`, isRunnerLinuxAppImage)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      color: "#ffffff",
+                      padding: "11px 14px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Direct AppImage Download</span>
+                    </div>
+                    {runnerLinuxAppImage?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerLinuxAppImage.size)}</span>
                     ) : null}
                   </button>
                 </div>
@@ -791,12 +904,17 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "18px",
+                  gap: "16px",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff" }}>
-                  macOS Runner
+                <div>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#ffffff", marginBottom: "3px" }}>
+                    macOS Runner
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888888" }}>
+                    Apple Silicon and Intel
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -819,10 +937,36 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <DownloadIcon size={14} />
-                      <span>Disk Image (.dmg)</span>
+                      <span>Runner .dmg</span>
                     </div>
                     {runnerMacDmg?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(runnerMacDmg.size)}</span>
+                    ) : null}
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile(`Cinema-Runner-${currentVersion}.dmg`, isRunnerMacDmg)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#18181c",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                      color: "#ffffff",
+                      padding: "11px 14px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                      <DownloadIcon size={14} />
+                      <span>Direct .dmg Download</span>
+                    </div>
+                    {runnerMacDmg?.size ? (
+                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerMacDmg.size)}</span>
                     ) : null}
                   </button>
                 </div>
