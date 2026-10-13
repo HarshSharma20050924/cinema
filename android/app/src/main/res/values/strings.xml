@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Cinema</string>
-    <string name="title_activity_main">Cinema</string>
-    <string name="package_name">com.cinema.streaming</string>
-    <string name="custom_url_scheme">com.cinema.streaming</string>
+    <string name="app_name">Cinema Runner</string>
+    <string name="title_activity_main">Cinema Runner</string>
+    <string name="package_name">com.cinema.runner</string>
+    <string name="custom_url_scheme">com.cinema.runner</string>
 </resources>

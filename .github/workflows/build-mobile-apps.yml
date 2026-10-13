@@ -67,6 +67,12 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets/public
           cp -r runner-app/public/* android/app/src/main/assets/public/
+          for m in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p android/app/src/main/res/mipmap-$m
+            cp public/runner-icon.png android/app/src/main/res/mipmap-$m/ic_launcher.png
+            cp public/runner-icon.png android/app/src/main/res/mipmap-$m/ic_launcher_round.png
+            cp public/runner-icon.png android/app/src/main/res/mipmap-$m/ic_launcher_foreground.png
+          done
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
@@ -78,18 +84,27 @@ jobs:
       # 3. Build Cinema Alternative Native Mobile App (Vega Standalone App)
       - name: Build Cinema Alternative Native App
         run: |
+          if [ ! -d "vega-app" ]; then
+            git clone --depth 1 -b vega-main https://github.com/HarshSharma20050924/cinema.git vega-app || true
+          fi
           if [ -d "vega-app" ] && [ -f "vega-app/package.json" ]; then
             cd vega-app
             npm ci || npm install
             cd android
             chmod +x gradlew
             ./gradlew assembleRelease
+            ARM64_APK=$(find app/build/outputs/apk/release -name "*arm64*.apk" | head -n 1)
             UNIVERSAL_APK=$(find app/build/outputs/apk/release -name "*universal*.apk" | head -n 1)
-            if [ -n "$UNIVERSAL_APK" ]; then
+            if [ -n "$ARM64_APK" ]; then
+              cp "$ARM64_APK" ../../Cinema-Vega.apk
+            elif [ -n "$UNIVERSAL_APK" ]; then
               cp "$UNIVERSAL_APK" ../../Cinema-Vega.apk
             else
               ANY_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
               [ -n "$ANY_APK" ] && cp "$ANY_APK" ../../Cinema-Vega.apk || true
+            fi
+            if [ -n "$UNIVERSAL_APK" ]; then
+              cp "$UNIVERSAL_APK" ../../Cinema-Vega-Universal.apk || true
             fi
           else
             echo "Alternative app source not present, skipping."

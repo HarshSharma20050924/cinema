@@ -16,6 +16,7 @@
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep Capacitor and Runner Plugin classes for R8 optimization
+-keep class com.getcapacitor.** { *; }
+-keep class com.cinema.runner.** { *; }
+-dontwarn com.getcapacitor.**

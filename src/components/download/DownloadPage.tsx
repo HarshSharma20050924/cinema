@@ -421,7 +421,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                     {appAndroidVega?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(appAndroidVega.size)}</span>
                     ) : (
-                      <span style={{ fontSize: "11px", opacity: 0.9 }}>48.2 MB</span>
+                      <span style={{ fontSize: "11px", opacity: 0.9 }}>28.5 MB</span>
                     )}
                   </button>
 
@@ -785,32 +785,6 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
                     </div>
                     {runnerAndroidApk?.size ? (
                       <span style={{ fontSize: "11px", opacity: 0.9 }}>{formatSize(runnerAndroidApk.size)}</span>
-                    ) : null}
-                  </button>
-
-                  <button
-                    onClick={() => downloadFile("Cinema-Runner.apk", isRunnerAndroidApk)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      background: "#18181c",
-                      border: "1px solid rgba(255, 255, 255, 0.12)",
-                      color: "#ffffff",
-                      padding: "11px 14px",
-                      borderRadius: "12px",
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                      <DownloadIcon size={14} />
-                      <span>Direct APK Download</span>
-                    </div>
-                    {runnerAndroidApk?.size ? (
-                      <span style={{ fontSize: "11px", color: "#a3a3a3" }}>{formatSize(runnerAndroidApk.size)}</span>
                     ) : null}
                   </button>
                 </div>
