@@ -603,6 +603,9 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       <DetailsTrailer
         trailerEmbed={activeTrailerEmbed}
         trailerUrl={activeTrailerUrl}
+        trailers={tmdb?.trailers}
+        backdrop={backdropImage}
+        title={displayTitle}
       />
 
       {/* 5. CAST SECTION */}

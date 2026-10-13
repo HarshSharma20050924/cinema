@@ -31,6 +31,7 @@ export interface TMDBDetails {
   similar: TMDBMediaItem[];
   trailerEmbed?: string | null;
   trailerUrl?: string | null;
+  trailers?: Array<{ key: string; name: string; type: string }>;
   screenshots?: string[];
   directors?: string[];
   creators?: string[];
@@ -184,11 +185,20 @@ export async function fetchTMDBDetails(
     let trailerEmbed: string | null = null;
     let trailerUrl: string | null = null;
     const vids = data.videos?.results || [];
+    const validVideos = vids.filter((v: any) => v.site === "YouTube" && v.key);
+    const trailers: Array<{ key: string; name: string; type: string }> = validVideos.map((v: any) => ({
+      key: v.key,
+      name: v.name || v.type || "Trailer",
+      type: v.type || "Trailer",
+    }));
+
     const trailerItem =
-      vids.find((v: any) => v.type === "Trailer" && v.site === "YouTube") ||
-      vids.find((v: any) => (v.type === "Teaser" || v.type === "Clip") && v.site === "YouTube");
+      validVideos.find((v: any) => v.type === "Trailer" && v.official) ||
+      validVideos.find((v: any) => v.type === "Trailer") ||
+      validVideos.find((v: any) => v.type === "Teaser" || v.type === "Clip") ||
+      validVideos[0];
     if (trailerItem && trailerItem.key) {
-      trailerEmbed = `https://www.youtube-nocookie.com/embed/${trailerItem.key}?rel=0&modestbranding=1&playsinline=1`;
+      trailerEmbed = `https://www.youtube-nocookie.com/embed/${trailerItem.key}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`;
       trailerUrl = `https://www.youtube.com/watch?v=${trailerItem.key}`;
     }
 
@@ -247,6 +257,7 @@ export async function fetchTMDBDetails(
       similar,
       trailerEmbed,
       trailerUrl,
+      trailers,
       screenshots,
       directors,
       creators,
