@@ -227,21 +227,18 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
         {/* SECTION 1: CINEMA APPLICATION */}
         {(activeTab === "all" || activeTab === "app") && (
           <div style={{ marginBottom: "50px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-              <div
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+              <img
+                src="/logo.png"
+                alt="Cinema App"
                 style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "8px",
-                  background: "rgba(229, 9, 20, 0.15)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#e50914",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "9px",
+                  objectFit: "cover",
+                  boxShadow: "0 2px 10px rgba(229, 9, 20, 0.35)",
                 }}
-              >
-                <FilmIcon size={18} />
-              </div>
+              />
               <div>
                 <h2 style={{ fontSize: "19px", fontWeight: 800, margin: 0 }}>
                   Cinema App
@@ -561,21 +558,18 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
         {/* SECTION 2: RUNNER APP */}
         {(activeTab === "all" || activeTab === "runner") && (
           <div style={{ marginBottom: "50px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-              <div
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+              <img
+                src="/runner-icon.png"
+                alt="Runner App"
                 style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "8px",
-                  background: "rgba(255, 255, 255, 0.08)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#ffffff",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "9px",
+                  objectFit: "cover",
+                  boxShadow: "0 2px 10px rgba(255, 255, 255, 0.15)",
                 }}
-              >
-                <ServerIcon size={18} />
-              </div>
+              />
               <div>
                 <h2 style={{ fontSize: "19px", fontWeight: 800, margin: 0 }}>
                   Runner App
