@@ -70,3 +70,6 @@ server.log
 *.sln
 *.sw?
 vega-app
+
+# Graphify & Knowledge Graph outputs
+graphify-out/
