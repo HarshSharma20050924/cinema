@@ -89,22 +89,29 @@ jobs:
           fi
           if [ -d "vega-app" ] && [ -f "vega-app/package.json" ]; then
             cd vega-app
-            npm ci || npm install
-            cd android
-            chmod +x gradlew
-            ./gradlew assembleRelease
-            ARM64_APK=$(find app/build/outputs/apk/release -name "*arm64*.apk" | head -n 1)
-            UNIVERSAL_APK=$(find app/build/outputs/apk/release -name "*universal*.apk" | head -n 1)
-            if [ -n "$ARM64_APK" ]; then
-              cp "$ARM64_APK" ../../Cinema-Vega.apk
-            elif [ -n "$UNIVERSAL_APK" ]; then
-              cp "$UNIVERSAL_APK" ../../Cinema-Vega.apk
-            else
-              ANY_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
-              [ -n "$ANY_APK" ] && cp "$ANY_APK" ../../Cinema-Vega.apk || true
+            npm ci || npm install --legacy-peer-deps || true
+            if [ ! -d "android" ]; then
+              npx expo prebuild --platform android --no-install || npm run prebuild || true
             fi
-            if [ -n "$UNIVERSAL_APK" ]; then
-              cp "$UNIVERSAL_APK" ../../Cinema-Vega-Universal.apk || true
+            if [ -d "android" ]; then
+              cd android
+              chmod +x gradlew
+              ./gradlew assembleRelease || true
+              ARM64_APK=$(find app/build/outputs/apk/release -name "*arm64*.apk" 2>/dev/null | head -n 1)
+              UNIVERSAL_APK=$(find app/build/outputs/apk/release -name "*universal*.apk" 2>/dev/null | head -n 1)
+              if [ -n "$ARM64_APK" ]; then
+                cp "$ARM64_APK" ../../Cinema-Vega.apk
+              elif [ -n "$UNIVERSAL_APK" ]; then
+                cp "$UNIVERSAL_APK" ../../Cinema-Vega.apk
+              else
+                ANY_APK=$(find app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -n 1)
+                [ -n "$ANY_APK" ] && cp "$ANY_APK" ../../Cinema-Vega.apk || true
+              fi
+              if [ -n "$UNIVERSAL_APK" ]; then
+                cp "$UNIVERSAL_APK" ../../Cinema-Vega-Universal.apk || true
+              fi
+            else
+              echo "Android directory not present in alternative app, skipping build."
             fi
           else
             echo "Alternative app source not present, skipping."

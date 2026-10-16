@@ -15,31 +15,16 @@ let lastCheckTime = 0;
 
 async function getEffectiveApiUrl() {
   const cfg = loadConfig();
-  const defaultUrl = cfg.CINEMA_API || 'http://127.0.0.1:3001/api';
+  const cloudflareApi = `${(cfg.WEB_URL || 'https://cinema-dwh.pages.dev').replace(/\/$/, '')}/api`;
 
-  // Quick health check on local runner first
+  // 1. If local runner (127.0.0.1:3001) is active, use it for zero-latency testing
   try {
-    await axios.get(`${defaultUrl}/providers`, { timeout: 1500 });
-    return defaultUrl;
-  } catch (_) {
-    // If local runner is unreachable, check if an active runner tunnel is registered
-    const now = Date.now();
-    if (cachedApiUrl && (now - lastCheckTime < 60000)) {
-      return cachedApiUrl;
-    }
-    try {
-      const tunnelRes = await axios.get(`${cfg.WEB_URL}/api/tunnel-status`, { timeout: 3000 });
-      const tunnelBackend = tunnelRes.data?.backendUrl;
-      if (tunnelBackend) {
-        const candidateUrl = `${tunnelBackend.replace(/\/$/, '')}/api`;
-        await axios.get(`${candidateUrl}/providers`, { timeout: 2500 });
-        cachedApiUrl = candidateUrl;
-        lastCheckTime = now;
-        return candidateUrl;
-      }
-    } catch (_) {}
-  }
-  return defaultUrl;
+    await axios.get('http://127.0.0.1:3001/api/providers', { timeout: 800 });
+    return 'http://127.0.0.1:3001/api';
+  } catch (_) {}
+
+  // 2. Otherwise always use Cloudflare Runner Gateway (routes to your Android phone runner)
+  return cfg.CINEMA_API || cloudflareApi;
 }
 
 async function getAllProviders() {
