@@ -15,7 +15,7 @@ A fast, client-side streaming application and provider indexing system for movie
 [![Latest Release](https://img.shields.io/github/v/release/HarshSharma20050924/cinema?color=E50914&label=Latest%20Release&style=flat-square&logo=github)](https://github.com/HarshSharma20050924/cinema/releases/latest)
 [![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Web-111111?style=flat-square)](https://github.com/HarshSharma20050924/cinema/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache%202.0-111111?style=flat-square)](LICENSE)
-[![Contributions](https://img.shields.io/badge/Contributions-Welcome-E50914?style=flat-square)](CONTRIBUTING.md)
+
 
 <br/>
 
