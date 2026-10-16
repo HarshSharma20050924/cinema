@@ -87,6 +87,22 @@ class ZendaEngine {
       return this.moduleCache.get(cacheKey);
     }
 
+    // 1. Check local provider modules first (e.g. tpb, gramcinema, etc.)
+    const fs = require('fs');
+    const path = require('path');
+    const localPathCjs = path.resolve(__dirname, `../providers/${provider}/${moduleName}.cjs`);
+    const localPathJs = path.resolve(__dirname, `../providers/${provider}/${moduleName}.js`);
+    if (fs.existsSync(localPathCjs)) {
+      const localMod = require(localPathCjs);
+      this.moduleCache.set(cacheKey, localMod);
+      return localMod;
+    }
+    if (fs.existsSync(localPathJs)) {
+      const localMod = require(localPathJs);
+      this.moduleCache.set(cacheKey, localMod);
+      return localMod;
+    }
+
     const url = `${ZENDA_RAW}/dist/${provider}/${moduleName}.js`;
     const response = await axios.get(url, { timeout: 12000 });
     const code = response.data;

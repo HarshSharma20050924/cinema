@@ -8,8 +8,23 @@ const path = require('path');
 const app = express();
 const PORT = 3001;
 
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
+
+const { playInVlc } = require('./server/controllers/vlcController.cjs');
+app.post('/api/play-vlc', playInVlc);
+app.get('/api/play-vlc', playInVlc);
 
 const ZENDA_RAW = 'https://raw.githubusercontent.com/Zenda-Cross/vega-providers/refs/heads/main';
 const moduleCache = new Map();
@@ -34,6 +49,8 @@ const PROVIDER_DISPLAY_NAMES = {
   moviebox: 'MovieBox',
   movieboxweb: 'MovieBox',
   allmoviesforyou: 'AllMoviesForYou',
+  tpb: 'ThePirateBay',
+  thepiratebay: 'ThePirateBay',
 };
 
 function getProviderDisplayName(key) {
@@ -63,6 +80,12 @@ const LOCAL_PROVIDERS = {
     posts:   require('./server/providers/olamovies/posts.cjs'),
     meta:    require('./server/providers/olamovies/meta.cjs'),
     stream:  require('./server/providers/olamovies/stream.cjs'),
+  },
+  tpb: {
+    catalog: require('./server/providers/tpb/catalog.cjs'),
+    posts:   require('./server/providers/tpb/posts.cjs'),
+    meta:    require('./server/providers/tpb/meta.cjs'),
+    stream:  require('./server/providers/tpb/stream.cjs'),
   },
   katmovies: katmoviesProvider,
   katmoviehd: katmoviesProvider,
@@ -174,10 +197,21 @@ app.get('/api/providers', async (req, res) => {
       name: 'OlaMovies',
       value: 'olamovies',
       version: '1.0',
-      icon: 'https://v6.olamovies.mov/apple-touch-icon.png',
+      icon: '/icons/olamovies.svg',
       type: 'hindi',
       disabled: false,
       description: 'Highest Quality 4K UHD, 1080p Movies & Series (v6.olamovies.mov)',
+    });
+
+    // Add local ThePirateBay provider
+    providers.push({
+      name: 'ThePirateBay',
+      value: 'tpb',
+      version: '1.0',
+      icon: '/icons/tpb.svg',
+      type: 'global',
+      disabled: false,
+      description: 'The Pirate Bay (Movies & TV Series)',
     });
 
     res.json(providers);
@@ -402,8 +436,8 @@ async function enrichMetaEpisodes(provider, meta) {
         ? meta.linkList
         : [{ title: meta.title || 'Episodes', episodesLink: meta.episodesLink }];
 
-    // Prioritize popular tracks (original audio, english, hindi)
-    const preferredLangs = ['original', 'english', 'hindi'];
+    // Prioritize popular tracks (Hindi first, then Original Audio, then English)
+    const preferredLangs = ['hindi', 'original', 'english'];
     const sortedGroups = [...rawGroups].sort((a, b) => {
       const aT = (a.title || '').toLowerCase();
       const bT = (b.title || '').toLowerCase();
@@ -612,6 +646,23 @@ app.get('/api/streams', async (req, res) => {
     console.error(`Stream error (${req.query.provider}):`, error.message);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Torrent Stream & Download Handlers
+app.get('/api/stream/torrent', async (req, res) => {
+  const hash = req.query.hash || req.query.infoHash;
+  const name = req.query.name || '';
+  if (!hash) return res.status(400).send('infoHash parameter required');
+  const torrentService = require('./server/services/torrentService.cjs');
+  await torrentService.handleStream(req, res, hash, name);
+});
+
+app.get('/api/torrent/download', async (req, res) => {
+  const hash = req.query.hash || req.query.infoHash;
+  const name = req.query.name || '';
+  if (!hash) return res.status(400).send('infoHash parameter required');
+  const torrentService = require('./server/services/torrentService.cjs');
+  await torrentService.handleDownload(req, res, hash, name);
 });
 
 // 7. Video Stream / Download Header Proxy

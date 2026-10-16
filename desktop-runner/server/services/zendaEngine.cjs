@@ -87,6 +87,20 @@ class ZendaEngine {
       return this.moduleCache.get(cacheKey);
     }
 
+    // Check local custom providers first (e.g. tpb, gramcinema, etc.)
+    const fs = require('fs');
+    const path = require('path');
+    const localPath = path.join(__dirname, '..', 'providers', provider, `${moduleName}.cjs`);
+    if (fs.existsSync(localPath)) {
+      try {
+        const localMod = require(localPath);
+        this.moduleCache.set(cacheKey, localMod);
+        return localMod;
+      } catch (err) {
+        console.error(`[ZendaEngine] Error loading local module ${provider}/${moduleName}:`, err.message);
+      }
+    }
+
     const url = `${ZENDA_RAW}/dist/${provider}/${moduleName}.js`;
     const response = await axios.get(url, { timeout: 12000 });
     const code = response.data;

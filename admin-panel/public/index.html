@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <style>
+    :root {
+      --bg: #06080e;
+      --card-bg: rgba(18, 22, 36, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(25, 31, 50, 0.85);
+      --red: #e50914;
+      --red-hover: #b80710;
+      --blue: #2563eb;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --text: #ffffff;
+      --text-muted: #94a3b8;
+      --text-sub: #64748b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .ambient-glow {
+      position: fixed;
+      top: -180px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 380px;
+      background: radial-gradient(circle, rgba(229, 9, 20, 0.12) 0%, rgba(37, 99, 235, 0.08) 50%, transparent 80%);
+      pointer-events: none;
+      filter: blur(90px);
+      z-index: 0;
+    }
+    input, select, textarea, button {
+      font-family: inherit;
+    }
+    /* SVG Icon styles */
+    .icon {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      stroke-width: 2;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vertical-align: middle;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes pulse-ring {
+      0%, 100% { opacity: 0.6; transform: scale(0.98); }
+      50% { opacity: 1; transform: scale(1); }
+    }
+    .animate-in {
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body>
+  
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // SVG Icons
+    const Icons = {
+      Server: () => (
+        <svg className="icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+      ),
+      Sliders: () => (
+        <svg className="icon" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+      ),
+      Check: () => (
+        <svg className="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      ),
+      Power: () => (
+        <svg className="icon" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+      ),
+      Trash: () => (
+        <svg className="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      ),
+      ExternalLink: () => (
+        <svg className="icon" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+      ),
+      Refresh: () => (
+        <svg className="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+      ),
+      Lock: () => (
+        <svg className="icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      ),
+    };
+
+    function AdminApp() {
+      const [token, setToken] = useState(localStorage.getItem('cinema_admin_token') || '');
+      const [passwordInput, setPasswordInput] = useState('');
+      const [loginError, setLoginError] = useState(false);
+      const [activeTab, setActiveTab] = useState('devices');
+
+      const [devices, setDevices] = useState([]);
+      const [settings, setSettings] = useState({
+        serverEnabled: true,
+        activeTunnelUrl: '',
+        activeDeviceId: null,
+        activeDeviceName: '',
+      });
+      const [extensionsList, setExtensionsList] = useState([]);
+      const [providersConfig, setProvidersConfig] = useState({});
+      const [extensionSearch, setExtensionSearch] = useState('');
+      const [extensionFilterTab, setExtensionFilterTab] = useState('all');
+      const [isSavingProviders, setIsSavingProviders] = useState(false);
+      const [saveSuccess, setSaveSuccess] = useState(false);
+      const [isSyncing, setIsSyncing] = useState(false);
+
+      const [showAddNodeModal, setShowAddNodeModal] = useState(false);
+      const [newNodeName, setNewNodeName] = useState('');
+      const [newNodeUrl, setNewNodeUrl] = useState('');
+      const [isAddingNode, setIsAddingNode] = useState(false);
+
+      // Check Cloudflare Pages Live Connection
+      const checkWebsiteSync = async () => {
+        try {
+          const res = await fetch('https://cinema-dwh.pages.dev/api/tunnel-status');
+          const data = await res.json();
+          if (data && data.backendUrl) {
+            setWebsiteSyncStatus(data.backendUrl);
+          } else {
+            setWebsiteSyncStatus('Offline / Awaiting node connection');
+          }
+        } catch {
+          setWebsiteSyncStatus('Standby');
+        }
+      };
+
+      // Login
+      const handleLogin = async (e) => {
+        if (e) e.preventDefault();
+        setLoginError(false);
+        try {
+          const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: passwordInput.trim() || 'admin123' }),
+          });
+          const data = await res.json();
+          if (data.success && data.token) {
+            setToken(data.token);
+            localStorage.setItem('cinema_admin_token', data.token);
+          } else {
+            setLoginError(true);
+          }
+        } catch {
+          setLoginError(true);
+        }
+      };
+
+      const handleLogout = () => {
+        localStorage.removeItem('cinema_admin_token');
+        setToken('');
+      };
+
+      // Fetch Data
+      const fetchData = async () => {
+        if (!token) return;
+        try {
+          const res = await fetch('/api/admin/devices', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (res.status === 401) return handleLogout();
+          const data = await res.json();
+          setDevices(data.devices || []);
+          if (data.settings) setSettings(data.settings);
+        } catch (e) {
+          console.error(e);
+        }
+        checkWebsiteSync();
+      };
+
+      // Fetch Providers & Extensions
+      const fetchProviders = async () => {
+        if (!token) return;
+        try {
+          const res = await fetch(`/api/admin/providers?_t=${Date.now()}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            cache: 'no-store',
+          });
+          const data = await res.json();
+          if (data && data.extensions) {
+            setExtensionsList(data.extensions);
+            setProvidersConfig(data.config || {});
+          } else if (data && typeof data === 'object') {
+            setProvidersConfig(data);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+
+      useEffect(() => {
+        if (token) {
+          fetchData();
+          fetchProviders();
+          const timer = setInterval(fetchData, 4000);
+          return () => clearInterval(timer);
+        }
+      }, [token]);
+
+      const [togglingDeviceIds, setTogglingDeviceIds] = useState({});
+      const [promotingDeviceIds, setPromotingDeviceIds] = useState({});
+      const [deletingDeviceIds, setDeletingDeviceIds] = useState({});
+
+      // Toggle Single Device (Revoke or Authorize)
+      const toggleDevice = async (deviceId) => {
+        setTogglingDeviceIds(prev => ({ ...prev, [deviceId]: true }));
+        try {
+          const res = await fetch(`/api/admin/devices/${deviceId}/toggle`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            alert(data.error || 'Failed to toggle device access');
+          }
+          await fetchData();
+        } catch (err) {
+          alert('Communication error with server');
+        } finally {
+          setTogglingDeviceIds(prev => ({ ...prev, [deviceId]: false }));
+        }
+      };
+
+      // Make Primary
+      const makePrimary = async (deviceId) => {
+        setPromotingDeviceIds(prev => ({ ...prev, [deviceId]: true }));
+        try {
+          const res = await fetch(`/api/admin/devices/${deviceId}/make-primary`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (data.success) {
+            await fetchData();
+          } else {
+            alert(data.error || 'Failed to update priority');
+          }
+        } catch (e) {
+          alert('Network communication error');
+        } finally {
+          setPromotingDeviceIds(prev => ({ ...prev, [deviceId]: false }));
+        }
+      };
+
+      // Delete Device
+      const deleteDevice = async (deviceId) => {
+        if (!confirm('Remove this device from cluster registry?')) return;
+        setDeletingDeviceIds(prev => ({ ...prev, [deviceId]: true }));
+        try {
+          await fetch(`/api/admin/devices/${deviceId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          await fetchData();
+        } catch (e) {
+          alert('Network communication error');
+        } finally {
+          setDeletingDeviceIds(prev => ({ ...prev, [deviceId]: false }));
+        }
+      };
+
+      // Toggle Master Killswitch
+      const toggleKillswitch = async () => {
+        const nextState = !settings.serverEnabled;
+        const msg = nextState
+          ? 'Enable global website streaming network?'
+          : 'HALT all streaming? All connected phones will stop broadcasting.';
+        if (!confirm(msg)) return;
+
+        await fetch('/api/admin/global-killswitch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ enabled: nextState }),
+        });
+        fetchData();
+      };
+
+      // Force Sync to Website
+      const handleForceSyncWebsite = async () => {
+        setIsSyncing(true);
+        try {
+          const res = await fetch('/api/admin/sync-website', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ url: settings.activeTunnelUrl }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            checkWebsiteSync();
+            alert('Synced active tunnel to cinema-dwh.pages.dev');
+          } else {
+            alert('Sync failed. Please check network.');
+          }
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+
+      // Prune Offline Nodes
+      const handlePruneOffline = async () => {
+        try {
+          const res = await fetch('/api/admin/devices/prune-offline', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (data.success) {
+            fetchData();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+
+      // Manually add server node
+      const handleAddNode = async (e) => {
+        if (e) e.preventDefault();
+        const cleanUrl = (newNodeUrl || '').trim();
+        if (!cleanUrl || !cleanUrl.startsWith('http')) {
+          alert('Please enter a valid URL (starting with http:// or https://)');
+          return;
+        }
+        setIsAddingNode(true);
+        try {
+          const res = await fetch('/api/admin/devices', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ deviceName: newNodeName.trim() || 'Custom Node', url: cleanUrl }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            setShowAddNodeModal(false);
+            setNewNodeName('');
+            setNewNodeUrl('');
+            fetchData();
+          } else {
+            alert(data.error || 'Failed to add node');
+          }
+        } catch (err) {
+          alert('Failed to connect to admin coordinator');
+        } finally {
+          setIsAddingNode(false);
+        }
+      };
+
+      // Save Provider / Extension Visibility Configuration to Server
+      const saveProvidersConfigDirectly = async (configToSave) => {
+        setIsSavingProviders(true);
+        try {
+          const res = await fetch('/api/admin/providers', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ config: configToSave }),
+          });
+
+          if (res.ok) {
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2500);
+          }
+        } catch (err) {
+          console.error('Failed to save provider config:', err);
+        } finally {
+          setIsSavingProviders(false);
+        }
+      };
+
+      // Toggle individual extension enabled/hidden with instant database sync
+      const toggleExtensionStatus = (value) => {
+        const currentExt = extensionsList.find(e => e.value === value);
+        const nextEnabled = currentExt ? !currentExt.enabled : false;
+
+        // 1. Update UI state immediately
+        setExtensionsList(prev => prev.map(ext => {
+          if (ext.value === value) {
+            return { ...ext, enabled: nextEnabled, hidden: !nextEnabled };
+          }
+          return ext;
+        }));
+
+        // 2. Update config state
+        const nextConfig = {
+          ...providersConfig,
+          [value]: {
+            ...(providersConfig[value] || {}),
+            enabled: nextEnabled,
+            hidden: !nextEnabled,
+          }
+        };
+        setProvidersConfig(nextConfig);
+
+        // 3. Auto-save directly to Cloudflare D1 & KV
+        saveProvidersConfigDirectly(nextConfig);
+      };
+
+      // Bulk enable or hide all extensions with instant database sync
+      const setAllExtensionsStatus = (shouldEnable) => {
+        setExtensionsList(prev => prev.map(ext => ({
+          ...ext,
+          enabled: shouldEnable,
+          hidden: !shouldEnable,
+        })));
+
+        const nextConfig = { ...providersConfig };
+        extensionsList.forEach(ext => {
+          nextConfig[ext.value] = {
+            ...(nextConfig[ext.value] || {}),
+            enabled: shouldEnable,
+            hidden: !shouldEnable,
+          };
+        });
+
+        setProvidersConfig(nextConfig);
+        saveProvidersConfigDirectly(nextConfig);
+      };
+
+      // Manual Save Button Handler
+      const saveProviders = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        await saveProvidersConfigDirectly(providersConfig);
+      };
+
+
+      // LOGIN SCREEN
+      if (!token) {
+        return (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            background: 'radial-gradient(circle at 50% 25%, #131929 0%, #06080e 100%)',
+          }}>
+            <div style={{
+              maxWidth: '360px',
+              width: '100%',
+              background: 'rgba(18, 22, 36, 0.85)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '24px',
+              padding: '36px 28px',
+              textAlign: 'center',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+            }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                margin: '0 auto 18px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #e50914, #1d4ed8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 24px rgba(229, 9, 20, 0.35)',
+              }}>
+                <Icons.Lock />
+              </div>
+              <h2 style={{ fontSize: '19px', fontWeight: 800, letterSpacing: '-0.3px', marginBottom: '6px' }}>
+                Admin Panel
+              </h2>
+              <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '24px' }}>
+                Login to access admin dashboard.
+              </p>
+
+              <form onSubmit={handleLogin}>
+                <input
+                  type="password"
+                  placeholder="Master Password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '13px 16px',
+                    borderRadius: '14px',
+                    background: 'rgba(0, 0, 0, 0.45)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#ffffff',
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    outline: 'none',
+                    marginBottom: '14px',
+                  }}
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  style={{
+                    width: '100%',
+                    padding: '13px',
+                    borderRadius: '14px',
+                    background: '#e50914',
+                    color: '#ffffff',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 16px rgba(229, 9, 20, 0.35)',
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  Authenticate
+                </button>
+                {loginError && (
+                  <p style={{ color: '#f87171', fontSize: '12px', marginTop: '12px', fontWeight: 600 }}>
+                    Incorrect password.
+                  </p>
+                )}
+              </form>
+            </div>
+          </div>
+        );
+      }
+
+      const activeCount = devices.filter(d => d.isOnline && d.status === 'running' && d.allowed !== false).length;
+
+      return (
+        <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '24px 20px 80px', position: 'relative', zIndex: 1 }} className="animate-in">
+          {/* Header Bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingBottom: '20px',
+            marginBottom: '24px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #e50914, #2563eb)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 18px rgba(229, 9, 20, 0.3)',
+              }}>
+                <Icons.Server />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h1 style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.3px' }}>
+                    Admin Panel
+                  </h1>
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                  Manage connected devices and settings
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={toggleKillswitch}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '999px',
+                  background: settings.serverEnabled ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                  border: `1px solid ${settings.serverEnabled ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.35)'}`,
+                  color: settings.serverEnabled ? '#f87171' : '#34d399',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Icons.Power />
+                <span>{settings.serverEnabled ? 'Disable System' : 'Enable System'}</span>
+              </button>
+
+              <button
+                onClick={handleLogout}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '999px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#94a3b8',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+
+          {/* Cluster Status Card */}
+          <div style={{
+            background: 'var(--card-bg)',
+            border: '1px solid var(--card-border)',
+            borderRadius: '20px',
+            padding: '20px 24px',
+            backdropFilter: 'blur(16px)',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{
+                  width: '9px',
+                  height: '9px',
+                  borderRadius: '50%',
+                  background: settings.serverEnabled && activeCount > 0 ? '#10b981' : '#f59e0b',
+                  boxShadow: `0 0 10px ${settings.serverEnabled && activeCount > 0 ? '#10b981' : '#f59e0b'}`,
+                }}></span>
+                <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+                  {settings.serverEnabled
+                    ? (activeCount > 0 ? `${activeCount} Device${activeCount > 1 ? 's' : ''} Connected` : 'Waiting for Devices')
+                    : 'System Disabled Globally'}
+                </span>
+              </div>
+
+              {settings.activeTunnelUrl && (
+                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span>Primary Host: <strong style={{ color: '#ffffff' }}>{settings.activeDeviceName || 'Node'}</strong></span>
+                  <span>•</span>
+                  <a href={settings.activeTunnelUrl} target="_blank" style={{ color: '#38bdf8', textDecoration: 'none', fontFamily: 'JetBrains Mono', fontSize: '11px' }}>
+                    {settings.activeTunnelUrl}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handlePruneOffline}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '999px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  color: '#cbd5e1',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+                title="Remove inactive or offline nodes"
+              >
+                <Icons.Trash />
+                <span>Clean Offline</span>
+              </button>
+
+              <button
+                onClick={handleForceSyncWebsite}
+                disabled={isSyncing || !settings.activeTunnelUrl}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '999px',
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: !settings.activeTunnelUrl ? 0.5 : 1,
+                }}
+              >
+                <Icons.Refresh />
+                <span>{isSyncing ? 'Syncing...' : 'Sync Website KV'}</span>
+              </button>
+
+              <a
+                href="https://cinema-dwh.pages.dev/"
+                target="_blank"
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '999px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>Live Site</span>
+                <Icons.ExternalLink />
+              </a>
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            paddingBottom: '12px',
+          }}>
+            <button
+              onClick={() => setActiveTab('devices')}
+              style={{
+                padding: '9px 20px',
+                borderRadius: '999px',
+                background: activeTab === 'devices' ? '#e50914' : 'rgba(255, 255, 255, 0.04)',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 700,
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s',
+              }}
+            >
+              <Icons.Server />
+              <span>Devices ({devices.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('providers')}
+              style={{
+                padding: '9px 20px',
+                borderRadius: '999px',
+                background: activeTab === 'providers' ? '#e50914' : 'rgba(255, 255, 255, 0.04)',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 700,
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s',
+              }}
+            >
+              <Icons.Sliders />
+              <span>Extensions ({extensionsList.length || 0})</span>
+            </button>
+          </div>
+
+          {/* TAB 1: CONNECTED PHONES */}
+          {activeTab === 'devices' && (
+            <div>
+              {/* Device Controls Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 600 }}>
+                  Active Nodes: <strong style={{ color: '#fff' }}>{devices.filter(d => d.status === 'running').length}</strong> / {devices.length}
+                </span>
+                <button
+                  onClick={() => setShowAddNodeModal(true)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '999px',
+                    background: '#10b981',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span>+ Add Server Node / URL</span>
+                </button>
+              </div>
+
+              {/* Add Node Modal */}
+              {showAddNodeModal && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(0,0,0,0.7)',
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 9999,
+                  padding: '20px',
+                }}>
+                  <div style={{
+                    background: '#13151b',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '20px',
+                    padding: '28px',
+                    width: '100%',
+                    maxWidth: '460px',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)',
+                  }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', marginBottom: '6px' }}>
+                      Add Server Node
+                    </h3>
+                    <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '20px' }}>
+                      Register an active Cloudflare tunnel or server URL to include it in the cluster.
+                    </p>
+                    <form onSubmit={handleAddNode}>
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#cbd5e1', marginBottom: '6px' }}>
+                          Device / Node Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Phone 1, Living Room TV, Termux"
+                          value={newNodeName}
+                          onChange={(e) => setNewNodeName(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '10px',
+                            color: '#fff',
+                            fontSize: '13px',
+                          }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '24px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#cbd5e1', marginBottom: '6px' }}>
+                          Tunnel / Endpoint URL <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://xxxx.trycloudflare.com"
+                          required
+                          value={newNodeUrl}
+                          onChange={(e) => setNewNodeUrl(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '10px',
+                            color: '#fff',
+                            fontSize: '13px',
+                            fontFamily: 'JetBrains Mono',
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddNodeModal(false)}
+                          style={{
+                            padding: '9px 18px',
+                            borderRadius: '999px',
+                            background: 'rgba(255,255,255,0.06)',
+                            color: '#cbd5e1',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isAddingNode}
+                          style={{
+                            padding: '9px 20px',
+                            borderRadius: '999px',
+                            background: '#10b981',
+                            color: '#ffffff',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {isAddingNode ? 'Adding...' : 'Add Node'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {devices.length === 0 ? (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                  borderRadius: '20px',
+                  padding: '48px 24px',
+                  textAlign: 'center',
+                  color: '#94a3b8',
+                }}>
+                  <div style={{ width: '40px', height: '40px', margin: '0 auto 12px', color: '#64748b' }}>
+                    <Icons.Server />
+                  </div>
+                  <h3 style={{ fontSize: '15px', color: '#ffffff', fontWeight: 700, marginBottom: '6px' }}>
+                    No Server Nodes Registered
+                  </h3>
+                  <p style={{ fontSize: '13px', maxWidth: '440px', margin: '0 auto', color: '#94a3b8' }}>
+                    Launch the runner app on any phone and click Start. The device will register here automatically.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {devices.map(d => {
+                    const isAllowed = d.allowed !== false;
+                    const isRunning = d.status === 'running';
+                    const isOnline = d.isOnline;
+                    const isPrimary = d.deviceId === settings.activeDeviceId;
+
+                    let badgeColor = '#94a3b8';
+                    let badgeBg = 'rgba(148, 163, 184, 0.12)';
+                    let statusLabel = 'Offline';
+
+                    if (!isAllowed) {
+                      badgeColor = '#f87171';
+                      badgeBg = 'rgba(239, 68, 68, 0.15)';
+                      statusLabel = 'Disabled';
+                    } else if (isPrimary && isRunning) {
+                      badgeColor = '#34d399';
+                      badgeBg = 'rgba(16, 185, 129, 0.15)';
+                      statusLabel = 'Primary Broadcaster';
+                    } else if (isRunning) {
+                      badgeColor = '#38bdf8';
+                      badgeBg = 'rgba(56, 189, 248, 0.15)';
+                      statusLabel = 'Parallel Node (Active)';
+                    } else if (isOnline) {
+                      badgeColor = '#94a3b8';
+                      badgeBg = 'rgba(255, 255, 255, 0.08)';
+                      statusLabel = 'Idle';
+                    }
+
+                    const timeAgo = d.lastPing ? `${Math.round((Date.now() - d.lastPing) / 1000)}s ago` : 'Never';
+
+                    return (
+                      <div
+                        key={d.deviceId}
+                        style={{
+                          background: 'var(--card-bg)',
+                          border: `1px solid ${!isAllowed ? 'rgba(239, 68, 68, 0.25)' : (isPrimary ? 'rgba(16, 185, 129, 0.3)' : 'var(--card-border)')}`,
+                          borderRadius: '18px',
+                          padding: '18px 22px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '16px',
+                          opacity: !isAllowed ? 0.75 : 1,
+                          transition: 'border 0.2s',
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+                              {d.deviceName || 'Android Device'}
+                            </span>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '3px 10px',
+                              borderRadius: '999px',
+                              background: badgeBg,
+                              color: badgeColor,
+                            }}>
+                              {statusLabel}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                            <span>ID: <code style={{ color: '#cbd5e1', fontFamily: 'JetBrains Mono', fontSize: '11px' }}>{d.deviceId}</code></span>
+                            <span>Ping: {timeAgo}</span>
+                            {d.tunnelUrl && (
+                              <span>Tunnel: <a href={d.tunnelUrl} target="_blank" style={{ color: '#60a5fa', textDecoration: 'none', fontFamily: 'JetBrains Mono', fontSize: '11px' }}>{d.tunnelUrl}</a></span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {isRunning && !isPrimary && isAllowed && (
+                            <button
+                              disabled={Boolean(promotingDeviceIds[d.deviceId] || togglingDeviceIds[d.deviceId])}
+                              onClick={() => makePrimary(d.deviceId)}
+                              style={{
+                                padding: '8px 16px',
+                                borderRadius: '999px',
+                                background: promotingDeviceIds[d.deviceId] ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.15)',
+                                color: '#60a5fa',
+                                border: '1px solid rgba(37, 99, 235, 0.3)',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: promotingDeviceIds[d.deviceId] ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              {promotingDeviceIds[d.deviceId] && (
+                                <svg
+                                  style={{ width: '12px', height: '12px', animation: 'spin 0.75s linear infinite' }}
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                >
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                </svg>
+                              )}
+                              {promotingDeviceIds[d.deviceId] ? 'Promoting...' : 'Promote to Primary'}
+                            </button>
+                          )}
+
+                          <button
+                            disabled={Boolean(togglingDeviceIds[d.deviceId])}
+                            onClick={() => toggleDevice(d.deviceId)}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '999px',
+                              background: togglingDeviceIds[d.deviceId]
+                                ? (isAllowed ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)')
+                                : isAllowed
+                                ? 'rgba(239, 68, 68, 0.12)'
+                                : 'rgba(16, 185, 129, 0.12)',
+                              color: togglingDeviceIds[d.deviceId]
+                                ? (isAllowed ? '#fca5a5' : '#6ee7b7')
+                                : isAllowed
+                                ? '#f87171'
+                                : '#34d399',
+                              border: `1px solid ${
+                                togglingDeviceIds[d.deviceId]
+                                  ? (isAllowed ? 'rgba(239, 68, 68, 0.5)' : 'rgba(16, 185, 129, 0.5)')
+                                  : isAllowed
+                                  ? 'rgba(239, 68, 68, 0.28)'
+                                  : 'rgba(16, 185, 129, 0.28)'
+                              }`,
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: togglingDeviceIds[d.deviceId] ? 'not-allowed' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              opacity: togglingDeviceIds[d.deviceId] ? 0.9 : 1,
+                              transition: 'all 0.2s ease',
+                              boxShadow: togglingDeviceIds[d.deviceId] ? '0 0 12px rgba(239, 68, 68, 0.25)' : 'none',
+                            }}
+                          >
+                            {togglingDeviceIds[d.deviceId] && (
+                              <svg
+                                style={{
+                                  width: '13px',
+                                  height: '13px',
+                                  animation: 'spin 0.75s linear infinite',
+                                  flexShrink: 0,
+                                }}
+                                viewBox="0 0 24 24"
+                                fill="none"
+                              >
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                              </svg>
+                            )}
+                            {togglingDeviceIds[d.deviceId]
+                              ? (isAllowed ? 'Revoking Access...' : 'Authorizing...')
+                              : (isAllowed ? 'Revoke Access' : 'Authorize')}
+                          </button>
+
+                          <button
+                            disabled={Boolean(deletingDeviceIds[d.deviceId] || togglingDeviceIds[d.deviceId])}
+                            onClick={() => deleteDevice(d.deviceId)}
+                            title="Remove"
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '999px',
+                              background: 'rgba(255, 255, 255, 0.04)',
+                              color: '#94a3b8',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              cursor: (deletingDeviceIds[d.deviceId] || togglingDeviceIds[d.deviceId]) ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              opacity: (deletingDeviceIds[d.deviceId] || togglingDeviceIds[d.deviceId]) ? 0.5 : 1,
+                            }}
+                          >
+                            {deletingDeviceIds[d.deviceId] ? (
+                              <svg
+                                style={{ width: '13px', height: '13px', animation: 'spin 0.75s linear infinite' }}
+                                viewBox="0 0 24 24"
+                                fill="none"
+                              >
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                              </svg>
+                            ) : (
+                              <Icons.Trash />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: EXTENSIONS & SCRAPER MANAGEMENT */}
+          {activeTab === 'providers' && (
+            <div style={{
+              background: 'var(--card-bg)',
+              border: '1px solid var(--card-border)',
+              borderRadius: '22px',
+              padding: '28px',
+              backdropFilter: 'blur(16px)',
+            }}>
+              {/* Header with Stats */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexWrap: 'wrap',
+                gap: '16px',
+                marginBottom: '24px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                paddingBottom: '20px',
+              }}>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '6px', color: '#ffffff' }}>
+                    Extension & Source Control
+                  </h3>
+                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, maxWidth: '640px', lineHeight: 1.5 }}>
+                    Complete administrator control over all sources. Hide or enable any extension at will.
+                    Users on <strong>cinema-dwh.pages.dev</strong> can <em>only</em> see and install extensions you keep enabled here.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    background: 'rgba(52, 211, 153, 0.12)',
+                    border: '1px solid rgba(52, 211, 153, 0.3)',
+                    color: '#34d399',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}>
+                    ● {extensionsList.filter(e => e.enabled).length} Visible to Users
+                  </div>
+                  <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#f87171',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}>
+                    ✕ {extensionsList.filter(e => e.hidden).length} Hidden / Blocked
+                  </div>
+                  <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#94a3b8',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}>
+                    Total: {extensionsList.length}
+                  </div>
+                </div>
+              </div>
+
+              {/* Toolbar: Search, Filters & Bulk Actions */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '14px',
+                marginBottom: '20px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 300px' }}>
+                  <input
+                    type="text"
+                    value={extensionSearch}
+                    onChange={(e) => setExtensionSearch(e.target.value)}
+                    placeholder="Search extensions (e.g. tpb, ola, netflix, hdhub)..."
+                    style={{
+                      width: '100%',
+                      maxWidth: '380px',
+                      padding: '10px 16px',
+                      background: 'rgba(0, 0, 0, 0.45)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: '999px',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  {['all', 'enabled', 'hidden', 'hindi', 'global', 'anime'].map(tabKey => (
+                    <button
+                      key={tabKey}
+                      type="button"
+                      onClick={() => setExtensionFilterTab(tabKey)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '999px',
+                        background: extensionFilterTab === tabKey ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.04)',
+                        border: extensionFilterTab === tabKey ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
+                        color: extensionFilterTab === tabKey ? '#ffffff' : '#94a3b8',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {tabKey === 'all' ? `All (${extensionsList.length})`
+                        : tabKey === 'enabled' ? `Visible (${extensionsList.filter(e => e.enabled).length})`
+                        : tabKey === 'hidden' ? `Hidden (${extensionsList.filter(e => e.hidden).length})`
+                        : tabKey}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAllExtensionsStatus(true)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Enable All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAllExtensionsStatus(false)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.25)',
+                      color: '#f87171',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Hide All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveProviders}
+                    disabled={isSavingProviders}
+                    style={{
+                      padding: '9px 24px',
+                      borderRadius: '999px',
+                      background: '#e50914',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      border: 'none',
+                      cursor: isSavingProviders ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 18px rgba(229, 9, 20, 0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    {isSavingProviders ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+
+              {saveSuccess && (
+                <div style={{
+                  padding: '12px 18px',
+                  borderRadius: '12px',
+                  background: 'rgba(52, 211, 153, 0.15)',
+                  border: '1px solid rgba(52, 211, 153, 0.3)',
+                  color: '#34d399',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  marginBottom: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <Icons.Check />
+                  <span>Extension visibility saved! Changes are now live on cinema-dwh.pages.dev</span>
+                </div>
+              )}
+
+              {/* Extension Cards Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '14px',
+              }}>
+                {extensionsList
+                  .filter(ext => {
+                    // Filter by search query
+                    if (extensionSearch.trim()) {
+                      const q = extensionSearch.toLowerCase().trim();
+                      const matchName = (ext.name || '').toLowerCase().includes(q);
+                      const matchVal = (ext.value || '').toLowerCase().includes(q);
+                      const matchType = (ext.type || '').toLowerCase().includes(q);
+                      if (!matchName && !matchVal && !matchType) return false;
+                    }
+                    // Filter by tab
+                    if (extensionFilterTab === 'enabled') return ext.enabled;
+                    if (extensionFilterTab === 'hidden') return ext.hidden;
+                    if (extensionFilterTab === 'hindi') return ext.type === 'hindi' || ext.type === 'india';
+                    if (extensionFilterTab === 'global') return ext.type === 'global';
+                    if (extensionFilterTab === 'anime') return ext.type === 'anime';
+                    return true;
+                  })
+                  .map(ext => (
+                    <div
+                      key={ext.value}
+                      style={{
+                        padding: '16px',
+                        borderRadius: '16px',
+                        background: ext.enabled
+                          ? 'rgba(255, 255, 255, 0.03)'
+                          : 'rgba(239, 68, 68, 0.04)',
+                        border: ext.enabled
+                          ? '1px solid rgba(255, 255, 255, 0.08)'
+                          : '1px solid rgba(239, 68, 68, 0.25)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {ext.icon ? (
+                            <img
+                              src={ext.icon}
+                              alt=""
+                              style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }}
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '6px',
+                              background: 'rgba(255,255,255,0.1)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                            }}>
+                              📦
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>
+                              {ext.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>
+                              id: {ext.value}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span style={{
+                          fontSize: '10px',
+                          padding: '3px 8px',
+                          borderRadius: '999px',
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          color: '#94a3b8',
+                          textTransform: 'capitalize',
+                        }}>
+                          {ext.type || 'global'}
+                        </span>
+                      </div>
+
+                      {/* Status & Toggle Switch */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingTop: '10px',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: ext.enabled ? '#34d399' : '#f87171',
+                          }} />
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: ext.enabled ? '#34d399' : '#f87171',
+                            letterSpacing: '0.04em',
+                          }}>
+                            {ext.enabled ? 'VISIBLE TO USERS' : 'HIDDEN / BLOCKED'}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleExtensionStatus(ext.value)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '999px',
+                            background: ext.enabled ? 'rgba(239, 68, 68, 0.15)' : 'rgba(52, 211, 153, 0.15)',
+                            border: ext.enabled ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(52, 211, 153, 0.3)',
+                            color: ext.enabled ? '#f87171' : '#34d399',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {ext.enabled ? 'Click to Hide' : 'Click to Enable'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Bottom Quick Save Bar */}
+              <div style={{
+                marginTop: '28px',
+                paddingTop: '20px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '14px',
+              }}>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  Live API Endpoint: <a href="https://cinema-dwh.pages.dev/api/providers" target="_blank" rel="noreferrer" style={{ color: '#38bdf8' }}>/api/providers</a>
+                </span>
+
+                <button
+                  type="button"
+                  onClick={saveProviders}
+                  disabled={isSavingProviders}
+                  style={{
+                    padding: '12px 32px',
+                    borderRadius: '999px',
+                    background: '#e50914',
+                    color: '#ffffff',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: isSavingProviders ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 18px rgba(229, 9, 20, 0.35)',
+                  }}
+                >
+                  {isSavingProviders ? 'Saving Settings...' : 'Save Extension Changes'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp />);
+  </script>
+</body>
+</html>

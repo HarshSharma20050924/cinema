@@ -49,7 +49,8 @@ function resolveRequestHeaders(targetUrl, queryHeaders, queryReferer, queryOrigi
       host.includes("hakunaymatata.com") ||
       host.includes("moviebox") ||
       host.includes("inmoviebox.com") ||
-      host.includes("aoneroom.com")
+      host.includes("aoneroom.com") ||
+      host.includes("sssrr.org")
     ) {
       headers["Origin"] = "https://officialmoviebox.com";
       headers["Referer"] = "https://officialmoviebox.com/";
@@ -70,6 +71,20 @@ function resolveRequestHeaders(targetUrl, queryHeaders, queryReferer, queryOrigi
     ) {
       headers["Origin"] = "https://kisskh.is";
       headers["Referer"] = "https://kisskh.is/";
+    } else if (
+      host.includes("mxplayer") ||
+      host.includes("d3sgzbosmwirao.cloudfront.net")
+    ) {
+      headers["Origin"] = "https://www.mxplayer.in";
+      headers["Referer"] = "https://www.mxplayer.in/";
+    } else if (
+      host.includes("bhcoxn.com") ||
+      host.includes("fhxod.com") ||
+      host.includes("hlowb.com")
+    ) {
+      headers["User-Agent"] = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36";
+      headers["Origin"] = parsed.origin;
+      headers["Referer"] = parsed.origin + "/";
     } else {
       if (!headers["Origin"]) headers["Origin"] = parsed.origin;
       if (!headers["Referer"]) headers["Referer"] = parsed.origin + "/";
@@ -195,6 +210,7 @@ async function streamHlsDownload(req, res, { targetUrl, headers, filename }) {
       "-loglevel", "error",
       "-i", "pipe:0",
       "-c", "copy",
+      "-bsf:a", "aac_adtstoasc",
       "-movflags", "frag_keyframe+empty_moov+default_base_moof",
       "-f", "mp4",
       "pipe:1",
@@ -316,7 +332,10 @@ async function proxyStream(req, res) {
   if (!url) return res.status(400).send("URL required");
 
   try {
-    let targetUrl = decodeURIComponent(url);
+    let targetUrl = url;
+    if (typeof targetUrl === "string" && targetUrl.startsWith("http%3A")) {
+      try { targetUrl = decodeURIComponent(targetUrl); } catch (_) {}
+    }
     if (/(hubcdn|hubcloud|hubdrive)/i.test(targetUrl)) {
       const direct = await resolveHubCloudDirect(targetUrl);
       if (direct) targetUrl = direct;
@@ -374,11 +393,12 @@ async function proxyStream(req, res) {
       return res.status(200).send(rewritten.join("\n"));
     }
 
+    const isHead = req.method === "HEAD";
     const response = await axios({
-      method: "get",
+      method: isHead ? "head" : "get",
       url: targetUrl,
       headers,
-      responseType: "stream",
+      responseType: isHead ? "text" : "stream",
       timeout: 25000,
       validateStatus: (status) => status < 500,
     });
@@ -389,6 +409,10 @@ async function proxyStream(req, res) {
     if (response.headers["content-length"]) res.set("Content-Length", response.headers["content-length"]);
     if (response.headers["content-range"]) res.set("Content-Range", response.headers["content-range"]);
     if (response.headers["accept-ranges"]) res.set("Accept-Ranges", response.headers["accept-ranges"]);
+
+    if (isHead) {
+      return res.end();
+    }
 
     req.on("close", () => {
       if (response.data && !response.data.destroyed) {
@@ -421,7 +445,10 @@ async function downloadFile(req, res) {
   if (!url) return res.status(400).send("URL required");
 
   try {
-    let targetUrl = decodeURIComponent(url);
+    let targetUrl = url;
+    if (typeof targetUrl === "string" && targetUrl.startsWith("http%3A")) {
+      try { targetUrl = decodeURIComponent(targetUrl); } catch (_) {}
+    }
     if (/(hubcdn|hubcloud|hubdrive)/i.test(targetUrl)) {
       const direct = await resolveHubCloudDirect(targetUrl);
       if (direct) targetUrl = direct;
@@ -430,11 +457,11 @@ async function downloadFile(req, res) {
     let requestedName = filename ? decodeURIComponent(filename) : "video.mp4";
     const headers = resolveRequestHeaders(targetUrl, queryHeaders, referer, origin);
 
-    if (req.headers.range) {
+    const isExplicitM3u8 = type === "m3u8" || targetUrl.includes(".m3u8");
+
+    if (req.headers.range && !isExplicitM3u8) {
       headers["Range"] = req.headers.range;
     }
-
-    const isExplicitM3u8 = type === "m3u8" || targetUrl.includes(".m3u8");
 
     // If HLS (.m3u8), stream/remux all segments
     if (isExplicitM3u8) {
@@ -569,6 +596,11 @@ function getPlaylistM3u(req, res) {
     host.includes("inmoviebox.com") ||
     host.includes("aoneroom.com");
 
+  const isMxPlayer =
+    host.includes("mxplayer") ||
+    host.includes("d3sgzbosmwirao.cloudfront.net") ||
+    (host.includes("cloudfront.net") && targetUrl.includes("/secim/"));
+
   const needsProxy =
     isMovieBox ||
     host.includes("kisskh") ||
@@ -591,6 +623,9 @@ function getPlaylistM3u(req, res) {
   if (isMovieBox) {
     m3u += "#EXTVLCOPT:http-referrer=https://officialmoviebox.com/\n";
     m3u += "#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\n";
+  } else if (isMxPlayer) {
+    m3u += "#EXTVLCOPT:http-referrer=https://www.mxplayer.in/\n";
+    m3u += "#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\n";
   }
   m3u += `${streamUrlInM3u}\n`;
 

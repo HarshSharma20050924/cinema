@@ -268,7 +268,7 @@ export const DetailsTrailer: React.FC<DetailsTrailerProps> = ({
               key={currentKey}
               src={currentEmbedUrl}
               title={title ? `${title} Trailer` : "Official Trailer"}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
               style={{

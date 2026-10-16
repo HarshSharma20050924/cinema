@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="om-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="om-inner" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded pill -->
+  <rect width="64" height="64" rx="14" fill="#0f1117"/>
+  <rect width="64" height="64" rx="14" fill="none" stroke="rgba(124, 58, 237, 0.4)" stroke-width="1.5"/>
+
+  <!-- Glowing circle ring -->
+  <circle cx="32" cy="32" r="23" fill="none" stroke="url(#om-bg)" stroke-width="4.5"/>
+
+  <!-- Film reel perforations -->
+  <circle cx="32" cy="15" r="2.5" fill="#ffffff" opacity="0.9"/>
+  <circle cx="49" cy="32" r="2.5" fill="#ffffff" opacity="0.9"/>
+  <circle cx="32" cy="49" r="2.5" fill="#ffffff" opacity="0.9"/>
+  <circle cx="15" cy="32" r="2.5" fill="#ffffff" opacity="0.9"/>
+
+  <!-- Central "OM" letters stylization -->
+  <text x="32" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="900" fill="url(#om-inner)" text-anchor="middle" letter-spacing="-0.05em">OM</text>
+</svg>

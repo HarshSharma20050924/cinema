@@ -1,25 +1,57 @@
-import React from "react";
-import { DownloadIcon, XIcon } from "../../icons";
+import React, { useState } from "react";
+import { DownloadIcon, XIcon, LoaderIcon, PlayIcon } from "../../icons";
 
 export interface MoreLinksModalData {
   title: string;
   subtitle?: string;
   links: Array<{ name: string; url: string }>;
   loading?: boolean;
+  mode?: "stream" | "download";
 }
 
 export interface MoreLinksModalProps {
   data: MoreLinksModalData | null;
   onClose: () => void;
   onDownloadUrl: (url: string, serverName: string, label?: string) => void;
+  onPlayStream?: (url: string, title?: string) => void;
 }
 
 export const MoreLinksModal: React.FC<MoreLinksModalProps> = ({
   data,
   onClose,
   onDownloadUrl,
+  onPlayStream,
 }) => {
+  const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null);
+  const [streamingIdx, setStreamingIdx] = useState<number | null>(null);
+
   if (!data) return null;
+
+  const isStreamMode = data.mode === "stream";
+
+  const handleDownload = (idx: number, url: string, name: string, subtitle?: string) => {
+    setDownloadingIdx(idx);
+    try {
+      onDownloadUrl(url, name, subtitle);
+    } finally {
+      setTimeout(() => {
+        setDownloadingIdx((curr) => (curr === idx ? null : curr));
+      }, 6500);
+    }
+  };
+
+  const handleStream = (idx: number, url: string, name: string) => {
+    setStreamingIdx(idx);
+    try {
+      if (onPlayStream) {
+        onPlayStream(url, `${data.title} ${data.subtitle ? `• ${data.subtitle}` : ""}`);
+      }
+    } finally {
+      setTimeout(() => {
+        setStreamingIdx((curr) => (curr === idx ? null : curr));
+      }, 4000);
+    }
+  };
 
   return (
     <div
@@ -71,18 +103,22 @@ export const MoreLinksModal: React.FC<MoreLinksModalProps> = ({
                 width: "36px",
                 height: "36px",
                 borderRadius: "10px",
-                background: "#2563eb",
+                background: isStreamMode ? "#e50914" : "#2563eb",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
               }}
             >
-              <DownloadIcon size={18} color="#ffffff" />
+              {isStreamMode ? (
+                <PlayIcon size={18} color="#ffffff" fill="#ffffff" />
+              ) : (
+                <DownloadIcon size={18} color="#ffffff" />
+              )}
             </div>
             <div style={{ minWidth: 0 }}>
               <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#ffffff" }}>
-                Download Servers
+                {isStreamMode ? "Stream Servers & Mirrors" : "Download Servers"}
               </h3>
               <p
                 style={{
@@ -179,65 +215,126 @@ export const MoreLinksModal: React.FC<MoreLinksModalProps> = ({
               No direct download mirrors found for this item.
             </div>
           ) : (
-            data.links.map((linkItem, idx) => (
-              <div
-                key={idx}
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  backgroundColor: "rgba(255, 255, 255, 0.04)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                }}
-              >
-                <span
+            data.links.map((linkItem, idx) => {
+              const isDownloading = downloadingIdx === idx;
+              return (
+                <div
+                  key={idx}
                   style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "#f1f5f9",
-                    minWidth: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {linkItem.name}
-                </span>
-
-                <button
-                  onClick={() =>
-                    onDownloadUrl(linkItem.url, linkItem.name, data.subtitle)
-                  }
-                  style={{
-                    display: "inline-flex",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    backgroundColor: "rgba(255, 255, 255, 0.04)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    display: "flex",
                     alignItems: "center",
-                    gap: "6px",
-                    padding: "7px 16px",
-                    borderRadius: "8px",
-                    background: "#2563eb",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    flexShrink: 0,
-                    transition: "background 0.15s ease",
+                    justifyContent: "space-between",
+                    gap: "12px",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "#1d4ed8")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "#2563eb")
-                  }
                 >
-                  <DownloadIcon size={13} color="#ffffff" />
-                  <span>Download</span>
-                </button>
-              </div>
-            ))
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "#f1f5f9",
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {linkItem.name}
+                  </span>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                    {/* Stream Mode -> ONLY Stream Button */}
+                    {isStreamMode && onPlayStream && (
+                      <button
+                        disabled={streamingIdx === idx}
+                        onClick={() => handleStream(idx, linkItem.url, linkItem.name)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "8px 18px",
+                          borderRadius: "8px",
+                          background: streamingIdx === idx ? "#991b1b" : "#e50914",
+                          border: "none",
+                          color: "#ffffff",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          cursor: streamingIdx === idx ? "wait" : "pointer",
+                          opacity: streamingIdx === idx ? 0.85 : 1,
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (streamingIdx !== idx) e.currentTarget.style.background = "#b91c1c";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (streamingIdx !== idx) e.currentTarget.style.background = "#e50914";
+                        }}
+                        title="Stream or play directly in VLC"
+                      >
+                        {streamingIdx === idx ? (
+                          <>
+                            <LoaderIcon size={13} color="#ffffff" />
+                            <span>Opening...</span>
+                          </>
+                        ) : (
+                          <>
+                            <PlayIcon size={12} color="#ffffff" fill="#ffffff" />
+                            <span>Stream</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Download Mode -> ONLY Download Button */}
+                    {!isStreamMode && (
+                      <button
+                        disabled={isDownloading}
+                        onClick={() =>
+                          handleDownload(idx, linkItem.url, linkItem.name, data.subtitle)
+                        }
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "8px 18px",
+                          borderRadius: "8px",
+                          background: isDownloading ? "#1d4ed8" : "#2563eb",
+                          border: "none",
+                          color: "#ffffff",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          cursor: isDownloading ? "wait" : "pointer",
+                          opacity: isDownloading ? 0.85 : 1,
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isDownloading) e.currentTarget.style.background = "#1d4ed8";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isDownloading) e.currentTarget.style.background = "#2563eb";
+                        }}
+                        title="Download file"
+                      >
+                        {isDownloading ? (
+                          <>
+                            <LoaderIcon size={13} color="#ffffff" />
+                            <span>Preparing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <DownloadIcon size={13} color="#ffffff" />
+                            <span>Download</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
 

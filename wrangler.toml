@@ -1,0 +1,13 @@
+name = "cinema"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "cinema_db"
+database_name = "cinema-db"
+database_id = "90abede4-85b2-4b98-9215-832e8605b7f4"
+
+[[kv_namespaces]]
+binding = "CINEMA_KV"
+id = "368bebd025884a38b84e8f46fbd5757a"

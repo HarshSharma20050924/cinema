@@ -199,7 +199,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ playbackUrl,
  const handleOpenVlc = () => {
   if (!playbackUrl) return;
   const targetUrl = playableCopyUrl;
-  launchExternalPlayer(targetUrl, "vlc");
+  launchExternalPlayer(targetUrl, "vlc", "vlc://", "Cinema Stream");
   setCopied(true);
   setTimeout(() => setCopied(false), 2500);
  };

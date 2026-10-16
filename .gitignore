@@ -73,3 +73,13 @@ vega-app
 
 # Graphify & Knowledge Graph outputs
 graphify-out/
+
+# Telegram bot runtime cache & history
+telegram-bot/link_cache.json
+telegram-bot/posted_history.json
+
+# Scratch root images
+/image.png
+/download-Photoroom.png
+
+

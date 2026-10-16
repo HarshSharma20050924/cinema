@@ -75,9 +75,9 @@ export const ProviderDropdown: React.FC<ProviderDropdownProps> = ({
           e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";
         }}
       >
-        {activeProvider?.icon ? (
+        {(activeProvider?.icon || activeProvider?.value === "tpb" || activeProvider?.value === "olamovies") ? (
           <img
-            src={activeProvider.icon}
+            src={activeProvider.icon || (activeProvider.value === "tpb" ? "/icons/tpb.svg" : "/icons/olamovies.svg")}
             alt=""
             style={{
               width: "18px",
@@ -86,7 +86,10 @@ export const ProviderDropdown: React.FC<ProviderDropdownProps> = ({
               objectFit: "contain",
             }}
             onError={(e) => {
-              (e.target as HTMLElement).style.display = "none";
+              const el = e.target as HTMLImageElement;
+              if (activeProvider?.value === "tpb") el.src = "/icons/tpb.svg";
+              else if (activeProvider?.value === "olamovies") el.src = "/icons/olamovies.svg";
+              else el.style.display = "none";
             }}
           />
         ) : (
@@ -224,9 +227,9 @@ export const ProviderDropdown: React.FC<ProviderDropdownProps> = ({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  {p.icon && (
+                  {(p.icon || p.value === "tpb" || p.value === "olamovies") && (
                     <img
-                      src={p.icon}
+                      src={p.icon || (p.value === "tpb" ? "/icons/tpb.svg" : "/icons/olamovies.svg")}
                       alt=""
                       style={{
                         width: "16px",
@@ -235,7 +238,10 @@ export const ProviderDropdown: React.FC<ProviderDropdownProps> = ({
                         objectFit: "contain",
                       }}
                       onError={(e) => {
-                        (e.target as HTMLElement).style.display = "none";
+                        const el = e.target as HTMLImageElement;
+                        if (p.value === "tpb") el.src = "/icons/tpb.svg";
+                        else if (p.value === "olamovies") el.src = "/icons/olamovies.svg";
+                        else el.style.display = "none";
                       }}
                     />
                   )}

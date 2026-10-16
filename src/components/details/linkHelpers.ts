@@ -4,7 +4,7 @@ export const isValidStreamUrl = (url: string): boolean => {
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) return false;
   if (trimmed.includes("skydrop.live") || trimmed.includes("magiclinks.lol/series")) return false;
   if (trimmed.includes("t.me/") || trimmed.includes("telegram")) return false;
-  return /^(https?|magnet):/i.test(trimmed);
+  return /^(https?|magnet):/i.test(trimmed) || trimmed.startsWith("/api/");
 };
 
 export const isDirectMediaUrl = (url: string): boolean => {
@@ -29,7 +29,9 @@ export const isDirectMediaUrl = (url: string): boolean => {
     lower.includes("hakunaymatata") ||
     lower.includes("aoneroom") ||
     lower.startsWith("magnet:") ||
-    /\.(mkv|mp4|webm|avi|m3u8|zip|rar)(\?|$)/i.test(lower)
+    lower.includes("/api/stream/torrent") ||
+    lower.includes("/api/torrent/download") ||
+    /\.(mkv|mp4|webm|avi|m3u8|ts)(\?|$)/i.test(lower)
   );
 };
 
@@ -48,6 +50,9 @@ export const isLandingPageUrl = (url: string): boolean => {
   }
 
   const isIntermediateHoster =
+    host.includes("links.ol-am.top") ||
+    host.includes("links.olamovies") ||
+    host.includes("ol-am.top") ||
     host.includes("greenmotors") ||
     host.includes("hubdrive") ||
     host.includes("hubcloud") ||

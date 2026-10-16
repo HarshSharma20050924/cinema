@@ -11,6 +11,7 @@ A fast, client-side streaming application and provider indexing system for movie
 <br/>
 
 [![Live Web App](https://img.shields.io/badge/Web_App-cinema--dwh.pages.dev-E50914?style=flat-square&logo=googlechrome&logoColor=white)](https://cinema-dwh.pages.dev/)
+[![Telegram Bot](https://img.shields.io/badge/Telegram_Bot-@cinemaisherebtw__bot-0088cc?style=flat-square&logo=telegram&logoColor=white)](https://t.me/cinemaisherebtw_bot)
 [![Latest Release](https://img.shields.io/github/v/release/HarshSharma20050924/cinema?color=E50914&label=Latest%20Release&style=flat-square&logo=github)](https://github.com/HarshSharma20050924/cinema/releases/latest)
 [![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Web-111111?style=flat-square)](https://github.com/HarshSharma20050924/cinema/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache%202.0-111111?style=flat-square)](LICENSE)
@@ -29,6 +30,7 @@ A fast, client-side streaming application and provider indexing system for movie
 - [Overview](#overview)
 - [Ecosystem Components](#ecosystem-components)
 - [Official Downloads](#official-downloads)
+- [Telegram Bot Ecosystem](#telegram-bot-ecosystem)
 - [Running in All Environments](#running-in-all-environments)
   - [1. Web Application](#1-web-application-browser)
   - [2. Local Backend Server](#2-local-backend-server)
@@ -36,8 +38,9 @@ A fast, client-side streaming application and provider indexing system for movie
   - [4. Desktop Runner Daemon](#4-desktop-runner-daemon)
   - [5. Android Mobile Application](#5-android-mobile-application)
   - [6. Android Runner Daemon](#6-android-runner-daemon)
-  - [7. Docker Container](#7-docker-container)
-  - [8. Cloudflare Pages Deployment](#8-cloudflare-pages-deployment)
+  - [7. Telegram Bot Daemon](#7-telegram-bot-daemon)
+  - [8. Docker Container](#8-docker-container)
+  - [9. Cloudflare Pages Deployment](#9-cloudflare-pages-deployment)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [Author & Contact Details](#author--contact-details)
@@ -75,6 +78,12 @@ A background service that connects to provider sources, resolves links, and expo
 * **Android Runner**: Android foreground service running without root permissions.
 * **Desktop Runner**: Headless background service for servers, Linux, Windows, and macOS.
 
+### 3. Cinema Telegram Bot & Channel Ecosystem
+An automated Telegram assistant and scheduled release channel powered by Cinema's scraping backend.
+* **Interactive Bot**: Search movies/series, choose resolution & quality, stream via VLC, or download.
+* **Release Channel Poster**: Automatically shares high-quality cards of new releases with direct interactive playback buttons.
+* **Runner Bridge**: Connects directly to local or networked Cinema Runner instances to bypass datacenter IP restrictions.
+
 ---
 
 ## Official Downloads
@@ -103,6 +112,24 @@ All precompiled binaries and installation packages are published on the [GitHub 
 | Linux / Ubuntu / Debian | Runner Debian Package | `.deb` (~72 MB) | [Download Runner Debian (.deb)](https://github.com/HarshSharma20050924/cinema/releases/latest/download/cinema-node-runner_2.2.0_amd64.deb) |
 | Linux / Server | Standalone Runner | `.AppImage` (~105 MB) | [Download Runner AppImage](https://github.com/HarshSharma20050924/cinema/releases/latest) |
 | macOS | macOS Runner | `.dmg` (~96 MB) | [Download Runner Disk Image (.dmg)](https://github.com/HarshSharma20050924/cinema/releases/latest) |
+
+---
+
+## Telegram Bot Ecosystem
+
+Cinema includes an interactive Telegram bot and automated release posting channel:
+
+* **Official Bot**: [@cinemaisherebtw_bot](https://t.me/cinemaisherebtw_bot)
+* **Official Channel**: [Join Updates Channel](https://t.me/+2QbDC2GcZFg0YjZl)
+* **Runner Downloads**: [cinema-dwh.pages.dev/?tab=downloads](https://cinema-dwh.pages.dev/?tab=downloads)
+
+### Features:
+* **Instant Search & Filters**: Search across 38+ unified scrapers with multi-page pagination.
+* **VLC Media Player Handoff**: 1-click launch to external VLC Player (Android, iOS, Windows, Mac, Linux) for zero-buffering hardware streaming.
+* **Authentic Direct Downloads**: Filters out hotlink-protected streaming links that cause 429 rate-limit errors, providing genuine direct download mirrors (Cloudflare R2, Pixeldrain, Google Drive, FastDL).
+* **Direct Extension Deep Links**: Clicking "Stream & Download" on a channel post opens that exact release directly from that provider without re-searching across other extensions.
+* **Admin Controls**: Manage enabled providers in real-time (`/toggle <provider>`, `/providers`), trigger syncs (`/sync`), and pin guides (`/pinvlc`).
+* **Cinema Runner Fallback**: Automatically connects to your local runner or active tunnel to bypass datacenter IP restrictions.
 
 ---
 
@@ -226,7 +253,23 @@ chmod +x gradlew
 
 The output APK will be in `android/app/build/outputs/apk/release/app-release.apk`.
 
-### 7. Docker Container
+### 7. Telegram Bot Daemon
+
+To run the interactive Telegram bot and automated release posting channel:
+
+```bash
+# 1. Install dependencies
+cd telegram-bot
+npm install
+
+# 2. Configure credentials in telegram-bot/bot_settings.json or environment variables
+# BOT_TOKEN, CHANNEL_ID, ADMIN_IDS
+
+# 3. Start the bot and auto-poster daemon
+node index.cjs
+```
+
+### 8. Docker Container
 
 You can run Cinema inside a self-contained Docker container:
 
@@ -243,7 +286,7 @@ docker logs -f cinema-app
 
 Access the application in your browser at `http://localhost:5174`.
 
-### 8. Cloudflare Pages Deployment
+### 9. Cloudflare Pages Deployment
 
 Cinema deploys directly to Cloudflare Pages as a high-performance static web application with serverless functions:
 
@@ -252,7 +295,7 @@ Cinema deploys directly to Cloudflare Pages as a high-performance static web app
 npm run build
 
 # 2. Deploy dist/ to Cloudflare Pages via Wrangler
-npx wrangler pages deploy dist --project-name=cinema
+npx wrangler pages deploy dist --project-name=cinema --branch=production
 ```
 
 Or push changes to the `main` branch to trigger the automated Cloudflare GitHub integration.
@@ -272,6 +315,12 @@ cinema/
 │   ├── controllers/        # Media and stream controllers
 │   ├── providers/          # Community provider scrapers
 │   └── routes/             # API routes
+├── telegram-bot/           # Telegram Bot & Channel Ecosystem
+│   ├── bot.cjs             # Interactive Telegram bot with VLC handoff & pagination
+│   ├── autoPoster.cjs      # Scheduled channel release card poster
+│   ├── cinemaApi.cjs       # Scraper engine bridge with dynamic runner discovery
+│   ├── linkStore.cjs       # Shared persistent link cache
+│   └── config.cjs          # Ecosystem configuration & provider settings
 ├── desktop-app/            # Electron desktop application (Windows, Linux, macOS)
 ├── desktop-runner/         # Standalone desktop scraper daemon
 ├── mobile-app/             # Capacitor mobile wrapper

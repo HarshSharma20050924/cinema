@@ -5,6 +5,7 @@ import { parseTitleAndYear } from "../media/MediaCard";
 import { Navbar } from "../layout/Navbar";
 import { appCache } from "../../utils/cache";
 import { isValidStreamUrl, isLandingPageUrl, isDirectMediaUrl } from "./linkHelpers";
+import { getSeasonDisplayInfo } from "../../utils/seasonUtils";
 import { DetailsHero } from "./DetailsHero";
 import { DetailsLinksDrawer } from "./DetailsLinksDrawer";
 import { DetailsScreenshots } from "./DetailsScreenshots";
@@ -73,8 +74,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   const [selectedSeasonIdx, setSelectedSeasonIdx] = useState<number>(0);
   const [tmdb, setTmdb] = useState<TMDBDetails | null>(null);
 
-  // Per-release server resolution cache and loading states
   const [resolvingKey, setResolvingKey] = useState<string | null>(null);
+  const [streamingKey, setStreamingKey] = useState<string | null>(null);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const [resolvingKeys, setResolvingKeys] = useState<Record<string, boolean>>({});
   const [isScanningMirrors, setIsScanningMirrors] = useState<boolean>(false);
@@ -225,6 +226,22 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   // Season resolution
   const validSeasonIdx =
     selectedSeasonIdx >= 0 && selectedSeasonIdx < linkList.length ? selectedSeasonIdx : 0;
+  // Auto-select Hindi dub season if available and user is on default index 0
+  useEffect(() => {
+    if (linkList.length > 1 && selectedSeasonIdx === 0) {
+      const firstInfo = getSeasonDisplayInfo(linkList[0], 0);
+      if (!firstInfo.dub.toLowerCase().includes("hindi")) {
+        const hindiIdx = linkList.findIndex((s, idx) => {
+          const info = getSeasonDisplayInfo(s, idx);
+          return info.dub.toLowerCase().includes("hindi");
+        });
+        if (hindiIdx > 0) {
+          setSelectedSeasonIdx(hindiIdx);
+        }
+      }
+    }
+  }, [linkList, selectedSeasonIdx]);
+
   const activeSeason = linkList.length > 0 ? linkList[validSeasonIdx] : null;
 
   // Single episodes
@@ -309,13 +326,69 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   // Direct download handler for any mirror URL
   const handleDownloadDirectUrl = (url: string, serverName: string, label?: string) => {
     if (!url) return;
+
+    // 0. Intermediate hosters & shortlink protectors (e.g. OlaMovies links.ol-am.top, katdrive, send.cm)
+    if (isLandingPageUrl(url) || url.includes("links.ol-am.top") || url.includes("links.olamovies") || url.includes("ol-am.top") || url.includes("/locked?")) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const isZip = url.includes(".zip") || (label && label.toLowerCase().includes("zip")) || (serverName && serverName.toLowerCase().includes("zip"));
+    const ext = isZip ? ".zip" : ".mp4";
+    const cleanFileName = `${displayTitle} - ${label || serverName}`.replace(/[^a-zA-Z0-9._-]/g, "_") + ext;
+    const backendUrl = getBackendUrl();
+
+    // 1. If it's a torrent magnet link, seamlessly convert to internal torrent engine download
     if (url.startsWith("magnet:")) {
+      const hashMatch = url.match(/btih:([a-fA-F0-9]{32,40})/i);
+      if (hashMatch) {
+        const infoHash = hashMatch[1];
+        const dlUrl = `${backendUrl}/api/torrent/download?hash=${infoHash}&name=${encodeURIComponent(cleanFileName)}`;
+        downloadManager.startDownload(dlUrl, displayTitle, cleanFileName);
+        if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
+          setIsDownloadManagerOpen(true);
+        }
+        return;
+      }
       window.location.href = url;
       return;
     }
 
-    const cleanFileName = `${displayTitle} - ${label || serverName}`.replace(/[^a-zA-Z0-9._-]/g, "_") + ".mp4";
+    // 1.5. TPB direct link handling
+    if (url.startsWith("tpb:")) {
+      const parts = url.split(":");
+      const infoHash = parts[2] || "";
+      const encName = parts.slice(3).join(":") || encodeURIComponent(cleanFileName);
+      const finalUrl = `${backendUrl}/api/torrent/download?hash=${infoHash}&name=${encName}`;
+      downloadManager.startDownload(finalUrl, displayTitle, cleanFileName);
+      if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
+        setIsDownloadManagerOpen(true);
+      }
+      return;
+    }
 
+    // 2. Direct internal torrent download endpoint
+    if (url.includes("/api/torrent/download")) {
+      const finalUrl = url.startsWith("http") ? url : `${backendUrl}${url}`;
+      downloadManager.startDownload(finalUrl, displayTitle, cleanFileName);
+      if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
+        setIsDownloadManagerOpen(true);
+      }
+      return;
+    }
+
+    // 3. Direct internal stream endpoint used as download
+    if (url.includes("/api/stream/torrent")) {
+      const convertedUrl = url.replace("/api/stream/torrent", "/api/torrent/download");
+      const finalUrl = convertedUrl.startsWith("http") ? convertedUrl : `${backendUrl}${convertedUrl}`;
+      downloadManager.startDownload(finalUrl, displayTitle, cleanFileName);
+      if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
+        setIsDownloadManagerOpen(true);
+      }
+      return;
+    }
+
+    // 4. Pixeldrain direct download
     if (url.includes("pixeldrain.dev/api/file") || url.includes("pixeldrain.com/api/file")) {
       const dlUrl = url.includes("?download") ? url : `${url}?download`;
       downloadManager.startDownload(dlUrl, displayTitle, cleanFileName);
@@ -325,7 +398,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       return;
     }
 
-    const backendUrl = getBackendUrl();
+    // 5. Standard backend download proxy
     const downloadUrl = `${backendUrl}/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFileName)}`;
     downloadManager.startDownload(downloadUrl, displayTitle, cleanFileName);
     if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
@@ -334,34 +407,135 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   };
 
   const handlePlayRelease = async (key: string, primaryLink: string) => {
-    const list = await fetchServersForLink(key, primaryLink);
-    const streamable = list.filter(
-      (s) =>
-        !s.server?.toLowerCase().includes("download only") &&
-        !s.server?.toLowerCase().includes("gdrive")
-    );
-    const chosen = streamable[0]?.link || list[0]?.link || primaryLink;
-    if (chosen) {
-      onPlayStream(chosen, displayTitle);
+    setStreamingKey(key);
+    setResolvingKey(key);
+
+    try {
+      if (primaryLink.startsWith("tpb:")) {
+        const parts = primaryLink.split(":");
+        const infoHash = parts[2] || "";
+        const encName = parts.slice(3).join(":") || encodeURIComponent(cleanFileName);
+        const streamUrl = `${backendUrl}/api/stream/torrent?hash=${infoHash}&name=${encName}`;
+        onPlayStream(streamUrl, displayTitle);
+        return;
+      }
+
+      const list = await fetchServersForLink(key, primaryLink);
+      const streamable = list.filter(
+        (s) =>
+          !s.server?.toLowerCase().includes("download only") &&
+          !s.server?.toLowerCase().includes("gdrive") &&
+          s.type !== "download" &&
+          !s.link.includes("/api/torrent/download") &&
+          !s.link.includes(".zip") &&
+          !s.link.includes("links.ol-am.top") &&
+          !s.link.includes("links.olamovies")
+      );
+
+      // Prioritize proven reliable, high-speed streaming mirrors (Pixeldrain, FastDL, HubCDN, Gofile)
+      const getMirrorScore = (url: string, serverName: string = ""): number => {
+        const u = url.toLowerCase();
+        const s = serverName.toLowerCase();
+        if (u.includes("pixeldrain.dev") || u.includes("pixeldrain.com") || s.includes("pixeldrain")) return 100;
+        if (u.includes("fuckingfast.net") || u.includes("fastdl") || s.includes("fastdl")) return 90;
+        if (u.includes("r2.dev") || u.includes("hubcdn") || u.includes("workers.dev") || u.includes(".buzz") || s.includes("hubcdn") || s.includes("cf worker")) return 85;
+        if (u.includes("gofile.io") || s.includes("gofile")) return 80;
+        if (u.includes("/api/stream/torrent")) return 75;
+        if (/\.(mp4|mkv|m3u8|webm|ts)(\?|$)/i.test(u) && !u.includes("cloudflarestorage.com") && !u.includes("hakunaymatata")) return 70;
+        if (u.includes("cloudflarestorage.com") || s.includes("cf storage")) return 40;
+        if (u.includes("hakunaymatata") || u.includes("moviebox") || u.includes("aoneroom")) return 30;
+        if (u.startsWith("magnet:")) return 20;
+        return 10;
+      };
+
+      const sortedStreamable = [...streamable].sort((a, b) => {
+        return getMirrorScore(b.link, b.server) - getMirrorScore(a.link, a.server);
+      });
+
+      let chosen = sortedStreamable[0]?.link;
+
+      // If no direct streamable link found (e.g. from OlaMovies where releases are .zip or shortlinks), auto-resolve working stream from other extensions
+      if (!chosen || chosen.includes(".zip") || chosen.includes("links.ol-am.top") || chosen.includes("links.olamovies")) {
+        try {
+          const cleanQ = displayTitle.replace(/\(\d{4}\)/g, "").trim();
+          const searchRes = await fetch(`${backendUrl}/api/global-search?q=${encodeURIComponent(cleanQ)}`);
+          if (searchRes.ok) {
+            const matches: any[] = await searchRes.json();
+            const altMatch = matches.find(
+              (m) => m && m.provider !== "olamovies" && (m.provider === "vega" || m.provider === "hdhub4u" || m.provider === "autoEmbed" || m.provider === "tpb")
+            );
+            if (altMatch) {
+              const metaRes = await fetch(`${backendUrl}/api/meta?provider=${encodeURIComponent(altMatch.provider)}&link=${encodeURIComponent(altMatch.link)}`);
+              if (metaRes.ok) {
+                const metaData = await metaRes.json();
+                const altPrimary = metaData.linkList?.[0]?.directLinks?.[0]?.link || metaData.linkList?.[0]?.link;
+                if (altPrimary) {
+                  const altList = await fetchServersForLink(`alt_${altMatch.provider}`, altPrimary);
+                  const altStreamable = altList.filter(
+                    (s) => isValidStreamUrl(s.link) && !s.link.includes(".zip") && !isLandingPageUrl(s.link)
+                  );
+                  const bestAlt = [...altStreamable].sort(
+                    (a, b) => getMirrorScore(b.link, b.server) - getMirrorScore(a.link, a.server)
+                  )[0];
+                  if (bestAlt?.link) {
+                    chosen = bestAlt.link;
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!chosen) {
+        chosen = list[0]?.link || primaryLink;
+      }
+
+      if (chosen) {
+        onPlayStream(chosen, displayTitle);
+      }
+    } catch (err) {
+      console.warn("Play release resolution error:", err);
+    } finally {
+      setStreamingKey(null);
+      setResolvingKey(null);
     }
   };
 
   const handleDownloadRelease = async (key: string, primaryLink: string, label: string) => {
     setDownloadingKey(key);
+
     try {
+      if (primaryLink.startsWith("tpb:")) {
+        const parts = primaryLink.split(":");
+        const infoHash = parts[2] || "";
+        const encName = parts.slice(3).join(":") || encodeURIComponent(cleanFileName);
+        const dlUrl = `${backendUrl}/api/torrent/download?hash=${infoHash}&name=${encName}`;
+        handleDownloadDirectUrl(dlUrl, "Direct Torrent Download", label);
+        return;
+      }
+
       const list = await fetchServersForLink(key, primaryLink);
-      const directCandidates = list.filter(
-        (s) => !/links\.(kmhd|kmphotos)\.[a-z]+/i.test(s.link) && !/\/locked\?/i.test(s.link)
-      );
-      const chosen = directCandidates[0] || list[0];
-      const dlLink = chosen?.link || primaryLink;
-      const serverName = chosen?.server || "Mirror";
+      // Prioritize internal torrent download endpoint over raw magnet
+      const dlCandidate =
+        list.find((s) => s.type === "download" || s.link.includes("/api/torrent/download")) ||
+        list.find(
+          (s) =>
+            !s.link.startsWith("magnet:") &&
+            !/links\.(kmhd|kmphotos)\.[a-z]+/i.test(s.link) &&
+            !/\/locked\?/i.test(s.link)
+        ) ||
+        list[0];
+      const dlLink = dlCandidate?.link || primaryLink;
+      const serverName = dlCandidate?.server || "Download";
       handleDownloadDirectUrl(dlLink, serverName, label);
     } catch (err) {
       console.error("Download release resolution error:", err);
       handleDownloadDirectUrl(primaryLink, "Mirror", label);
     } finally {
-      setDownloadingKey(null);
+      setTimeout(() => {
+        setDownloadingKey(null);
+      }, 3500);
     }
   };
 
@@ -578,6 +752,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
           targetProviderKey={targetProviderKey}
           displayTitle={displayTitle}
           resolvingKey={resolvingKey}
+          streamingKey={streamingKey}
           downloadingKey={downloadingKey}
           resolvingKeys={resolvingKeys}
           releaseServers={releaseServers}
@@ -590,6 +765,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
           onPlayExternal={onPlayExternal}
           onSearchGlobal={onSearchGlobal}
           onCloseModal={onClose}
+          providers={providers}
+          onSelectProvider={onSelectProvider}
         />
       </DetailsHero>
 
@@ -623,11 +800,15 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         containerRef={containerRef}
       />
 
-      {/* 7. MORE DOWNLOAD LINKS / MIRRORS MODAL */}
+      {/* 7. MORE DOWNLOAD / STREAM LINKS / MIRRORS MODAL */}
       <MoreLinksModal
         data={moreLinksData}
         onClose={() => setMoreLinksData(null)}
         onDownloadUrl={handleDownloadDirectUrl}
+        onPlayStream={(url, title) => {
+          onPlayStream(url, title);
+          setMoreLinksData(null);
+        }}
       />
 
       {/* 8. FULLSCREEN SCREENSHOT LIGHTBOX */}
@@ -643,6 +824,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         isOpen={isDownloadManagerOpen}
         onClose={() => setIsDownloadManagerOpen(false)}
       />
+
     </div>
   );
 };

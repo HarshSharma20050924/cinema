@@ -1,0 +1,20 @@
+{
+  "BOT_TOKEN": "8887103348:AAHjlYSV1s8uFQ2x_6B--3FwNmvlL12GYvk",
+  "CHANNEL_ID": "-1004363607477",
+  "ADMIN_IDS": [
+    1872734142
+  ],
+  "CINEMA_API": "http://127.0.0.1:3001/api",
+  "WEB_URL": "https://cinema-dwh.pages.dev",
+  "TMDB_API_KEY": "cfe422613b250f702980a3bbf9e90716",
+  "POSTING_INTERVAL_HOURS": 4,
+  "MAX_DAILY_POSTS": 4,
+  "enabledProviders": [
+    "vega",
+    "hdhub4u",
+    "4khdhub",
+    "movieBoxWeb",
+    "autoEmbed",
+    "drive"
+  ]
+}

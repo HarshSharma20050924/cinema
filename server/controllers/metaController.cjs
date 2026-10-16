@@ -130,8 +130,8 @@ async function resolveProviderEpisodes(provider, meta, context) {
         ? meta.linkList
         : [{ title: meta.title || "Episodes", episodesLink: meta.episodesLink }];
 
-    // Prioritize popular tracks (Original Audio, English, Hindi)
-    const preferredLangs = ["original", "english", "hindi"];
+    // Prioritize popular tracks (Hindi first, then Original Audio, then English)
+    const preferredLangs = ["hindi", "original", "english"];
     const sortedGroups = [...rawGroups].sort((a, b) => {
       const aT = (a.title || "").toLowerCase();
       const bT = (b.title || "").toLowerCase();
@@ -184,12 +184,14 @@ async function resolveProviderEpisodes(provider, meta, context) {
               });
             }
 
+            const dubName = (g.title || g.language || '').trim();
+            const isMultiDub = groupsToProcess.length > 1 && dubName;
             const sortedSeasons = Array.from(seasonMap.keys()).sort((a, b) => a - b);
             for (const sNum of sortedSeasons) {
               resolvedGroups.push({
-                title: `Season ${sNum}`,
+                title: isMultiDub ? `${dubName} · Season ${sNum}` : `Season ${sNum}`,
                 season: sNum,
-                dub: g.title || g.language || 'Default Audio',
+                dub: dubName || 'Default Audio',
                 quality: g.quality || 'HD',
                 directLinks: seasonMap.get(sNum),
               });

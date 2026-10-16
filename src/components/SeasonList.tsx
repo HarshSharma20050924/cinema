@@ -33,6 +33,7 @@ import {EpisodeLink, Link} from '../lib/providers/types';
 import {RootStackParamList} from '../App';
 import Downloader from './Downloader';
 import {launchVlcPlayer} from '../lib/services/vlcLauncher';
+import {getSeasonDisplayInfo} from '../utils/seasonUtils';
 import {cacheStorage, mainStorage, settingsStorage} from '../lib/storage';
 import {ifExists} from '../lib/file/ifExists';
 import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
@@ -900,7 +901,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
             getKey={item =>
               item.episodesLink || item.directLinks?.[0]?.link || item.title
             }
-            getLabel={item => item.title || 'Unknown'}
+            getLabel={item => getSeasonDisplayInfo(item).formattedLabel || item.title || 'Unknown'}
             onChange={handleSeasonChange}
             showFullOptionLabels
           />
@@ -946,7 +947,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         getKey={item =>
           item.episodesLink || item.directLinks?.[0]?.link || item.title
         }
-        getLabel={item => item.title || 'Unknown'}
+        getLabel={item => getSeasonDisplayInfo(item).formattedLabel || item.title || 'Unknown'}
         onChange={handleSeasonChange}
         showFullOptionLabels
         style={{marginBottom: 8}}

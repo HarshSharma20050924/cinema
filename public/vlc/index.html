@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cinema - Open in VLC</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body {
+      background-color: #0b0c10;
+      color: #e0e6ed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .card {
+      background: rgba(22, 27, 34, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      max-width: 480px;
+      width: 100%;
+      padding: 32px 24px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .icon-container {
+      width: 72px;
+      height: 72px;
+      background: radial-gradient(circle, rgba(230, 57, 70, 0.2) 0%, rgba(230, 57, 70, 0) 70%);
+      border: 1px solid rgba(230, 57, 70, 0.3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .icon {
+      font-size: 32px;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+    .title-display {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 24px;
+      word-break: break-word;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: rgba(230, 57, 70, 0.15);
+      color: #ff6b6b;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      border: 1px solid rgba(230, 57, 70, 0.25);
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      margin-bottom: 12px;
+    }
+    .btn-primary {
+      background: #e63946;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(230, 57, 70, 0.35);
+    }
+    .btn-primary:hover {
+      background: #d62839;
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+    }
+    .copy-box {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      font-size: 11px;
+      color: #64748b;
+      word-break: break-all;
+      border: 1px dashed rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      position: relative;
+    }
+    .copy-box:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #94a3b8;
+    }
+    .footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: #64748b;
+    }
+    .footer a {
+      color: #e63946;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-container">
+      <span class="icon">🎬</span>
+    </div>
+    <h1>Launching VLC Media Player</h1>
+    <p class="title-display" id="titleText">Loading stream...</p>
+    <div class="status-badge" id="statusBadge">Handing off to VLC...</div>
+
+    <button class="btn btn-primary" id="vlcBtn">
+      <span>▶️</span> Launch VLC Media Player
+    </button>
+
+    <button class="btn btn-secondary" id="androidBtn" style="display: none;">
+      <span>📱</span> Open in Android VLC App
+    </button>
+
+    <a class="btn btn-secondary" id="botDownloadBtn" href="https://t.me/cinemaisherebtw_bot" target="_blank" rel="noopener noreferrer">
+      <span>🤖</span> Download File via Telegram Bot
+    </a>
+
+    <p style="font-size: 12px; color: #94a3b8; margin: 10px 0 14px; line-height: 1.4;">
+      💡 <b>High Performance Stream:</b> Use VLC Player for zero buffering. To download without speed limits or errors, use <b>@cinemaisherebtw_bot</b>.
+    </p>
+
+    <div class="copy-box" id="copyBox" title="Click to copy stream URL">
+      <span id="urlPreview">https://...</span>
+      <div id="copyToast" style="display: none; color: #4ade80; font-weight: 600; margin-top: 4px;">Copied to clipboard!</div>
+    </div>
+
+    <div class="footer">
+      Powered by <a href="/">Cinema</a> • 100% Ad-Free Native Streaming
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      let streamUrl = params.get('url') || '';
+      const title = params.get('title') || 'Cinema Stream';
+
+      if (!streamUrl) {
+        document.getElementById('titleText').textContent = 'No stream URL provided.';
+        document.getElementById('statusBadge').textContent = 'Error: Invalid Link';
+        return;
+      }
+
+      // Clean streamUrl if encoded
+      try {
+        if (streamUrl.includes('%3A') || streamUrl.includes('%2F')) {
+          streamUrl = decodeURIComponent(streamUrl);
+        }
+      } catch (_) {}
+
+      document.getElementById('titleText').textContent = title;
+      document.getElementById('urlPreview').textContent = streamUrl;
+
+      // Construct Protocols
+      const vlcProtocol = 'vlc://' + streamUrl;
+      const androidIntent = 'intent:' + streamUrl + '#Intent;action=android.intent.action.VIEW;type=video/*;package=org.videolan.vlc;end';
+      const isAndroid = /Android/i.test(navigator.userAgent);
+
+      if (isAndroid) {
+        const androidBtn = document.getElementById('androidBtn');
+        androidBtn.style.display = 'flex';
+        androidBtn.onclick = function () {
+          window.location.href = androidIntent;
+        };
+      }
+
+      // Auto Trigger VLC handoff
+      function triggerVlc() {
+        if (isAndroid) {
+          window.location.href = androidIntent;
+        } else {
+          window.location.href = vlcProtocol;
+        }
+      }
+
+      // Trigger automatically after 400ms
+      setTimeout(triggerVlc, 400);
+
+      // Manual Buttons
+      document.getElementById('vlcBtn').onclick = function () {
+        triggerVlc();
+      };
+
+      document.getElementById('webBtn').onclick = function () {
+        window.location.href = '/?play=' + encodeURIComponent(streamUrl);
+      };
+
+      // Copy to clipboard
+      const copyBox = document.getElementById('copyBox');
+      const copyToast = document.getElementById('copyToast');
+      copyBox.onclick = function () {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(streamUrl).then(showToast);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = streamUrl;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          showToast();
+        }
+      };
+
+      function showToast() {
+        copyToast.style.display = 'block';
+        setTimeout(() => { copyToast.style.display = 'none'; }, 2000);
+      }
+    })();
+  </script>
+</body>
+</html>

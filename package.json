@@ -10,6 +10,8 @@
     "dev": "vite --port 5174 --host 0.0.0.0",
     "build": "vite build",
     "test:downloads": "node scripts/test-all-downloads.cjs",
+    "start:bot": "node telegram-bot/index.cjs",
+    "bot": "node telegram-bot/index.cjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -27,7 +29,8 @@
     "hls.js": "^1.7.3",
     "nodejs-mobile-react-native": "^18.20.4",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "webtorrent": "^3.0.21"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",

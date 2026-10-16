@@ -82,7 +82,7 @@ async function fetchTMDBJson(url: string): Promise<any> {
 export async function fetchTMDBDetails(
   title: string,
   imdbId?: string,
-  year?: string
+  searchYear?: string
 ): Promise<TMDBDetails | null> {
   try {
     let tmdbId: number | null = null;
@@ -122,8 +122,8 @@ export async function fetchTMDBDetails(
 
       const targetClean = (cleanTitle || title).trim().toLowerCase();
       const searchQuery = encodeURIComponent(cleanTitle || title);
-      const searchUrl = year
-        ? `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${searchQuery}&year=${year}`
+      const searchUrl = searchYear
+        ? `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${searchQuery}&year=${searchYear}`
         : `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${searchQuery}`;
 
       let searchData = await fetchTMDBJson(searchUrl);
@@ -139,21 +139,40 @@ export async function fetchTMDBDetails(
           (r: any) => r.media_type === "movie" || r.media_type === "tv"
         );
 
-        // 1. Exact title match (e.g. "I" matches movie named "I")
-        let matched = results.find(
-          (r: any) =>
-            (r.title && r.title.trim().toLowerCase() === targetClean) ||
-            (r.name && r.name.trim().toLowerCase() === targetClean) ||
-            (r.original_title && r.original_title.trim().toLowerCase() === targetClean) ||
-            (r.original_name && r.original_name.trim().toLowerCase() === targetClean)
-        );
+        const normalizeStr = (s: string) =>
+          (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-        // 2. Fuzzy match only if query has sufficient length (>= 4 characters)
-        if (!matched && targetClean.length >= 4) {
+        const normalizedTarget = normalizeStr(cleanTitle || title);
+
+        // 1. Exact normalized match (ignoring punctuation, colons, hyphens)
+        let matched = results.find((r: any) => {
+          const t1 = normalizeStr(r.title);
+          const t2 = normalizeStr(r.name);
+          const t3 = normalizeStr(r.original_title);
+          const t4 = normalizeStr(r.original_name);
+          return (
+            t1 === normalizedTarget ||
+            t2 === normalizedTarget ||
+            t3 === normalizedTarget ||
+            t4 === normalizedTarget
+          );
+        });
+
+        // 2. Fuzzy match only if query has sufficient length (>= 3 characters)
+        if (!matched && normalizedTarget.length >= 3) {
           matched = results.find((r: any) => {
-            const rt = (r.title || r.name || "").toLowerCase();
-            return rt.startsWith(targetClean) || rt.includes(targetClean);
+            const rt = normalizeStr(r.title || r.name);
+            return (
+              rt.startsWith(normalizedTarget) ||
+              rt.includes(normalizedTarget) ||
+              normalizedTarget.includes(rt)
+            );
           });
+        }
+
+        // 3. Fallback to top-ranked TMDB search result
+        if (!matched && results.length > 0) {
+          matched = results[0];
         }
 
         if (matched) {
@@ -379,4 +398,121 @@ export async function fetchTMDBPersonDetails(personId: number): Promise<TMDBPers
     return null;
   }
 }
+
+export async function fetchRankingsFromTMDB(
+  category: string,
+  page = 1
+): Promise<any[]> {
+  try {
+    let url = "";
+    let isTv = false;
+
+    switch (category) {
+      case "tv":
+        url = `${BASE_URL}/tv/top_rated?api_key=${TMDB_API_KEY}&page=${page}`;
+        isTv = true;
+        break;
+      case "anime":
+        url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&with_genres=16&with_original_language=ja&sort_by=vote_average.desc&vote_count.gte=100&page=${page}`;
+        isTv = true;
+        break;
+      case "bollywood":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_original_language=hi&sort_by=vote_average.desc&vote_count.gte=80&page=${page}`;
+        break;
+      case "south":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_original_language=te|ta|ml|kn&sort_by=vote_average.desc&vote_count.gte=40&page=${page}`;
+        break;
+      case "korean":
+        url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&with_original_language=ko&sort_by=vote_average.desc&vote_count.gte=50&page=${page}`;
+        isTv = true;
+        break;
+      case "action":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=28&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "scifi":
+      case "science-fiction":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=878&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "horror":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=27&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "comedy":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=35&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "romance":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=10749&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "drama":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=18&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "crime":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=80&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "thriller":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=53&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "adventure":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=12&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "animation":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&sort_by=vote_average.desc&vote_count.gte=300&page=${page}`;
+        break;
+      case "mystery":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=9648&sort_by=vote_average.desc&vote_count.gte=200&page=${page}`;
+        break;
+      case "fantasy":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=14&sort_by=vote_average.desc&vote_count.gte=200&page=${page}`;
+        break;
+      case "documentary":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=99&sort_by=vote_average.desc&vote_count.gte=100&page=${page}`;
+        break;
+      case "war":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=10752&sort_by=vote_average.desc&vote_count.gte=200&page=${page}`;
+        break;
+      case "western":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=37&sort_by=vote_average.desc&vote_count.gte=100&page=${page}`;
+        break;
+      case "history":
+        url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=36&sort_by=vote_average.desc&vote_count.gte=150&page=${page}`;
+        break;
+      case "movies":
+      default:
+        url = `${BASE_URL}/movie/top_rated?api_key=${TMDB_API_KEY}&page=${page}`;
+        break;
+    }
+
+    const data = await fetchTMDBJson(url);
+    if (!data || !data.results) return [];
+
+    return data.results.map((r: any, idx: number) => {
+      const year = parseInt((r.release_date || r.first_air_date || "").split("-")[0]) || 2020;
+      const imdbRating = Math.round((r.vote_average || 7.0) * 10) / 10;
+      const letterboxdRating = Math.min(5.0, Math.round(((r.vote_average || 7.0) / 2) * 10) / 10);
+      const voteCount = r.vote_count || 0;
+      const imdbVotes = voteCount >= 1000 ? `${(voteCount / 1000).toFixed(1)}K` : `${voteCount}`;
+
+      return {
+        id: `tmdb_${r.id}`,
+        tmdbId: r.id,
+        rank: (page - 1) * 20 + idx + 1,
+        title: r.title || r.name,
+        year,
+        type: isTv ? "tv" : "movie",
+        imdbRating,
+        imdbVotes,
+        letterboxdRating,
+        letterboxdRank: (page - 1) * 20 + idx + 1,
+        genres: [],
+        category,
+        poster: r.poster_path ? `${IMG_BASE_W500}${r.poster_path}` : "",
+        backdrop: r.backdrop_path ? `${IMG_BASE_ORIGINAL}${r.backdrop_path}` : "",
+        overview: r.overview || "",
+      };
+    });
+  } catch (e) {
+    console.error("fetchRankingsFromTMDB error:", e);
+    return [];
+  }
+}
+
 

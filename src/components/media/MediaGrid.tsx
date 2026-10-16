@@ -19,6 +19,7 @@ interface MediaGridProps {
   isGlobalSearch?: boolean;
   isStreaming?: boolean;
   totalPages?: number;
+  onToggleGlobalSearch?: () => void;
 }
 
 export const MediaGrid: React.FC<MediaGridProps> = ({
@@ -34,6 +35,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({
   isGlobalSearch = false,
   isStreaming = false,
   totalPages = 94,
+  onToggleGlobalSearch,
 }) => {
   const [showSlowLoadHint, setShowSlowLoadHint] = useState(false);
 
@@ -406,24 +408,49 @@ export const MediaGrid: React.FC<MediaGridProps> = ({
           <div style={{ fontSize: "12px", marginTop: "6px" }}>
             Try searching with another title or keyword.
           </div>
-          {showBack && onBack && (
-            <button
-              onClick={onBack}
-              style={{
-                marginTop: "14px",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                background: "rgba(255, 255, 255, 0.08)",
-                color: "#fff",
-                fontSize: "12px",
-                fontWeight: 600,
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                cursor: "pointer",
-              }}
-            >
-              ← Back to Home
-            </button>
-          )}
+          <div style={{ display: "flex", gap: "10px", justifyContent: "center", alignItems: "center", flexWrap: "wrap", marginTop: "14px" }}>
+            {!isGlobalSearch && onToggleGlobalSearch && (
+              <button
+                onClick={onToggleGlobalSearch}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  padding: "8px 18px",
+                  borderRadius: "8px",
+                  background: "linear-gradient(135deg, #e50914, #ff334b)",
+                  color: "#fff",
+                  fontSize: "12.5px",
+                  fontWeight: 700,
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(229, 9, 20, 0.4)",
+                  transition: "transform 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                <span>🔍 Search Globally Across All Sources</span>
+              </button>
+            )}
+            {showBack && onBack && (
+              <button
+                onClick={onBack}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  color: "#fff",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  cursor: "pointer",
+                }}
+              >
+                ← Back to Home
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <>

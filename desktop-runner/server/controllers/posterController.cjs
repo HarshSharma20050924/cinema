@@ -11,7 +11,11 @@ async function getPoster(req, res) {
 
   const cacheKey = query.toLowerCase();
   if (posterMemoryCache.has(cacheKey)) {
-    return res.json({ poster: posterMemoryCache.get(cacheKey) });
+    const cached = posterMemoryCache.get(cacheKey);
+    if (typeof cached === "string") {
+      return res.json({ poster: cached, background: null });
+    }
+    return res.json({ poster: cached?.poster || null, background: cached?.background || null });
   }
 
   try {
@@ -23,8 +27,34 @@ async function getPoster(req, res) {
         headers: { "User-Agent": "Mozilla/5.0" },
       }
     );
-    let poster = mRes.data?.metas?.[0]?.poster;
-    if (!poster) {
+    const qLower = query.toLowerCase();
+    const findBestArtwork = (metas = []) => {
+      if (!Array.isArray(metas) || metas.length === 0) return { poster: null, background: null };
+      const exact = metas.find((m) => m.name && m.name.trim().toLowerCase() === qLower);
+      if (exact?.poster || exact?.background) {
+        return {
+          poster: exact.poster || null,
+          background: exact.background || null,
+        };
+      }
+      if (qLower.length >= 4) {
+        const contains = metas.find((m) => m.name && m.name.toLowerCase().includes(qLower));
+        if (contains?.poster || contains?.background) {
+          return {
+            poster: contains.poster || null,
+            background: contains.background || null,
+          };
+        }
+        return {
+          poster: metas[0]?.poster || null,
+          background: metas[0]?.background || null,
+        };
+      }
+      return { poster: null, background: null };
+    };
+
+    let art = findBestArtwork(mRes.data?.metas);
+    if (!art.poster && !art.background) {
       const sRes = await axios.get(
         `https://v3-cinemeta.strem.io/catalog/series/top/search=${encoded}.json`,
         {
@@ -32,17 +62,17 @@ async function getPoster(req, res) {
           headers: { "User-Agent": "Mozilla/5.0" },
         }
       );
-      poster = sRes.data?.metas?.[0]?.poster;
+      art = findBestArtwork(sRes.data?.metas);
     }
 
-    if (poster) {
-      posterMemoryCache.set(cacheKey, poster);
-      return res.json({ poster });
+    if (art.poster || art.background) {
+      posterMemoryCache.set(cacheKey, art);
+      return res.json({ poster: art.poster, background: art.background });
     }
   } catch (_) {}
 
   posterMemoryCache.set(cacheKey, null);
-  return res.json({ poster: null });
+  return res.json({ poster: null, background: null });
 }
 
 /**

@@ -3,8 +3,8 @@ const manifestService = require("../services/manifestService.cjs");
 const serverCache = require("../services/cacheService.cjs");
 
 async function getPosts(req, res) {
-  const { provider = "autoEmbed", filter = "", page = 1 } = req.query;
-  const cacheKey = `posts:${provider}:${filter}:${page}`;
+  const { provider = "autoEmbed", filter = "", page = 1, tab = "", niche = "" } = req.query;
+  const cacheKey = `posts:${provider}:${filter}:${page}:${tab}:${niche}`;
   const cached = serverCache.get(cacheKey);
   if (cached) return res.json(cached);
 
@@ -23,6 +23,7 @@ async function getPosts(req, res) {
       page: parseInt(page, 10),
       providerValue: provider,
       providerContext: context,
+      params: req.query,
       signal: new AbortController().signal,
     });
 

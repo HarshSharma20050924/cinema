@@ -7,6 +7,8 @@ const { getStreams } = require("../controllers/streamController.cjs");
 const { getRatings } = require("../controllers/ratingsController.cjs");
 const { proxyStream, downloadFile, getPlaylistM3u } = require("../controllers/proxyController.cjs");
 const { getPoster, proxyImage } = require("../controllers/posterController.cjs");
+const { getLetterboxdFilms } = require("../controllers/letterboxdController.cjs");
+const { getImdbFilms } = require("../controllers/imdbController.cjs");
 
 const router = express.Router();
 
@@ -18,12 +20,34 @@ router.get("/search/global", globalSearch);
 router.get("/global-search", globalSearch);
 router.get("/meta", getMeta);
 router.get("/ratings", getRatings);
+router.get("/letterboxd", getLetterboxdFilms);
+router.get("/letterboxd/films", getLetterboxdFilms);
+router.get("/imdb", getImdbFilms);
+router.get("/imdb/films", getImdbFilms);
 router.get("/streams", getStreams);
 router.get("/poster", getPoster);
 router.get("/image-proxy", proxyImage);
 router.get("/proxy", proxyStream);
 router.get("/download", downloadFile);
+router.get("/stream/torrent", async (req, res) => {
+  const hash = req.query.hash || req.query.infoHash;
+  const name = req.query.name || '';
+  if (!hash) return res.status(400).send("infoHash parameter required");
+  const torrentService = require("../services/torrentService.cjs");
+  await torrentService.handleStream(req, res, hash, name);
+});
+router.get("/torrent/download", async (req, res) => {
+  const hash = req.query.hash || req.query.infoHash;
+  const name = req.query.name || '';
+  if (!hash) return res.status(400).send("infoHash parameter required");
+  const torrentService = require("../services/torrentService.cjs");
+  await torrentService.handleDownload(req, res, hash, name);
+});
 router.get("/playlist", getPlaylistM3u);
 router.get("/playlist.m3u", getPlaylistM3u);
+
+const { playInVlc } = require("../controllers/vlcController.cjs");
+router.post("/play-vlc", playInVlc);
+router.get("/play-vlc", playInVlc);
 
 module.exports = router;

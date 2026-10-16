@@ -15,6 +15,8 @@ interface CatalogFilterBarProps {
   onSelectGenreCategory: (genre: CreativeCategory | null) => void;
   onSelectProviderGenre?: (filter: string, title: string) => void;
   onToggleMerge: () => void;
+  onOpenLetterboxd?: () => void;
+  onOpenImdb?: () => void;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -29,6 +31,8 @@ export const CatalogFilterBar: React.FC<CatalogFilterBarProps> = ({
   onSelectGenreCategory,
   onSelectProviderGenre,
   onToggleMerge,
+  onOpenLetterboxd,
+  onOpenImdb,
   className = "",
   style,
 }) => {
@@ -140,6 +144,109 @@ export const CatalogFilterBar: React.FC<CatalogFilterBarProps> = ({
         extraGenres={extraGenres}
         onSelectProviderGenre={onSelectProviderGenre}
       />
+
+      {/* 4. IMDb Brand Discovery Button */}
+      {onOpenImdb && (
+        <button
+          type="button"
+          onClick={onOpenImdb}
+          title="Explore IMDb Ratings & Discovery"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "38px",
+            padding: "0 15px",
+            borderRadius: "999px",
+            background: "rgba(14, 14, 14, 0.90)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            color: "#ffffff",
+            fontSize: "12.5px",
+            fontWeight: 800,
+            cursor: "pointer",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+            boxShadow: "0 4px 14px rgba(0, 0, 0, 0.5)",
+            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#f5c518";
+            e.currentTarget.style.borderColor = "#f5c518";
+            e.currentTarget.style.color = "#000000";
+            e.currentTarget.style.boxShadow = "0 4px 18px rgba(245, 197, 24, 0.6)";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(14, 14, 14, 0.90)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+            e.currentTarget.style.color = "#ffffff";
+            e.currentTarget.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.5)";
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 900,
+              fontSize: "12px",
+              letterSpacing: "0.02em",
+              lineHeight: 1,
+            }}
+          >
+            IMDb
+          </span>
+        </button>
+      )}
+
+      {/* 5. Letterboxd Brand Discovery Button */}
+      {onOpenLetterboxd && (
+        <button
+          type="button"
+          onClick={onOpenLetterboxd}
+          title="Explore Letterboxd Films & Ratings"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "7px",
+            height: "38px",
+            padding: "0 14px",
+            borderRadius: "999px",
+            background: "rgba(14, 14, 14, 0.90)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            color: "#ffffff",
+            fontSize: "12.5px",
+            fontWeight: 700,
+            cursor: "pointer",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+            boxShadow: "0 4px 14px rgba(0, 0, 0, 0.5)",
+            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#00e054";
+            e.currentTarget.style.borderColor = "#00e054";
+            e.currentTarget.style.color = "#000000";
+            e.currentTarget.style.boxShadow = "0 4px 18px rgba(0, 224, 84, 0.55)";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(14, 14, 14, 0.90)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+            e.currentTarget.style.color = "#ffffff";
+            e.currentTarget.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.5)";
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
+        >
+          {/* Authentic Letterboxd 3-circle dots */}
+          <div style={{ display: "flex", alignItems: "center", gap: "2.5px" }}>
+            <span style={{ width: "6.5px", height: "6.5px", borderRadius: "50%", background: "#ff8000" }} />
+            <span style={{ width: "6.5px", height: "6.5px", borderRadius: "50%", background: "#00e054" }} />
+            <span style={{ width: "6.5px", height: "6.5px", borderRadius: "50%", background: "#40bcf4" }} />
+          </div>
+          <span>Letterboxd</span>
+        </button>
+      )}
     </div>
   );
 };

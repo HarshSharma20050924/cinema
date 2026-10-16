@@ -86,14 +86,18 @@ class DownloadManagerService {
     }
 
     // 2. Web Browser Mode: Direct native browser download (handled by browser's download shelf)
+    // Avoid target="_blank" which triggers Brave/Chrome popup blockers on asynchronous actions
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename;
-    a.target = "_blank";
-    a.rel = "noreferrer";
+    a.setAttribute("download", filename);
+    a.style.display = "none";
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    setTimeout(() => {
+      try {
+        document.body.removeChild(a);
+      } catch (_) {}
+    }, 1000);
     return id;
   }
 

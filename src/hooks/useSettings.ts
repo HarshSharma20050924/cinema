@@ -6,7 +6,7 @@ const STORAGE_KEY = "cinema_user_settings_v2";
 const DEFAULT_SETTINGS: UserSettings = {
   cinemaName: "Cinema",
   providerSource: "Cinema",
-  installedExtensions: ["hdhub4u", "vega", "4khdhub", "olamovies", "gramcinema", "drive", "mod", "movieBoxWeb", "1cinevood", "autoEmbed", "katmovies", "world4u"],
+  installedExtensions: ["hdhub4u", "vega", "4khdhub", "mod", "movieBoxWeb", "1cinevood", "autoEmbed", "katmovies", "world4u"],
   defaultPlayer: "vlc",
   customPlayerScheme: "vlc://",
   isConfigured: false,
@@ -26,41 +26,28 @@ export const launchExternalPlayer = (
     streamUrl.includes("hakunaymatata") ||
     streamUrl.includes("moviebox") ||
     streamUrl.includes("inmoviebox") ||
-    streamUrl.includes("aoneroom");
+    streamUrl.includes("aoneroom") ||
+    streamUrl.includes("sssrr.org");
 
-  // 1. Desktop Electron Native VLC Launcher (Zero Location Error / Direct Process Spawn)
-  if (typeof window !== "undefined" && (window as any).CinemaDesktop?.playInVlc) {
-    (window as any).CinemaDesktop.playInVlc({
-      streamUrl,
-      title: cleanTitle,
-      isMovieBox,
-    });
-    return;
-  }
 
   const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
   const isIOS = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
-  const isDirectCors =
-    streamUrl.includes("pixeldrain.dev") ||
-    streamUrl.includes("pixeldrain.com") ||
-    streamUrl.includes("gofile.io") ||
-    streamUrl.includes("r2.dev");
 
-  // Route through proxy so external players (VLC/MPV) receive proper Referer/Origin headers
-  let playableUrl = streamUrl.trim();
-  if (!isDirectCors && origin && !streamUrl.includes("/api/proxy")) {
-    playableUrl = `${origin}/api/proxy?url=${encodeURIComponent(streamUrl)}`;
-    if (isMovieBox) {
-      playableUrl += `&referer=${encodeURIComponent("https://officialmoviebox.com/")}`;
-      playableUrl += `&origin=${encodeURIComponent("https://officialmoviebox.com")}`;
+  // Convert raw magnet to internal WebTorrent stream URL
+  let resolvedStreamUrl = streamUrl.trim();
+  if (resolvedStreamUrl.startsWith("magnet:")) {
+    const hashMatch = resolvedStreamUrl.match(/btih:([a-fA-F0-9]{32,40})/i);
+    if (hashMatch) {
+      resolvedStreamUrl = `/api/stream/torrent?hash=${hashMatch[1]}&name=${encodeURIComponent(cleanTitle)}`;
     }
   }
 
-  // Ensure the URL ends in a media extension (.mkv / .mp4) so media players recognize it
-  if (!/\.(mkv|mp4|m3u8|webm|avi|mov|flv|ts)(\?|$)/i.test(playableUrl)) {
-    playableUrl += playableUrl.includes("?") ? "&file=video.mp4" : "?file=video.mp4";
+  // Clean direct stream URL for external players (VLC connects directly without CORS limits)
+  let playableUrl = resolvedStreamUrl;
+  if (playableUrl.startsWith("/api/")) {
+    playableUrl = `${origin}${playableUrl}`;
   }
 
   // Auto-copy link to clipboard so user can instantly paste into VLC's Stream box if needed
@@ -98,30 +85,73 @@ export const launchExternalPlayer = (
     return;
   }
 
-  // Desktop (Windows / Mac / Linux Browser):
+  // Desktop (Windows / Mac / Linux):
   if (_player === "custom") {
     const scheme = customScheme.replace(/:\/\/$/, "");
     window.location.href = `${scheme}://${playableUrl}`;
     return;
   }
 
-  // On desktop browser, downloading a .m3u file launches VLC directly without location error:
-  const safeFileName = cleanTitle.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40) || "stream";
-  let m3uContent = `#EXTM3U\n#EXTINF:-1,${cleanTitle}\n`;
-  if (isMovieBox) {
-    m3uContent += "#EXTVLCOPT:http-referrer=https://officialmoviebox.com/\n";
-    m3uContent += "#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\n";
+  // 1. Electron Desktop App context (Direct VLC process spawn)
+  if (typeof window !== "undefined" && (window as any).CinemaDesktop?.playInVlc) {
+    (window as any).CinemaDesktop.playInVlc({
+      streamUrl: playableUrl,
+      title: cleanTitle,
+      isMovieBox,
+    });
+    return;
   }
-  m3uContent += `${playableUrl}\n`;
 
-  const blob = new Blob([m3uContent], { type: "audio/x-mpegurl" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${safeFileName}.m3u`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  // 2. Try Local Companion / Engine endpoints (direct 127.0.0.1, localhost, and relative /api/play-vlc)
+  const localEndpoints = [
+    "http://127.0.0.1:3001/api/play-vlc",
+    "http://localhost:3001/api/play-vlc",
+    "/api/play-vlc",
+  ];
+
+  const payload = JSON.stringify({
+    streamUrl: playableUrl,
+    title: cleanTitle,
+    isMovieBox,
+  });
+
+  const tryLocalSpawn = async () => {
+    for (const endpoint of localEndpoints) {
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          signal: AbortSignal.timeout(800),
+        });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data?.launched) {
+            return true;
+          }
+        }
+      } catch (_) {
+        // Try next endpoint
+      }
+    }
+    return false;
+  };
+
+  tryLocalSpawn().then((launched) => {
+    if (!launched) {
+      // Direct OS Protocol Handoff to VLC without downloading files to disk
+      const needsPlaylistWrapper =
+        isMovieBox ||
+        playableUrl.includes("mxplayer") ||
+        playableUrl.includes("cloudfront.net/secim/");
+
+      const vlcTarget = needsPlaylistWrapper
+        ? `${origin}/api/playlist.m3u?url=${encodeURIComponent(playableUrl)}&title=${encodeURIComponent(cleanTitle)}`
+        : playableUrl;
+
+      window.location.href = `vlc://${vlcTarget}`;
+    }
+  });
 };
 
 export function useSettings() {
@@ -130,14 +160,7 @@ export function useSettings() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        const existing: string[] = parsed.installedExtensions || [];
-        const installedExtensions = [...existing];
-        if (!installedExtensions.includes("olamovies")) {
-          installedExtensions.push("olamovies");
-        }
-        if (!installedExtensions.includes("gramcinema")) {
-          installedExtensions.push("gramcinema");
-        }
+        const installedExtensions: string[] = parsed.installedExtensions || DEFAULT_SETTINGS.installedExtensions;
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,

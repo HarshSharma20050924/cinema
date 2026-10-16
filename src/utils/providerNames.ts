@@ -1,4 +1,6 @@
 export const DEFAULT_PROVIDER_NAMES: Record<string, string> = {
+  tpb: "ThePirateBay",
+  thepiratebay: "ThePirateBay",
   hdhub4u: "HDHub4u",
   olamovies: "OlaMovies",
   gramcinema: "Gram Cinema",

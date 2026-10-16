@@ -6,6 +6,7 @@ import type { Post } from "../types";
 
 const PRIORITY_PROVIDERS = [
   "hdhub4u",
+  "tpb",
   "olamovies",
   "gramcinema",
   "vega",
@@ -145,7 +146,7 @@ export function useMediaPosts(
             const baseProviders =
               installedProviders.length > 0
                 ? installedProviders
-                : ["hdhub4u", "olamovies", "gramcinema", "vega", "topmovies"];
+                : ["hdhub4u", "tpb", "olamovies", "gramcinema", "vega", "topmovies"];
 
             const sortedProviders = [...new Set(baseProviders)].sort((a, b) => {
               const aIdx = PRIORITY_PROVIDERS.indexOf(a.toLowerCase());

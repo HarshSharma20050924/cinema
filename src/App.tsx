@@ -26,6 +26,7 @@ import { DownloadPage } from "./components/download/DownloadPage";
 import { TermsPage } from "./components/legal/TermsPage";
 import { PrivacyPage } from "./components/legal/PrivacyPage";
 import { DisclaimerPage } from "./components/legal/DisclaimerPage";
+import { RankingsHubPage } from "./components/rankings/RankingsHubPage";
 import { ServerIcon, DownloadIcon, RefreshIcon } from "./icons";
 import { TopProgressBar } from "./components/common/TopProgressBar";
 import { api } from "./api/client";
@@ -41,8 +42,45 @@ import type { Provider, Post, MediaDetails, StreamItem, ExternalPlayerType } fro
 // Load saved session state on initial startup
 const initialNavState: NavigationState | null = loadNavigationState();
 
+export function cleanSearchQuery(raw: string): string {
+  if (!raw) return "";
+  let clean = raw
+    .replace(/^\s*#?\s*\d+\s*[\.\:\-\)]+\s*/, "") // remove ranking numbers like "1. ", "250. ", "#1 - " but keep titles like "12 Angry Men", "3 Idiots", "1917"
+    .replace(/\(.*?\)/g, "") // remove parenthesized content like (1972), (2026)
+    .replace(/\[.*?\]/g, "") // remove brackets like [1080p], [Dual Audio]
+    .replace(/\b(19\d{2}|20\d{2})\b/g, "") // remove standalone years
+    .replace(
+      /\b(480p|720p|1080p|2160p|4k|hd|web-dl|webrip|bluray|brrip|bdrip|hdrip|dvdrip|x264|x265|hevc|hq|hdtc|cam|camrip|predvd|pre-dvd|v2|untouched|dual audio|multi audio|hindi|english|tamil|telugu|clean|uncut|extended|complete|season\s*\d+|s\d+|episode\s*\d+|e\d+)\b/gi,
+      ""
+    )
+    .replace(/[-_.:|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean || raw.trim();
+}
+
 function getInitialRouteState(saved: NavigationState | null) {
   const urlParams = new URLSearchParams(window.location.search);
+  const q = urlParams.get("q");
+  const isGlobal = urlParams.get("global") === "1";
+  const filter = urlParams.get("filter");
+  const title = urlParams.get("title");
+  const niche = urlParams.get("niche");
+  const pageNum = parseInt(urlParams.get("page") || "1", 10);
+
+  // 1. Search Query parameter ALWAYS takes highest priority over tabs
+  if (q) {
+    return {
+      tab: "home" as const,
+      isBrowsingCategories: false,
+      viewAllCategory: null,
+      searchQuery: q,
+      isGlobalSearch: isGlobal || saved?.isGlobalSearch || false,
+      nicheId: niche || saved?.selectedNicheId || null,
+      page: !isNaN(pageNum) && pageNum > 0 ? pageNum : (saved?.page || 1),
+    };
+  }
+
   let tab = urlParams.get("tab");
   if (!tab && window.location.hash) {
     const hash = window.location.hash.replace(/^#\/?/, "").toLowerCase();
@@ -54,12 +92,45 @@ function getInitialRouteState(saved: NavigationState | null) {
   if (!tab && saved?.activeNavTab) {
     tab = saved.activeNavTab;
   }
-  const q = urlParams.get("q");
-  const filter = urlParams.get("filter");
-  const title = urlParams.get("title");
-  const niche = urlParams.get("niche");
-  const isGlobal = urlParams.get("global") === "1";
-  const pageNum = parseInt(urlParams.get("page") || "1", 10);
+
+  if (tab === "top250" || tab === "rankings") {
+    return {
+      tab: "rankings" as const,
+      customPage: "rankings" as const,
+      isBrowsingCategories: false,
+      viewAllCategory: null,
+      searchQuery: "",
+      isGlobalSearch: false,
+      nicheId: null,
+      page: 1,
+    };
+  }
+
+  if (tab === "letterboxd") {
+    return {
+      tab: "letterboxd" as const,
+      customPage: "letterboxd" as const,
+      isBrowsingCategories: false,
+      viewAllCategory: null,
+      searchQuery: "",
+      isGlobalSearch: false,
+      nicheId: null,
+      page: 1,
+    };
+  }
+
+  if (tab === "imdb") {
+    return {
+      tab: "imdb" as const,
+      customPage: "imdb" as const,
+      isBrowsingCategories: false,
+      viewAllCategory: null,
+      searchQuery: "",
+      isGlobalSearch: false,
+      nicheId: null,
+      page: 1,
+    };
+  }
 
   if (tab === "downloads" || tab === "download") {
     return {
@@ -234,7 +305,7 @@ export default function App() {
   const [isGlobalSearch, setIsGlobalSearch] = useState(initialRoute.isGlobalSearch);
   const [page, setPage] = useState(initialRoute.page);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"home" | "search" | "extensions" | "settings">("home");
+  const [mobileTab, setMobileTab] = useState<"home" | "movies" | "tv" | "categories" | "extensions">("home");
 
   // Browse by Category page view state (shows colorful category cards)
   const [isBrowsingCategories, setIsBrowsingCategories] = useState(initialRoute.isBrowsingCategories);
@@ -261,13 +332,15 @@ export default function App() {
   const [isMergedFilter, setIsMergedFilter] = useState<boolean>(false);
   const selectedNicheId = selectedCategoryId || selectedGenreCategory?.id || null;
 
-  const [activeCustomPage, setActiveCustomPage] = useState<"downloads" | "terms" | "privacy" | "disclaimer" | null>(
+  const [activeCustomPage, setActiveCustomPage] = useState<"downloads" | "terms" | "privacy" | "disclaimer" | "rankings" | "letterboxd" | "imdb" | null>(
     (initialRoute as any).customPage || null
   );
 
   // Derive active navbar tab
-  const activeNavTab: "home" | "movies" | "tv" | "categories" | "downloads" =
-    activeCustomPage === "downloads"
+  const activeNavTab: "home" | "movies" | "tv" | "categories" | "rankings" | "downloads" =
+    activeCustomPage === "rankings"
+      ? "rankings"
+      : activeCustomPage === "downloads"
       ? "downloads"
       : isBrowsingCategories
       ? "categories"
@@ -342,7 +415,9 @@ export default function App() {
     searchQuery,
     page,
     isGlobalSearch,
-    isGlobalSearch ? installedProviders.map((p) => p.value) : [activeProvider?.value || "hdhub4u"],
+    isGlobalSearch
+      ? (allProviders.length > 0 ? allProviders.map((p) => p.value) : installedProviders.map((p) => p.value))
+      : [activeProvider?.value || "hdhub4u"],
     allProviders
   );
 
@@ -600,10 +675,50 @@ export default function App() {
     setLoadingStreams(true);
 
     try {
-      let meta: MediaDetails | null = null;
-      if (post.link) {
+      let activeLink = post.link;
+      const isDirectIdOrTitle =
+        !activeLink ||
+        activeLink.startsWith("tt") ||
+        (!activeLink.startsWith("http") && !activeLink.startsWith("/"));
+
+      if (isDirectIdOrTitle) {
         try {
-          meta = await api.getMeta(targetProviderKey, post.link);
+          const cleanTitle = post.title.replace(/\s*\(\d{4}\)$/, "").trim();
+          const searchResults = await api.search(targetProviderKey, cleanTitle);
+          if (searchResults && searchResults.length > 0) {
+            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const targetNorm = normalize(cleanTitle);
+
+            // Verify title match so an unrelated search result is never opened
+            const match = searchResults.find((r) => {
+              const rNorm = normalize(r.title);
+              return (
+                rNorm === targetNorm ||
+                rNorm.startsWith(targetNorm) ||
+                targetNorm.startsWith(rNorm) ||
+                rNorm.includes(targetNorm) ||
+                targetNorm.includes(rNorm)
+              );
+            });
+
+            if (match) {
+              activeLink = match.link;
+              setSelectedPost((prev) =>
+                prev ? { ...prev, link: activeLink, provider: targetProviderKey } : prev
+              );
+            } else {
+              console.log(`[Cinema] No match found for "${cleanTitle}" on ${targetProviderKey}`);
+            }
+          }
+        } catch (err) {
+          console.warn("Auto-search on active provider failed:", err);
+        }
+      }
+
+      let meta: MediaDetails | null = null;
+      if (activeLink && (activeLink.startsWith("http") || activeLink.startsWith("/"))) {
+        try {
+          meta = await api.getMeta(targetProviderKey, activeLink);
         } catch (e) {
           console.warn("Direct getMeta failed:", e);
         }
@@ -614,8 +729,8 @@ export default function App() {
 
       // If no release list exists (e.g. embed/single stream provider like AutoEmbed, KissKh), resolve direct stream
       if (!meta?.linkList || meta.linkList.length === 0) {
-        if (post.link) {
-          const resolved = await api.getStreams(targetProviderKey, post.link, meta?.type || "movie");
+        if (activeLink && (activeLink.startsWith("http") || activeLink.startsWith("/"))) {
+          const resolved = await api.getStreams(targetProviderKey, activeLink, meta?.type || "movie");
           setStreams(Array.isArray(resolved) ? resolved : []);
         }
       }
@@ -906,11 +1021,19 @@ export default function App() {
     }
   };
 
-  // Handle Navbar and Footer Links (Home, Movies, TV Shows, Categories, Downloads, Legal)
+  // Handle Navbar and Footer Links (Home, Movies, TV Shows, Categories, Downloads, Legal, Rankings)
   const handleSelectCategoryNav = (
-    type: "home" | "movies" | "tv" | "categories" | "downloads" | "terms" | "privacy" | "disclaimer"
+    type: "home" | "movies" | "tv" | "categories" | "rankings" | "letterboxd" | "imdb" | "downloads" | "terms" | "privacy" | "disclaimer"
   ) => {
-    if (type === "downloads" || type === "terms" || type === "privacy" || type === "disclaimer") {
+    if (
+      type === "downloads" ||
+      type === "terms" ||
+      type === "privacy" ||
+      type === "disclaimer" ||
+      type === "rankings" ||
+      type === "letterboxd" ||
+      type === "imdb"
+    ) {
       setActiveCustomPage(type);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -1010,7 +1133,15 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={(q) => {
           setSearchQuery(q);
-          setIsBrowsingCategories(false);
+          if (q.trim()) {
+            setActiveCustomPage(null);
+            setIsBrowsingCategories(false);
+            setViewAllCategory(null);
+            setSelectedCategoryId(null);
+            setSelectedGenreCategory(null);
+            setSelectedProviderGenre(null);
+            setIsMergedFilter(false);
+          }
           setPage(1);
         }}
         isGlobalSearch={isGlobalSearch}
@@ -1024,16 +1155,8 @@ export default function App() {
       />
 
       {/* 2. MAIN CONTENT AREA */}
-      {activeCustomPage === "downloads" ? (
-        <DownloadPage onBack={handleBackToHome} />
-      ) : activeCustomPage === "terms" ? (
-        <TermsPage onBack={handleBackToHome} />
-      ) : activeCustomPage === "privacy" ? (
-        <PrivacyPage onBack={handleBackToHome} />
-      ) : activeCustomPage === "disclaimer" ? (
-        <DisclaimerPage onBack={handleBackToHome} />
-      ) : searchQuery ? (
-        /* A. SEARCH RESULTS VIEW (with Niche Dropdown, Pagination & Back Button) */
+      {searchQuery ? (
+        /* A. SEARCH RESULTS VIEW (with Niche Dropdown, Pagination & Back Button) - Evaluated first so search works across all pages */
         <div className="cinema-subpage-container" style={{ width: "100%", paddingTop: "64px" }}>
           <div
             className="catalog-filter-container"
@@ -1080,12 +1203,45 @@ export default function App() {
             onBack={handleBackToHome}
             isGlobalSearch={isGlobalSearch}
             isStreaming={isStreaming}
+            onToggleGlobalSearch={() => setIsGlobalSearch(true)}
           />
         </div>
+      ) : activeCustomPage === "rankings" ? (
+        <RankingsHubPage
+          onSelectPost={handleSelectPost}
+          onBack={handleBackToHome}
+          activeProviderKey={activeProvider?.value}
+          pageMode="top250"
+        />
+      ) : activeCustomPage === "letterboxd" ? (
+        <RankingsHubPage
+          onSelectPost={handleSelectPost}
+          onBack={handleBackToHome}
+          activeProviderKey={activeProvider?.value}
+          pageMode="letterboxd"
+        />
+      ) : activeCustomPage === "imdb" ? (
+        <RankingsHubPage
+          onSelectPost={handleSelectPost}
+          onBack={handleBackToHome}
+          activeProviderKey={activeProvider?.value}
+          pageMode="imdb"
+        />
+      ) : activeCustomPage === "downloads" ? (
+        <DownloadPage onBack={handleBackToHome} />
+      ) : activeCustomPage === "terms" ? (
+        <TermsPage onBack={handleBackToHome} />
+      ) : activeCustomPage === "privacy" ? (
+        <PrivacyPage onBack={handleBackToHome} />
+      ) : activeCustomPage === "disclaimer" ? (
+        <DisclaimerPage onBack={handleBackToHome} />
       ) : isBrowsingCategories ? (
         /* B. BROWSE BY CATEGORY PAGE (Vibrant colorful category cards matching reference) */
         <div className="cinema-subpage-container" style={{ width: "100%", paddingTop: "64px" }}>
-          <BrowseCategoriesGrid onSelectCategory={handleSelectCategory} />
+          <BrowseCategoriesGrid
+            onSelectCategory={handleSelectCategory}
+            onOpenRankings={() => handleSelectCategoryNav("rankings")}
+          />
         </div>
       ) : viewAllCategory ? (
         /* C. DEDICATED VIEW ALL CATEGORY PAGE (with Cinema Niche Dropdown + 30+ titles Grid & Pagination) */
@@ -1131,6 +1287,7 @@ export default function App() {
             showBack={true}
             onBack={handleBackToHome}
             isStreaming={isStreaming}
+            onToggleGlobalSearch={() => setIsGlobalSearch(true)}
           />
         </div>
       ) : (
@@ -1141,6 +1298,7 @@ export default function App() {
             <div style={{ marginTop: "-64px" }}>
               <HeroSpotlight
                 post={heroPost}
+                candidatePosts={posts.slice(0, 8)}
                 provider={activeProvider}
                 onStream={handleSelectPost}
                 onDownload={handleSelectPost}
@@ -1172,6 +1330,8 @@ export default function App() {
               onSelectGenreCategory={handleSelectGenreCategory}
               onSelectProviderGenre={handleSelectProviderGenre}
               onToggleMerge={handleToggleMerge}
+              onOpenLetterboxd={() => handleSelectCategoryNav("letterboxd")}
+              onOpenImdb={() => handleSelectCategoryNav("imdb")}
             />
           </div>
 
@@ -1335,18 +1495,18 @@ export default function App() {
 
       {/* 4. Mobile Bottom Nav */}
       <BottomNav
-        activeTab={mobileTab}
+        activeTab={settingsModalOpen ? "extensions" : activeNavTab}
         onTabChange={(tab) => {
           setMobileTab(tab);
           if (tab === "home") {
             handleBackToHome();
-          } else if (tab === "search") {
-            const inputs = document.querySelectorAll("input");
-            const mobileInput = inputs[inputs.length - 1] as HTMLInputElement;
-            if (mobileInput) {
-              mobileInput.focus();
-            }
-          } else if (tab === "extensions" || tab === "settings") {
+          } else if (tab === "movies") {
+            handleSelectCategoryNav("movies");
+          } else if (tab === "tv") {
+            handleSelectCategoryNav("tv");
+          } else if (tab === "categories") {
+            handleSelectCategoryNav("categories");
+          } else if (tab === "extensions") {
             setSettingsModalOpen(true);
           }
         }}
@@ -1365,7 +1525,12 @@ export default function App() {
           providers={installedProviders}
           onSelectProvider={(p) => {
             handleSelectProvider(p);
-            handleCloseDetails();
+            if (selectedPost) {
+              const updated = { ...selectedPost, provider: p.value };
+              handleSelectPost(updated, true);
+            } else {
+              handleCloseDetails();
+            }
           }}
           searchQuery={searchQuery}
           onSearchChange={(q) => {
@@ -1390,6 +1555,51 @@ export default function App() {
           onPlayExternal={handlePlayExternal}
           onSelectRecommended={(p) => handleSelectPost(p)}
           onSelectPerson={handleOpenPerson}
+          onSearchGlobal={(title) => {
+            const rawTitle = title || selectedPost?.title || details?.title || "";
+            const clean = cleanSearchQuery(rawTitle);
+            const q = clean || rawTitle.trim();
+            if (!q) return;
+
+            detailsHistoryStackRef.current = [];
+            setSelectedPost(null);
+            setDetails(null);
+            setStreams([]);
+            clearOverlayState();
+            document.body.style.overflow = "";
+
+            setActiveCustomPage(null);
+            setIsBrowsingCategories(false);
+            setViewAllCategory(null);
+            setSelectedCategoryId(null);
+            setSelectedGenreCategory(null);
+            setSelectedProviderGenre(null);
+            setIsMergedFilter(false);
+            setIsGlobalSearch(true);
+            setSearchQuery(q);
+            setPage(1);
+
+            // Directly save to session storage navigation state so popstate / back doesn't revert to blank home
+            saveNavigationState({
+              activeProviderValue: activeProvider?.value,
+              activeFilter: "",
+              searchQuery: q,
+              isGlobalSearch: true,
+              page: 1,
+              selectedPost: null,
+              details: null,
+              streams: [],
+              playbackUrl: null,
+              activeNavTab: "home",
+              activeCustomPage: null,
+              isBrowsingCategories: false,
+              viewAllCategory: null,
+              selectedNicheId: null,
+            });
+
+            const newUrl = `${window.location.pathname}?q=${encodeURIComponent(q)}&global=1`;
+            window.history.replaceState({ q, global: "1" }, "", newUrl);
+          }}
         />
       )}
 

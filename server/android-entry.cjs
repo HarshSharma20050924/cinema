@@ -84,6 +84,12 @@ const LOCAL_PROVIDERS = {
     meta:    require('./providers/olamovies/meta.cjs'),
     stream:  require('./providers/olamovies/stream.cjs'),
   },
+  tpb: {
+    catalog: require('./providers/tpb/catalog.cjs'),
+    posts:   require('./providers/tpb/posts.cjs'),
+    meta:    require('./providers/tpb/meta.cjs'),
+    stream:  require('./providers/tpb/stream.cjs'),
+  },
 };
 
 let currentTunnelUrl = '';
@@ -253,10 +259,20 @@ app.get('/api/providers', async (req, res) => {
       name: 'OlaMovies',
       value: 'olamovies',
       version: '1.0',
-      icon: 'https://v6.olamovies.mov/apple-touch-icon.png',
+      icon: '/icons/olamovies.svg',
       type: 'hindi',
       disabled: false,
       description: 'Highest Quality 4K UHD, 1080p Movies & Series',
+    });
+
+    providers.push({
+      name: 'ThePirateBay',
+      value: 'tpb',
+      version: '1.0',
+      icon: '/icons/tpb.svg',
+      type: 'global',
+      disabled: false,
+      description: 'The Pirate Bay (Movies & TV Series)',
     });
 
     res.json(providers);
@@ -772,6 +788,50 @@ app.get('/api/download', async (req, res) => {
   } catch (err) {
     log('Download proxy failed:', err.message);
     res.status(500).send(`Download failed: ${err.message}`);
+  }
+});
+
+// 9. Torrent Stream Route
+app.get('/api/stream/torrent', async (req, res) => {
+  const hash = req.query.hash || req.query.infoHash;
+  const name = req.query.name || '';
+  if (!hash) return res.status(400).send('infoHash parameter required');
+  try {
+    const torrentService = require('./services/torrentService.cjs');
+    await torrentService.handleStream(req, res, hash, name);
+  } catch (err) {
+    res.status(500).send(`Torrent stream error: ${err.message}`);
+  }
+});
+
+// 10. Torrent Download Route
+app.get('/api/torrent/download', async (req, res) => {
+  const hash = req.query.hash || req.query.infoHash;
+  const name = req.query.name || '';
+  if (!hash) return res.status(400).send('infoHash parameter required');
+  try {
+    const torrentService = require('./services/torrentService.cjs');
+    await torrentService.handleDownload(req, res, hash, name);
+  } catch (err) {
+    res.status(500).send(`Torrent download error: ${err.message}`);
+  }
+});
+
+// 11. Play in VLC Route
+app.post('/api/play-vlc', (req, res) => {
+  try {
+    const { playInVlc } = require('./controllers/vlcController.cjs');
+    playInVlc(req, res);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get('/api/play-vlc', (req, res) => {
+  try {
+    const { playInVlc } = require('./controllers/vlcController.cjs');
+    playInVlc(req, res);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

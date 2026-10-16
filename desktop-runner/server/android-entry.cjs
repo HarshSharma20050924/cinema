@@ -84,6 +84,12 @@ const LOCAL_PROVIDERS = {
     meta:    require('./providers/olamovies/meta.cjs'),
     stream:  require('./providers/olamovies/stream.cjs'),
   },
+  tpb: {
+    catalog: require('./providers/tpb/catalog.cjs'),
+    posts:   require('./providers/tpb/posts.cjs'),
+    meta:    require('./providers/tpb/meta.cjs'),
+    stream:  require('./providers/tpb/stream.cjs'),
+  },
 };
 
 let currentTunnelUrl = '';
@@ -253,10 +259,20 @@ app.get('/api/providers', async (req, res) => {
       name: 'OlaMovies',
       value: 'olamovies',
       version: '1.0',
-      icon: 'https://v6.olamovies.mov/apple-touch-icon.png',
+      icon: '/icons/olamovies.svg',
       type: 'hindi',
       disabled: false,
       description: 'Highest Quality 4K UHD, 1080p Movies & Series',
+    });
+
+    providers.push({
+      name: 'ThePirateBay',
+      value: 'tpb',
+      version: '1.0',
+      icon: '/icons/tpb.svg',
+      type: 'global',
+      disabled: false,
+      description: 'The Pirate Bay (Movies & TV Series)',
     });
 
     res.json(providers);

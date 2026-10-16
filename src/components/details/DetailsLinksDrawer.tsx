@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { PlayIcon, DownloadIcon, FilmIcon, SearchIcon, LoaderIcon } from "../../icons";
 import { isValidStreamUrl, isLandingPageUrl, isDirectMediaUrl } from "./linkHelpers";
-import type { StreamItem, ExternalPlayerType } from "../../types";
+import { getSeasonDisplayInfo } from "../../utils/seasonUtils";
+import { SeasonDropdown } from "./SeasonDropdown";
+import type { StreamItem, ExternalPlayerType, Provider } from "../../types";
 
 export interface DetailsLinksDrawerProps {
   activeTab: "stream" | "download" | null;
@@ -20,6 +22,7 @@ export interface DetailsLinksDrawerProps {
   targetProviderKey: string;
   displayTitle: string;
   resolvingKey: string | null;
+  streamingKey?: string | null;
   downloadingKey: string | null;
   resolvingKeys: Record<string, boolean>;
   releaseServers: Record<string, StreamItem[]>;
@@ -37,6 +40,8 @@ export interface DetailsLinksDrawerProps {
   onPlayExternal?: (url: string, player: ExternalPlayerType) => void;
   onSearchGlobal?: (title: string) => void;
   onCloseModal?: () => void;
+  providers?: Provider[];
+  onSelectProvider?: (provider: Provider) => void;
 }
 
 export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
@@ -56,6 +61,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
   targetProviderKey,
   displayTitle,
   resolvingKey,
+  streamingKey,
   downloadingKey,
   resolvingKeys,
   releaseServers,
@@ -67,8 +73,34 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
   onFetchServersForLink,
   onSearchGlobal,
   onCloseModal,
+  providers,
+  onSelectProvider,
 }) => {
   const [showSlowLoadHint, setShowSlowLoadHint] = useState(false);
+  const [activeDirectActionKey, setActiveDirectActionKey] = useState<string | null>(null);
+  const [releasePage, setReleasePage] = useState(1);
+  const RELEASES_PER_PAGE = 8;
+  const [episodePage, setEpisodePage] = useState(1);
+  const EPISODES_PER_PAGE = 20;
+
+  useEffect(() => {
+    setReleasePage(1);
+  }, [displayTitle, linkList.length]);
+
+  useEffect(() => {
+    setEpisodePage(1);
+  }, [displayTitle, validSeasonIdx, episodes.length]);
+
+  const triggerDirectAction = (key: string, actionFn: () => void) => {
+    setActiveDirectActionKey(key);
+    try {
+      actionFn();
+    } finally {
+      setTimeout(() => {
+        setActiveDirectActionKey((curr) => (curr === key ? null : curr));
+      }, 6500);
+    }
+  };
 
   useEffect(() => {
     const isLoading = loadingDetails || (linkList.length === 0 && loadingStreams);
@@ -119,16 +151,18 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
 
       let finalUrl = clean;
       if (clean.startsWith("/")) {
-        const providerDomain =
-          targetProviderKey === "4khdhub"
-            ? "https://4khdhub.dad"
-            : targetProviderKey === "hdhub4u"
-            ? "https://hdhub4u.dad"
-            : targetProviderKey === "movieBoxWeb"
-            ? "https://officialmoviebox.com"
-            : "";
-        if (providerDomain) {
-          finalUrl = `${providerDomain}${clean}`;
+        if (!clean.startsWith("/api/")) {
+          const providerDomain =
+            targetProviderKey === "4khdhub"
+              ? "https://4khdhub.dad"
+              : targetProviderKey === "hdhub4u"
+              ? "https://hdhub4u.dad"
+              : targetProviderKey === "movieBoxWeb"
+              ? "https://officialmoviebox.com"
+              : "";
+          if (providerDomain) {
+            finalUrl = `${providerDomain}${clean}`;
+          }
         }
       }
 
@@ -141,7 +175,9 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
       const host = getCleanDomain(finalUrl).toLowerCase();
 
       if (!serverLabel || serverLabel === "Primary" || serverLabel.includes("Primary Hoster") || serverLabel.includes("Page Link") || serverLabel.startsWith("Server ")) {
-        if (finalUrl.includes("cloudflarestorage")) serverLabel = "CF Storage";
+        if (finalUrl.includes("/api/torrent/download")) serverLabel = "Cinema Direct Download";
+        else if (finalUrl.includes("/api/stream/torrent")) serverLabel = "Cinema Fast Stream";
+        else if (finalUrl.includes("cloudflarestorage")) serverLabel = "CF Storage";
         else if (finalUrl.includes("pixeldrain")) serverLabel = "Pixeldrain";
         else if (finalUrl.includes(".dev/") || finalUrl.includes(".buzz") || finalUrl.includes("workers.dev")) serverLabel = "CF Worker";
         else if (finalUrl.includes("storage.googleapis.com") || finalUrl.includes("googleusercontent")) serverLabel = "GDrive (download only)";
@@ -149,7 +185,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
         else if (finalUrl.includes("r2.dev") || finalUrl.includes("hubcdn")) serverLabel = "HubCDN";
         else if (finalUrl.includes("gofile.io")) serverLabel = "Gofile Direct";
         else if (host.includes("moviebox") || host.includes("hakunaymatata") || host.includes("aoneroom")) serverLabel = "MovieBox Server";
-        else if (finalUrl.startsWith("magnet:")) serverLabel = "Torrent";
+        else if (finalUrl.startsWith("magnet:")) serverLabel = "Torrent Magnet";
         else if (isDirectMediaUrl(finalUrl)) serverLabel = "Direct Mirror";
         else serverLabel = `Mirror ${result.length + 1}`;
       }
@@ -336,41 +372,130 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                   )}
                 </div>
 
-                {/* Season Dropdown */}
-                {linkList.length > 1 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <label htmlFor="season-group-select" style={{ fontSize: "12px", fontWeight: 700, color: "#94a3b8" }}>
-                      Season:
-                    </label>
-                    <select
-                      id="season-group-select"
-                      value={validSeasonIdx}
-                      onChange={(e) => onSelectSeasonIdx(Number(e.target.value))}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "8px",
-                        background: "#121722",
-                        color: "#ffffff",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        outline: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {linkList.map((season, sIdx) => (
-                        <option key={sIdx} value={sIdx} style={{ background: "#0c1017", color: "#ffffff" }}>
-                          {season.title || `Season ${season.season || sIdx + 1}`} ({season.directLinks?.length || 0} Eps)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {/* Custom Season Dropdown */}
+                <SeasonDropdown
+                  linkList={linkList}
+                  validSeasonIdx={validSeasonIdx}
+                  onSelectSeasonIdx={onSelectSeasonIdx}
+                  activeSeason={activeSeason}
+                />
               </div>
 
-              {/* Episodes List */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "380px", overflowY: "auto" }}>
-                {episodes.map((ep, epIdx) => {
+              {/* Audio / Language Dub Selector Pills for Multi-Dub Series */}
+              {(() => {
+                const dubMap = new Map<string, number[]>();
+                linkList.forEach((item, idx) => {
+                  const info = getSeasonDisplayInfo(item, idx);
+                  if (info.dub) {
+                    if (!dubMap.has(info.dub)) dubMap.set(info.dub, []);
+                    dubMap.get(info.dub)!.push(idx);
+                  }
+                });
+
+                const availableDubs = Array.from(dubMap.keys());
+                if (availableDubs.length <= 1) return null;
+
+                const currentInfo = getSeasonDisplayInfo(activeSeason, validSeasonIdx);
+                const currentDub = currentInfo.dub;
+                const currentSeasonNum = currentInfo.seasonNum;
+
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", padding: "4px 0" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#94a3b8" }}>Audio Track:</span>
+                    {availableDubs.map((dubName) => {
+                      const isSelected = currentDub.toLowerCase() === dubName.toLowerCase();
+                      return (
+                        <button
+                          key={dubName}
+                          type="button"
+                          onClick={() => {
+                            const indices = dubMap.get(dubName) || [];
+                            // Try to find matching season number in this dub
+                            const matchingSeasonIdx = indices.find((idx) => {
+                              const info = getSeasonDisplayInfo(linkList[idx], idx);
+                              return info.seasonNum === currentSeasonNum;
+                            });
+                            const targetIdx = matchingSeasonIdx !== undefined ? matchingSeasonIdx : indices[0];
+                            if (targetIdx !== undefined) {
+                              onSelectSeasonIdx(targetIdx);
+                            }
+                          }}
+                          style={{
+                            padding: "4px 14px",
+                            borderRadius: "999px",
+                            background: isSelected ? "#e50914" : "rgba(14, 14, 14, 0.8)",
+                            color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.75)",
+                            fontSize: "12px",
+                            fontWeight: isSelected ? 800 : 600,
+                            border: isSelected ? "1px solid #ff2b38" : "1px solid rgba(255, 255, 255, 0.12)",
+                            boxShadow: isSelected ? "0 4px 14px rgba(229, 9, 20, 0.45)" : "none",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          {dubName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {/* Episodes List & Pagination */}
+              {(() => {
+                const totalEpPages = Math.ceil(episodes.length / EPISODES_PER_PAGE);
+                const startEpIdx = (episodePage - 1) * EPISODES_PER_PAGE;
+                const currentEpisodes = episodes.length > EPISODES_PER_PAGE
+                  ? episodes.slice(startEpIdx, startEpIdx + EPISODES_PER_PAGE)
+                  : episodes;
+
+                return (
+                  <>
+                    {totalEpPages > 1 && (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>
+                          Episodes ({episodes.length}) · Page {episodePage} of {totalEpPages}
+                        </span>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            onClick={() => setEpisodePage((p) => Math.max(1, p - 1))}
+                            disabled={episodePage === 1}
+                            style={{
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              background: episodePage === 1 ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.12)",
+                              color: episodePage === 1 ? "#475569" : "#ffffff",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              cursor: episodePage === 1 ? "not-allowed" : "pointer",
+                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                            }}
+                          >
+                            ← Prev
+                          </button>
+                          <button
+                            onClick={() => setEpisodePage((p) => Math.min(totalEpPages, p + 1))}
+                            disabled={episodePage === totalEpPages}
+                            style={{
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              background: episodePage === totalEpPages ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.12)",
+                              color: episodePage === totalEpPages ? "#475569" : "#ffffff",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              cursor: episodePage === totalEpPages ? "not-allowed" : "pointer",
+                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                            }}
+                          >
+                            Next →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "380px", overflowY: "auto" }}>
+                      {currentEpisodes.map((ep, relIdx) => {
+                        const epIdx = episodes.length > EPISODES_PER_PAGE ? startEpIdx + relIdx : relIdx;
                   const epKey = `ep-${activeSeason?.title || "ep"}-${ep.title}-${epIdx}`;
                   const isResolving = resolvingKey === epKey;
                   const availableServers = (ep.servers && ep.servers.length > 0) ? ep.servers : releaseServers[epKey];
@@ -396,23 +521,34 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                           {activeTab === "stream" ? (
                             <button
                               onClick={() => onPlayRelease(epKey, ep.link)}
-                              disabled={isResolving}
+                              disabled={isResolving || streamingKey === epKey}
                               style={{
                                 padding: "6px 16px",
                                 borderRadius: "8px",
-                                background: "#e50914",
+                                background: (streamingKey === epKey || (isResolving && resolvingKey === epKey)) ? "#b91c1c" : "#e50914",
                                 color: "#fff",
                                 fontSize: "12px",
                                 fontWeight: 700,
-                                cursor: isResolving ? "wait" : "pointer",
+                                cursor: (isResolving || streamingKey === epKey) ? "wait" : "pointer",
                                 border: "none",
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "6px",
+                                opacity: (streamingKey === epKey || (isResolving && resolvingKey === epKey)) ? 0.85 : 1,
+                                transition: "all 0.15s ease",
                               }}
                             >
-                              <PlayIcon size={12} fill="#fff" />
-                              <span>Stream</span>
+                              {streamingKey === epKey || (isResolving && resolvingKey === epKey) ? (
+                                <>
+                                  <LoaderIcon size={12} color="#ffffff" />
+                                  <span>Loading Stream...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <PlayIcon size={12} fill="#fff" />
+                                  <span>Stream</span>
+                                </>
+                              )}
                             </button>
                           ) : (
                             <button
@@ -431,12 +567,13 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                 alignItems: "center",
                                 gap: "6px",
                                 opacity: downloadingKey === epKey ? 0.85 : 1,
+                                transition: "all 0.15s ease",
                               }}
                             >
                               {downloadingKey === epKey ? (
                                 <>
                                   <LoaderIcon size={12} color="#ffffff" />
-                                  <span>Preparing...</span>
+                                  <span>Preparing Download...</span>
                                 </>
                               ) : (
                                 <>
@@ -447,7 +584,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                             </button>
                           )}
 
-                          {activeTab === "download" && (
+                          {(activeTab === "stream" || activeTab === "download") && (
                             <button
                               onClick={async () => {
                                 onOpenMoreLinks({
@@ -455,8 +592,9 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                   subtitle: `${ep.title || `Episode ${epIdx + 1}`}`,
                                   links: [],
                                   loading: true,
+                                  mode: activeTab,
                                 });
-                                const sList = await onFetchServersForLink(epKey, ep.link, true);
+                                const sList = await onFetchServersForLink(epKey, ep.link, activeTab === "download");
                                 const epLinks = extractAllMirrorsForItem(
                                   `${displayTitle} - ${ep.title || `Episode ${epIdx + 1}`}`,
                                   ep.link,
@@ -468,6 +606,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                   subtitle: `${ep.title || `Episode ${epIdx + 1}`}`,
                                   links: epLinks,
                                   loading: false,
+                                  mode: activeTab,
                                 });
                               }}
                               style={{
@@ -492,9 +631,13 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
                                 e.currentTarget.style.color = "#cbd5e1";
                               }}
-                              title="Get download servers for this episode"
+                              title={activeTab === "stream" ? "Get more stream mirrors for this episode" : "Get download servers for this episode"}
                             >
-                              <DownloadIcon size={12} color="#93c5fd" />
+                              {activeTab === "stream" ? (
+                                <PlayIcon size={12} color="#f87171" fill="#f87171" />
+                              ) : (
+                                <DownloadIcon size={12} color="#93c5fd" />
+                              )}
                               <span>More Links</span>
                             </button>
                           )}
@@ -505,39 +648,62 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                         <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8" }}>Mirrors:</span>
                         {availableServers && availableServers.length > 0 ? (
-                          availableServers.map((s: StreamItem, sIdx: number) => (
-                            <button
-                              key={sIdx}
-                              onClick={() => {
-                                if (activeTab === "stream") {
-                                  onPlayStream(s.link, `${displayTitle} - ${ep.title} (${s.server || "Stream"})`);
-                                } else {
-                                  onDownloadDirectUrl(s.link, s.server, ep.title);
-                                }
-                              }}
-                              style={{
-                                padding: "5px 12px",
-                                borderRadius: "7px",
-                                background: "rgba(255, 255, 255, 0.08)",
-                                color: "#cbd5e1",
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                border: "1px solid rgba(255, 255, 255, 0.12)",
-                                transition: "all 0.15s ease",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = activeTab === "download" ? "#2563eb" : "#e50914";
-                                e.currentTarget.style.color = "#ffffff";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                                e.currentTarget.style.color = "#cbd5e1";
-                              }}
-                            >
-                              {s.server}
-                            </button>
-                          ))
+                          availableServers.map((s: StreamItem, sIdx: number) => {
+                            const mKey = `ep_mirror_${epKey}_${sIdx}`;
+                            const isPending = activeDirectActionKey === mKey;
+                            return (
+                              <button
+                                key={sIdx}
+                                disabled={isPending}
+                                onClick={() => {
+                                  triggerDirectAction(mKey, () => {
+                                    if (activeTab === "stream") {
+                                      onPlayStream(s.link, `${displayTitle} - ${ep.title} (${s.server || "Stream"})`);
+                                    } else {
+                                      onDownloadDirectUrl(s.link, s.server, ep.title);
+                                    }
+                                  });
+                                }}
+                                style={{
+                                  padding: "5px 12px",
+                                  borderRadius: "7px",
+                                  background: isPending
+                                    ? (activeTab === "download" ? "#1d4ed8" : "#b91c1c")
+                                    : "rgba(255, 255, 255, 0.08)",
+                                  color: "#ffffff",
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  cursor: isPending ? "wait" : "pointer",
+                                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "5px",
+                                  transition: "all 0.15s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isPending) {
+                                    e.currentTarget.style.background = activeTab === "download" ? "#2563eb" : "#e50914";
+                                    e.currentTarget.style.color = "#ffffff";
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isPending) {
+                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                                    e.currentTarget.style.color = "#cbd5e1";
+                                  }
+                                }}
+                              >
+                                {isPending ? (
+                                  <>
+                                    <LoaderIcon size={11} color="#ffffff" />
+                                    <span>{activeTab === "stream" ? "Loading..." : "Preparing..."}</span>
+                                  </>
+                                ) : (
+                                  s.server
+                                )}
+                              </button>
+                            );
+                          })
                         ) : isResolving ? (
                           <span style={{ fontSize: "11px", color: "#94a3b8" }}>Searching mirrors...</span>
                         ) : (
@@ -562,7 +728,10 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                   );
                 })}
               </div>
-            </div>
+            </>
+          );
+        })()}
+      </div>
           )}
 
           {/* 2. Complete Season Packs */}
@@ -629,23 +798,34 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                           {activeTab === "stream" ? (
                             <button
                               onClick={() => onPlayRelease(pKey, primaryLink)}
-                              disabled={isResolving}
+                              disabled={isResolving || streamingKey === pKey}
                               style={{
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "7px",
                                 padding: "8px 20px",
                                 borderRadius: "10px",
-                                background: "#e50914",
+                                background: (streamingKey === pKey || (isResolving && resolvingKey === pKey)) ? "#b91c1c" : "#e50914",
                                 color: "#ffffff",
                                 fontSize: "13px",
                                 fontWeight: 700,
-                                cursor: isResolving ? "wait" : "pointer",
+                                cursor: (isResolving || streamingKey === pKey) ? "wait" : "pointer",
                                 border: "none",
+                                opacity: (streamingKey === pKey || (isResolving && resolvingKey === pKey)) ? 0.85 : 1,
+                                transition: "all 0.15s ease",
                               }}
                             >
-                              <PlayIcon size={13} fill="#fff" />
-                              <span>Stream</span>
+                              {streamingKey === pKey || (isResolving && resolvingKey === pKey) ? (
+                                <>
+                                  <LoaderIcon size={13} color="#ffffff" />
+                                  <span>Loading Stream...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <PlayIcon size={13} fill="#fff" />
+                                  <span>Stream</span>
+                                </>
+                              )}
                             </button>
                           ) : (
                             <button
@@ -663,12 +843,14 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                 fontWeight: 700,
                                 cursor: isResolving || downloadingKey === pKey ? "wait" : "pointer",
                                 border: "none",
+                                opacity: downloadingKey === pKey ? 0.85 : 1,
+                                transition: "all 0.15s ease",
                               }}
                             >
                               {downloadingKey === pKey ? (
                                 <>
                                   <LoaderIcon size={13} color="#ffffff" />
-                                  <span>Resolving...</span>
+                                  <span>Preparing Download...</span>
                                 </>
                               ) : (
                                 <>
@@ -679,7 +861,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                             </button>
                           )}
 
-                          {activeTab === "download" && (
+                          {(activeTab === "stream" || activeTab === "download") && (
                             <button
                               onClick={async () => {
                                 onOpenMoreLinks({
@@ -687,8 +869,9 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                   subtitle: `${pack.title || "Season Pack"}`,
                                   links: [],
                                   loading: true,
+                                  mode: activeTab,
                                 });
-                                const sList = await onFetchServersForLink(pKey, primaryLink, true);
+                                const sList = await onFetchServersForLink(pKey, primaryLink, activeTab === "download");
                                 const packLinks = extractAllMirrorsForItem(
                                   `${displayTitle} - ${pack.title || "Season Pack"}`,
                                   primaryLink,
@@ -700,6 +883,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                   subtitle: `${pack.title || "Season Pack"}`,
                                   links: packLinks,
                                   loading: false,
+                                  mode: activeTab,
                                 });
                               }}
                               style={{
@@ -715,8 +899,13 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                 cursor: "pointer",
                                 border: "1px solid rgba(255, 255, 255, 0.14)",
                               }}
+                              title={activeTab === "stream" ? "Get more stream mirrors for this pack" : "Get download servers for this pack"}
                             >
-                              <DownloadIcon size={13} color="#93c5fd" />
+                              {activeTab === "stream" ? (
+                                <PlayIcon size={13} color="#f87171" fill="#f87171" />
+                              ) : (
+                                <DownloadIcon size={13} color="#93c5fd" />
+                              )}
                               <span>More Links</span>
                             </button>
                           )}
@@ -727,30 +916,50 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
                         <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8" }}>Mirrors:</span>
                         {servers && servers.length > 0 ? (
-                          servers.map((s, sIdx) => (
-                            <button
-                              key={sIdx}
-                              onClick={() => {
-                                if (activeTab === "stream") {
-                                  onPlayStream(s.link, `${displayTitle} - ${pack.seasonName || pack.title} (${s.server || "Stream"})`);
-                                } else {
-                                  onDownloadDirectUrl(s.link, s.server, pack.quality || pack.title);
-                                }
-                              }}
-                              style={{
-                                padding: "5px 12px",
-                                borderRadius: "7px",
-                                background: "rgba(255, 255, 255, 0.08)",
-                                color: "#cbd5e1",
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                border: "1px solid rgba(255, 255, 255, 0.12)",
-                              }}
-                            >
-                              {s.server}
-                            </button>
-                          ))
+                          servers.map((s, sIdx) => {
+                            const mKey = `pack_mirror_${pKey}_${sIdx}`;
+                            const isPending = activeDirectActionKey === mKey;
+                            return (
+                              <button
+                                key={sIdx}
+                                disabled={isPending}
+                                onClick={() => {
+                                  triggerDirectAction(mKey, () => {
+                                    if (activeTab === "stream") {
+                                      onPlayStream(s.link, `${displayTitle} - ${pack.seasonName || pack.title} (${s.server || "Stream"})`);
+                                    } else {
+                                      onDownloadDirectUrl(s.link, s.server, pack.quality || pack.title);
+                                    }
+                                  });
+                                }}
+                                style={{
+                                  padding: "5px 12px",
+                                  borderRadius: "7px",
+                                  background: isPending
+                                    ? (activeTab === "download" ? "#1d4ed8" : "#b91c1c")
+                                    : "rgba(255, 255, 255, 0.08)",
+                                  color: "#cbd5e1",
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  cursor: isPending ? "wait" : "pointer",
+                                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "5px",
+                                  transition: "all 0.15s ease",
+                                }}
+                              >
+                                {isPending ? (
+                                  <>
+                                    <LoaderIcon size={11} color="#ffffff" />
+                                    <span>{activeTab === "stream" ? "Loading..." : "Preparing..."}</span>
+                                  </>
+                                ) : (
+                                  s.server
+                                )}
+                              </button>
+                            );
+                          })
                         ) : isResolving ? (
                           <span style={{ fontSize: "11px", color: "#94a3b8" }}>Searching mirrors...</span>
                         ) : (
@@ -780,11 +989,89 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
         </div>
       )}
 
-      {/* Movie Releases List with Instant Filled Mirrors */}
-      {!loadingDetails && !isSeries && linkList.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {linkList.map((rel, relIdx) => {
-            const relKey = `rel-${rel.title}-${relIdx}`;
+      {/* Movie Releases List with Instant Filled Mirrors & Pagination */}
+      {!loadingDetails && !isSeries && linkList.length > 0 && (() => {
+        const totalReleasePages = Math.ceil(linkList.length / RELEASES_PER_PAGE);
+        const startIndex = (releasePage - 1) * RELEASES_PER_PAGE;
+        const currentReleases = linkList.slice(startIndex, startIndex + RELEASES_PER_PAGE);
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {/* Top Pagination & Stats Bar */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 14px",
+                background: "rgba(255, 255, 255, 0.04)",
+                borderRadius: "10px",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                flexWrap: "wrap",
+                gap: "8px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "#ffffff" }}>
+                  Available Releases ({linkList.length})
+                </span>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    padding: "2px 8px",
+                    borderRadius: "12px",
+                    background: "rgba(37, 99, 235, 0.2)",
+                    color: "#93c5fd",
+                    fontWeight: 600,
+                  }}
+                >
+                  Page {releasePage} of {totalReleasePages || 1}
+                </span>
+              </div>
+
+              {totalReleasePages > 1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <button
+                    onClick={() => setReleasePage((p) => Math.max(1, p - 1))}
+                    disabled={releasePage === 1}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      background: releasePage === 1 ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.12)",
+                      color: releasePage === 1 ? "#475569" : "#ffffff",
+                      fontSize: "11.5px",
+                      fontWeight: 700,
+                      cursor: releasePage === 1 ? "not-allowed" : "pointer",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    ← Prev
+                  </button>
+                  <button
+                    onClick={() => setReleasePage((p) => Math.min(totalReleasePages, p + 1))}
+                    disabled={releasePage === totalReleasePages}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      background: releasePage === totalReleasePages ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.12)",
+                      color: releasePage === totalReleasePages ? "#475569" : "#ffffff",
+                      fontSize: "11.5px",
+                      fontWeight: 700,
+                      cursor: releasePage === totalReleasePages ? "not-allowed" : "pointer",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {currentReleases.map((rel, relIdx) => {
+              const actualIdx = startIndex + relIdx;
+              const relKey = `rel-${rel.title}-${actualIdx}`;
             const isResolving = !!resolvingKeys[relKey] || resolvingKey === relKey;
             const primaryLink = rel.directLinks?.[0]?.link || "";
             const servers = releaseServers[relKey];
@@ -834,27 +1121,41 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                     {activeTab === "stream" ? (
                       <button
                         onClick={() => onPlayRelease(relKey, primaryLink)}
-                        disabled={isResolving}
+                        disabled={isResolving || streamingKey === relKey}
                         style={{
                           display: "flex",
                           alignItems: "center",
                           gap: "7px",
                           padding: "8px 20px",
                           borderRadius: "10px",
-                          background: "#e50914",
+                          background: (streamingKey === relKey || (isResolving && resolvingKey === relKey)) ? "#b91c1c" : "#e50914",
                           color: "#ffffff",
                           fontSize: "13px",
                           fontWeight: 700,
-                          cursor: isResolving ? "wait" : "pointer",
+                          cursor: (isResolving || streamingKey === relKey) ? "wait" : "pointer",
                           border: "none",
                           boxShadow: "0 4px 14px rgba(229, 9, 20, 0.35)",
+                          opacity: (streamingKey === relKey || (isResolving && resolvingKey === relKey)) ? 0.85 : 1,
                           transition: "all 0.2s",
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#f40612")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "#e50914")}
+                        onMouseEnter={(e) => {
+                          if (!isResolving && streamingKey !== relKey) e.currentTarget.style.background = "#f40612";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = (streamingKey === relKey || (isResolving && resolvingKey === relKey)) ? "#b91c1c" : "#e50914";
+                        }}
                       >
-                        <PlayIcon size={13} fill="#fff" />
-                        <span>Stream</span>
+                        {streamingKey === relKey || (isResolving && resolvingKey === relKey) ? (
+                          <>
+                            <LoaderIcon size={13} color="#ffffff" />
+                            <span>Loading Stream...</span>
+                          </>
+                        ) : (
+                          <>
+                            <PlayIcon size={13} fill="#fff" />
+                            <span>Stream</span>
+                          </>
+                        )}
                       </button>
                     ) : (
                       <button
@@ -876,13 +1177,17 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                           transition: "all 0.2s",
                           opacity: downloadingKey === relKey ? 0.85 : 1,
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#1d4ed8")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = downloadingKey === relKey ? "#1d4ed8" : "#2563eb")}
+                        onMouseEnter={(e) => {
+                          if (downloadingKey !== relKey) e.currentTarget.style.background = "#1d4ed8";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = downloadingKey === relKey ? "#1d4ed8" : "#2563eb";
+                        }}
                       >
                         {downloadingKey === relKey ? (
                           <>
                             <LoaderIcon size={13} color="#ffffff" />
-                            <span>Resolving...</span>
+                            <span>Preparing Download...</span>
                           </>
                         ) : (
                           <>
@@ -893,7 +1198,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                       </button>
                     )}
 
-                    {activeTab === "download" && (
+                    {(activeTab === "stream" || activeTab === "download") && (
                       <button
                         onClick={async () => {
                           onOpenMoreLinks({
@@ -901,8 +1206,9 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                             subtitle: `${rel.quality || rel.title}`,
                             links: [],
                             loading: true,
+                            mode: activeTab,
                           });
-                          const sList = await onFetchServersForLink(relKey, primaryLink, true);
+                          const sList = await onFetchServersForLink(relKey, primaryLink, activeTab === "download");
                           const relLinks = extractAllMirrorsForItem(
                             `${displayTitle} - ${rel.quality || rel.title}`,
                             primaryLink,
@@ -914,6 +1220,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                             subtitle: `${rel.quality || rel.title}`,
                             links: relLinks,
                             loading: false,
+                            mode: activeTab,
                           });
                         }}
                         style={{
@@ -938,9 +1245,13 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                           e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
                           e.currentTarget.style.color = "#cbd5e1";
                         }}
-                        title="Get direct download mirrors for this quality"
+                        title={activeTab === "stream" ? "Get more stream mirrors for this quality" : "Get direct download mirrors for this quality"}
                       >
-                        <DownloadIcon size={13} color="#93c5fd" />
+                        {activeTab === "stream" ? (
+                          <PlayIcon size={13} color="#f87171" fill="#f87171" />
+                        ) : (
+                          <DownloadIcon size={13} color="#93c5fd" />
+                        )}
                         <span>More Links</span>
                       </button>
                     )}
@@ -951,39 +1262,62 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8" }}>Mirrors:</span>
                   {servers && servers.length > 0 ? (
-                    servers.map((s, sIdx) => (
-                      <button
-                        key={sIdx}
-                        onClick={() => {
-                          if (activeTab === "stream") {
-                            onPlayStream(s.link, `${displayTitle} - ${rel.title} (${s.server || "Stream"})`);
-                          } else {
-                            onDownloadDirectUrl(s.link, s.server, rel.quality || rel.title);
-                          }
-                        }}
-                        style={{
-                          padding: "5px 12px",
-                          borderRadius: "7px",
-                          background: "rgba(255, 255, 255, 0.08)",
-                          color: "#cbd5e1",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          border: "1px solid rgba(255, 255, 255, 0.12)",
-                          transition: "all 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = activeTab === "download" ? "#2563eb" : "#e50914";
-                          e.currentTarget.style.color = "#ffffff";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                          e.currentTarget.style.color = "#cbd5e1";
-                        }}
-                      >
-                        {s.server}
-                      </button>
-                    ))
+                    servers.map((s, sIdx) => {
+                      const mKey = `movie_mirror_${relKey}_${sIdx}`;
+                      const isPending = activeDirectActionKey === mKey;
+                      return (
+                        <button
+                          key={sIdx}
+                          disabled={isPending}
+                          onClick={() => {
+                            triggerDirectAction(mKey, () => {
+                              if (activeTab === "stream") {
+                                onPlayStream(s.link, `${displayTitle} - ${rel.title} (${s.server || "Stream"})`);
+                              } else {
+                                onDownloadDirectUrl(s.link, s.server, rel.quality || rel.title);
+                              }
+                            });
+                          }}
+                          style={{
+                            padding: "5px 12px",
+                            borderRadius: "7px",
+                            background: isPending
+                              ? (activeTab === "download" ? "#1d4ed8" : "#b91c1c")
+                              : "rgba(255, 255, 255, 0.08)",
+                            color: "#cbd5e1",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            cursor: isPending ? "wait" : "pointer",
+                            border: "1px solid rgba(255, 255, 255, 0.12)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isPending) {
+                              e.currentTarget.style.background = activeTab === "download" ? "#2563eb" : "#e50914";
+                              e.currentTarget.style.color = "#ffffff";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isPending) {
+                              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                              e.currentTarget.style.color = "#cbd5e1";
+                            }
+                          }}
+                        >
+                          {isPending ? (
+                            <>
+                              <LoaderIcon size={11} color="#ffffff" />
+                              <span>{activeTab === "stream" ? "Loading..." : "Preparing..."}</span>
+                            </>
+                          ) : (
+                            s.server
+                          )}
+                        </button>
+                      );
+                    })
                   ) : isResolving ? (
                     <span style={{ fontSize: "11px", color: "#94a3b8" }}>Searching mirrors...</span>
                   ) : (
@@ -1007,8 +1341,92 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
               </div>
             );
           })}
-        </div>
-      )}
+
+          {/* Bottom Numbered Pagination Bar */}
+            {totalReleasePages > 1 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "12px 0 6px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  onClick={() => setReleasePage((p) => Math.max(1, p - 1))}
+                  disabled={releasePage === 1}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    background: releasePage === 1 ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.1)",
+                    color: releasePage === 1 ? "#475569" : "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: releasePage === 1 ? "not-allowed" : "pointer",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                  }}
+                >
+                  ← Previous
+                </button>
+
+                {Array.from({ length: totalReleasePages }).map((_, pIdx) => {
+                  const pNum = pIdx + 1;
+                  if (
+                    pNum === 1 ||
+                    pNum === totalReleasePages ||
+                    (pNum >= releasePage - 1 && pNum <= releasePage + 1)
+                  ) {
+                    const isCurr = pNum === releasePage;
+                    return (
+                      <button
+                        key={pNum}
+                        onClick={() => setReleasePage(pNum)}
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "8px",
+                          background: isCurr ? "#e50914" : "rgba(255, 255, 255, 0.06)",
+                          color: "#ffffff",
+                          fontSize: "12px",
+                          fontWeight: isCurr ? 800 : 600,
+                          cursor: "pointer",
+                          border: isCurr ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
+                          boxShadow: isCurr ? "0 2px 8px rgba(229, 9, 20, 0.4)" : "none",
+                        }}
+                      >
+                        {pNum}
+                      </button>
+                    );
+                  }
+                  if (pNum === releasePage - 2 || pNum === releasePage + 2) {
+                    return <span key={pNum} style={{ color: "#64748b", fontSize: "12px" }}>...</span>;
+                  }
+                  return null;
+                })}
+
+                <button
+                  onClick={() => setReleasePage((p) => Math.min(totalReleasePages, p + 1))}
+                  disabled={releasePage === totalReleasePages}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    background: releasePage === totalReleasePages ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.1)",
+                    color: releasePage === totalReleasePages ? "#475569" : "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: releasePage === totalReleasePages ? "not-allowed" : "pointer",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                  }}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Direct Streams List */}
       {!loadingDetails && !loadingStreams && linkList.length === 0 && streams.length > 0 && (
@@ -1048,35 +1466,73 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
 
               {activeTab === "stream" ? (
                 <button
-                  onClick={() => onPlayStream(s.link, `${displayTitle} (${s.server || "Stream"})`)}
+                  disabled={activeDirectActionKey === `stream_direct_${i}`}
+                  onClick={() => {
+                    triggerDirectAction(`stream_direct_${i}`, () => {
+                      onPlayStream(s.link, `${displayTitle} (${s.server || "Stream"})`);
+                    });
+                  }}
                   style={{
                     padding: "6px 16px",
                     borderRadius: "8px",
-                    background: "#e50914",
+                    background: activeDirectActionKey === `stream_direct_${i}` ? "#b91c1c" : "#e50914",
                     color: "#fff",
                     fontSize: "12px",
                     fontWeight: 700,
-                    cursor: "pointer",
+                    cursor: activeDirectActionKey === `stream_direct_${i}` ? "wait" : "pointer",
                     border: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    opacity: activeDirectActionKey === `stream_direct_${i}` ? 0.85 : 1,
                   }}
                 >
-                  Stream
+                  {activeDirectActionKey === `stream_direct_${i}` ? (
+                    <>
+                      <LoaderIcon size={12} color="#ffffff" />
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlayIcon size={12} fill="#fff" />
+                      <span>Stream</span>
+                    </>
+                  )}
                 </button>
               ) : (
                 <button
-                  onClick={() => onDownloadDirectUrl(s.link, s.server || "Direct Stream", "Stream")}
+                  disabled={activeDirectActionKey === `dl_direct_${i}`}
+                  onClick={() => {
+                    triggerDirectAction(`dl_direct_${i}`, () => {
+                      onDownloadDirectUrl(s.link, s.server || "Direct Stream", "Stream");
+                    });
+                  }}
                   style={{
                     padding: "6px 16px",
                     borderRadius: "8px",
-                    background: "#2563eb",
+                    background: activeDirectActionKey === `dl_direct_${i}` ? "#1d4ed8" : "#2563eb",
                     color: "#fff",
                     fontSize: "12px",
                     fontWeight: 700,
-                    cursor: "pointer",
+                    cursor: activeDirectActionKey === `dl_direct_${i}` ? "wait" : "pointer",
                     border: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    opacity: activeDirectActionKey === `dl_direct_${i}` ? 0.85 : 1,
                   }}
                 >
-                  Download
+                  {activeDirectActionKey === `dl_direct_${i}` ? (
+                    <>
+                      <LoaderIcon size={12} color="#ffffff" />
+                      <span>Preparing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <DownloadIcon size={12} />
+                      <span>Download</span>
+                    </>
+                  )}
                 </button>
               )}
             </div>
@@ -1084,36 +1540,120 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Empty State / Not available on current extension */}
       {!loadingDetails && !loadingStreams && linkList.length === 0 && streams.length === 0 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", padding: "10px 0" }}>
-          <span style={{ fontSize: "13px", color: "#94a3b8" }}>
-            No direct releases found on {targetProviderKey}.
-          </span>
-          {onSearchGlobal && (
-            <button
-              onClick={() => {
-                onSearchGlobal(displayTitle);
-                if (onCloseModal) onCloseModal();
-              }}
+        <div
+          style={{
+            marginTop: "14px",
+            padding: "18px 20px",
+            borderRadius: "14px",
+            background: "linear-gradient(145deg, rgba(229,9,20,0.06), rgba(20,20,25,0.85))",
+            border: "1px solid rgba(229,9,20,0.22)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "14px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+            <div
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 18px",
+                width: "36px",
+                height: "36px",
                 borderRadius: "10px",
-                background: "#e50914",
-                color: "#ffffff",
-                fontSize: "12px",
-                fontWeight: 700,
-                cursor: "pointer",
-                border: "none",
+                background: "rgba(229,9,20,0.15)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                color: "#e50914",
               }}
             >
-              <SearchIcon size={13} />
-              <span>Search Everywhere</span>
-            </button>
-          )}
+              <SearchIcon size={18} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: "#f8fafc", letterSpacing: "0.01em" }}>
+                Not available on {targetProviderKey || "this extension"}
+              </div>
+              <div style={{ fontSize: "12.5px", color: "#94a3b8", marginTop: "3px", lineHeight: 1.45 }}>
+                No direct stream or download links found on <strong style={{ color: "#e2e8f0" }}>{targetProviderKey}</strong>. Switch the extension or click <strong style={{ color: "#e50914" }}>Search Globally</strong> to find links across all extensions.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", paddingTop: "2px" }}>
+            {onSearchGlobal && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSearchGlobal(displayTitle || "");
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "9px 18px",
+                  borderRadius: "10px",
+                  background: "#e50914",
+                  color: "#ffffff",
+                  fontSize: "12.5px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  border: "none",
+                  boxShadow: "0 4px 14px rgba(229,9,20,0.35)",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.background = "#ff0f1a";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.background = "#e50914";
+                }}
+              >
+                <SearchIcon size={14} />
+                <span>Search Globally</span>
+              </button>
+            )}
+
+            {providers && providers.length > 1 && onSelectProvider && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>
+                  Switch extension:
+                </span>
+                {providers
+                  .filter((p) => p.value !== targetProviderKey)
+                  .slice(0, 5)
+                  .map((p) => (
+                    <button
+                      key={p.value}
+                      onClick={() => onSelectProvider(p)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: "8px",
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        color: "#e2e8f0",
+                        fontSize: "11.5px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+                      }}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

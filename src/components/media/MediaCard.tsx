@@ -27,13 +27,13 @@ export function parseTitleAndYear(raw: string) {
   const yearMatch = str.match(/\b(19\d{2}|20\d{2})\b/);
   const year = yearMatch ? yearMatch[1] : "";
 
-  // Strip quality tags, brackets, resolutions, "Full Movie", pipes
+  // Strip quality tags, brackets, resolutions, "Full Movie", pipes, scene groups, episode codes
   let clean = str
     .replace(/\[.*?\]/g, "")
     .replace(/\(.*?\)/g, "")
     .replace(/\|.*$/g, "")
     .replace(
-      /\b(480p|720p|1080p|2160p|4k|hd|web-dl|webrip|bluray|x264|x265|hevc|dual audio|hindi|english|tamil|telugu|esub|multi audio|clean|uncut|complete|full movie|all episodes|series|season\s*\d+|s\d+|durban|phd|ac|lc|gs|cftd|unrated|extended)\b/gi,
+      /\b(480p|720p|1080p|2160p|4k|hd|web-dl|webrip|bluray|brrip|bdrip|hdrip|dvdrip|x264|x265|hevc|remux|hq|hdtc|cam|camrip|predvd|pre-dvd|v2|untouched|dual audio|hindi|english|tamil|telugu|esub|multi audio|clean|uncut|complete|full movie|all episodes|series|season\s*\d+|s\d+e\d+|s\d+|e\d+|episode\s*\d+|megusta|cakes|rawr|grace|glxtv|galaxytv|flux|ntb|pahe|yify|yts|eztv|proper|repack|rerip|hdtv|ddp\d*(?:\.\d*)?|atmos|aac\d*(?:\.\d*)?|amzn|nf|dsnp|atvp|max|paramount|durban|phd|ac|lc|gs|cftd|unrated|extended)\b/gi,
       ""
     )
     .replace(/&amp;/gi, " ")
@@ -70,6 +70,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const [useProxy, setUseProxy] = useState(false);
   const [cinemetaPoster, setCinemetaPoster] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
 
   const { title: cleanTitle, year: extractedYear, language: extractedLang } = parseTitleAndYear(post.title);
 
@@ -97,6 +98,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     setImgError(false);
     setUseProxy(false);
     setCinemetaPoster(null);
+    setRetryCount(0);
   }, [post.link, post.image, reloadKey]);
 
   // Cinemeta lookup helper
@@ -105,7 +107,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     const cacheKey = cleanTitle.toLowerCase();
     if (posterCache.has(cacheKey)) {
       const cached = posterCache.get(cacheKey);
-      if (cached) setCinemetaPoster(cached);
+      if (cached) {
+        setCinemetaPoster(cached);
+        setImgError(false);
+        setImgLoaded(false);
+      }
       return;
     }
     try {
@@ -115,10 +121,27 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         if (data?.poster) {
           posterCache.set(cacheKey, data.poster);
           setCinemetaPoster(data.poster);
+          setImgError(false);
+          setImgLoaded(false);
         }
       }
     } catch (_) {}
   }, [cleanTitle]);
+
+  // Auto-reload failed images automatically up to 4 times
+  useEffect(() => {
+    if (imgError && retryCount < 4) {
+      const delay = Math.min(1200 * Math.pow(1.4, retryCount), 4000);
+      const timer = setTimeout(() => {
+        setRetryCount((c) => c + 1);
+        setImgError(false);
+        setImgLoaded(false);
+        setReloadKey((k) => k + 1);
+        fetchCinemeta();
+      }, delay);
+      return () => clearTimeout(timer);
+    }
+  }, [imgError, retryCount, fetchCinemeta]);
 
   // Initial Cinemeta fetch only if post has no image
   useEffect(() => {
@@ -296,29 +319,62 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               </span>
             )}
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setReloadKey((k) => k + 1);
-              }}
-              style={{
-                marginTop: "4px",
-                padding: "4px 12px",
-                borderRadius: "999px",
-                background: "rgba(255, 255, 255, 0.1)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                color: "#e2e8f0",
-                fontSize: "10px",
-                fontWeight: 600,
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
-              <span>↻ Reload</span>
-            </button>
+            {retryCount < 4 ? (
+              <div
+                style={{
+                  marginTop: "6px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "3px 10px",
+                  borderRadius: "999px",
+                  background: "#e50914",
+                  border: "none",
+                  color: "#ffffff",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  boxShadow: "0 2px 8px rgba(229, 9, 20, 0.4)",
+                }}
+              >
+                <div
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    border: "2px solid rgba(255, 255, 255, 0.35)",
+                    borderTopColor: "#ffffff",
+                    animation: "spin 0.8s linear infinite",
+                  }}
+                />
+                <span>Auto-reloading...</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRetryCount(0);
+                  setReloadKey((k) => k + 1);
+                }}
+                style={{
+                  marginTop: "4px",
+                  padding: "4px 12px",
+                  borderRadius: "999px",
+                  background: "#e50914",
+                  border: "none",
+                  color: "#ffffff",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  boxShadow: "0 2px 8px rgba(229, 9, 20, 0.4)",
+                }}
+              >
+                <span>↻ Reload</span>
+              </button>
+            )}
           </div>
         )}
 

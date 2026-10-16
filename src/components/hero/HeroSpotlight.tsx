@@ -6,41 +6,141 @@ import type { Post, Provider } from "../../types";
 
 interface HeroSpotlightProps {
   post: Post | null;
+  candidatePosts?: Post[];
   provider: Provider | null;
   onStream: (post: Post) => void;
   onDownload: (post: Post) => void;
 }
 
+// Clean release tags, rips, resolutions, etc. for clear title display and backdrop search
+function cleanHeroTitle(raw: string): string {
+  if (!raw) return "";
+  const { title } = parseTitleAndYear(raw);
+  return title
+    .replace(/\b(ds4k|ds\s*4k|full\s*movie|hq|hdtc|cam|camrip|predvd|pre-dvd|dvdrip|v2|untouched)\b/gi, "")
+    .replace(/[-_.:|&]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// High-res image helper: upgrades low-res thumbnails to uncompressed 1080p / 4K
+export const upgradeToHighRes = (url: string | null | undefined): string => {
+  if (!url) return "";
+  let clean = url.trim();
+  // TMDB resolution upgrade
+  if (clean.includes("image.tmdb.org/t/p/")) {
+    return clean.replace(/\/w\d+\//, "/original/");
+  }
+  // Metahub / Cinemeta resolution upgrade
+  if (clean.includes("images.metahub.space/")) {
+    return clean
+      .replace(/\/poster\/(?:small|medium)\//, "/poster/large/")
+      .replace(/\/background\/(?:small|medium)\//, "/background/large/");
+  }
+  // Amazon / IMDb uncompressed full-res upgrade
+  if (clean.includes("media-amazon.com/images/M/")) {
+    return clean.replace(/\._V1_.*?\.(jpg|jpeg|png)$/i, "._V1_FMjpg_UX1920_.$1");
+  }
+  // WordPress scaled thumbnails
+  if (clean.includes("/wp-content/uploads/")) {
+    return clean.replace(/-\d+x\d+(\.(?:webp|jpg|jpeg|png))$/i, "$1");
+  }
+  return clean;
+};
+
 export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
-  post,
+  post: initialPost,
+  candidatePosts = [],
   provider,
   onStream,
   onDownload,
 }) => {
+  const [activePost, setActivePost] = useState<Post | null>(initialPost);
   const [tmdb, setTmdb] = useState<TMDBDetails | null>(null);
+  const [cinemetaBg, setCinemetaBg] = useState<string | null>(null);
 
-  const { title: cleanTitle, year: extractedYear } = parseTitleAndYear(post?.title || "");
+  // Sync activePost when initialPost changes
+  useEffect(() => {
+    setActivePost(initialPost);
+  }, [initialPost]);
 
+  const post = activePost || initialPost;
+  const cleanTitle = cleanHeroTitle(post?.title || "");
+  const { year: extractedYear } = parseTitleAndYear(post?.title || "");
+
+  // 1. Fetch TMDB details & backdrop
   useEffect(() => {
     if (!cleanTitle) {
       setTmdb(null);
+      setCinemetaBg(null);
       return;
     }
 
     let isCurrent = true;
 
+    // A. Query TMDB for 4K backdrop
     fetchTMDBDetails(cleanTitle, undefined, extractedYear)
       .then((data) => {
-        if (isCurrent && data) {
+        if (!isCurrent) return;
+        if (data && data.backdropUrl) {
           setTmdb(data);
+        } else {
+          setTmdb(data || null);
+          // B. Fallback: Query Cinemeta for high-resolution background artwork
+          fetch(`/api/poster?query=${encodeURIComponent(cleanTitle)}`)
+            .then((r) => r.json())
+            .then((json) => {
+              if (!isCurrent) return;
+              let bg = json?.background;
+              if (!bg && json?.poster && json.poster.includes("/poster/")) {
+                bg = json.poster.replace("/poster/", "/background/");
+              }
+              if (bg) {
+                setCinemetaBg(upgradeToHighRes(bg));
+              }
+            })
+            .catch(() => {});
         }
       })
-      .catch((err) => console.warn("Hero TMDB fetch failed:", err));
+      .catch((err) => {
+        console.warn("Hero TMDB fetch failed:", err);
+      });
 
     return () => {
       isCurrent = false;
     };
   }, [cleanTitle, extractedYear]);
+
+  // 2. Intelligent hero selection: If current post has only a low-res vertical card and no backdrop,
+  // check if any candidate in the top posts has a verified 4K backdrop to showcase
+  useEffect(() => {
+    if (!activePost && initialPost) {
+      setActivePost(initialPost);
+      return;
+    }
+    // If active post has no TMDB backdrop and candidatePosts are available, search for a top item with backdrop
+    if (activePost === initialPost && candidatePosts.length > 1 && !tmdb?.backdropUrl && !cinemetaBg) {
+      let cancelled = false;
+      const checkCandidates = async () => {
+        for (const candidate of candidatePosts.slice(1, 6)) {
+          const candidateTitle = cleanHeroTitle(candidate.title || "");
+          if (!candidateTitle) continue;
+          try {
+            const data = await fetchTMDBDetails(candidateTitle);
+            if (!cancelled && data && data.backdropUrl) {
+              setActivePost(candidate);
+              setTmdb(data);
+              return;
+            }
+          } catch (_) {}
+        }
+      };
+      checkCandidates();
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [initialPost, candidatePosts, tmdb?.backdropUrl, cinemetaBg, activePost]);
 
   if (!post) return null;
 
@@ -50,33 +150,23 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
     (post.tag ? post.tag.replace(/[★⭐]/g, "").trim() : "7.8");
 
   // Year resolution: TMDB year or extracted year
-  const year =
-    tmdb?.year || extractedYear || "2025";
+  const year = tmdb?.year || extractedYear || "2026";
 
   // Media type resolution
   const mediaType =
-    tmdb?.genres && tmdb.genres.length > 0
-      ? "Movie"
-      : "Movie";
+    tmdb?.genres && tmdb.genres.length > 0 ? tmdb.genres[0] : "Movie";
 
   // Plot description: TMDB Overview or fallback
   const plot =
     tmdb?.overview ||
-    "As war and plague devastate the land, a humble commoner ignites a rebellion, uniting an army to defy the powers that be in a desperate fight for survival.";
+    "As conflict and intrigue unfold, unexpected heroes rise to unite allies and fight for survival in a gripping, high-stakes cinematic journey.";
 
-  // High-res image helper: upgrades any low-res w185/w342 thumbnail to original 4K
-  const upgradeToHighRes = (url: string | null | undefined): string => {
-    if (!url) return "";
-    let clean = url.trim();
-    if (clean.includes("image.tmdb.org/t/p/")) {
-      return clean.replace(/\/w\d+\//, "/original/");
-    }
-    return clean;
-  };
+  const hasTrueBackdrop = Boolean(tmdb?.backdropUrl || cinemetaBg);
 
-  // High-res backdrop from TMDB or upgraded original post image
+  // High-res backdrop from TMDB, Cinemeta, or upgraded original post image
   const heroImage =
     (tmdb?.backdropUrl && tmdb.backdropUrl.trim()) ||
+    cinemetaBg ||
     upgradeToHighRes(post.image) ||
     "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1600";
 
@@ -86,14 +176,14 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
       style={{
         position: "relative",
         width: "100%",
-        minHeight: "560px",
-        maxHeight: "640px",
+        minHeight: "580px",
+        maxHeight: "660px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-end",
-        padding: "0 24px 60px 24px",
-        paddingTop: "140px",
+        padding: "0 24px 44px 24px",
+        paddingTop: "120px",
         marginBottom: "20px",
         overflow: "hidden",
         backgroundColor: "#000000",
@@ -111,40 +201,66 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
             zIndex: 1,
           }}
         >
+          {/* Ambient blurred glow layer if using vertical card fallback to prevent any pixelation */}
+          {!hasTrueBackdrop && (
+            <div
+              style={{
+                position: "absolute",
+                inset: "-30px",
+                backgroundImage: `url(${heroImage})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center 30%",
+                filter: "blur(42px) brightness(0.28) saturate(1.4)",
+                transform: "scale(1.15)",
+                zIndex: 1,
+              }}
+            />
+          )}
+
+          {/* Crisp, properly framed Hero Backdrop */}
           <img
             src={heroImage}
             alt={cleanTitle}
             style={{
+              position: "absolute",
+              top: "-4px",
+              left: 0,
               width: "100%",
-              height: "100%",
+              height: "calc(100% + 28px)",
               objectFit: "cover",
-              objectPosition: "center 15%",
-              filter: "brightness(0.9) contrast(1.05)",
+              objectPosition: "center 28%",
+              transform: "translateY(22px) scale(1.03)",
+              filter: hasTrueBackdrop
+                ? "brightness(0.92) contrast(1.05)"
+                : "brightness(0.85) contrast(1.1)",
+              zIndex: 2,
             }}
             onError={(e) => {
               (e.target as HTMLImageElement).src =
                 "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1600";
             }}
           />
-          {/* Top dark shade for navbar readability + bottom fade to page bg */}
+
+          {/* Optimized vertical framing gradient: gentle top shade + bottom black fade pushed down */}
           <div
             style={{
               position: "absolute",
               inset: 0,
               background:
-                "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 25%, transparent 50%, rgba(0,0,0,0.65) 72%, #000000 100%)",
+                "linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.2) 20%, transparent 40%, transparent 72%, rgba(0,0,0,0.45) 86%, rgba(0,0,0,0.92) 96%, #000000 100%)",
+              zIndex: 3,
             }}
           />
         </div>
       )}
 
-      {/* Hero Content (Centered, exactly matching reference) */}
+      {/* Hero Content (Centered, elegant cinematic typography) */}
       <div
         className="hero-spotlight-content"
         style={{
           position: "relative",
-          zIndex: 3,
-          maxWidth: "720px",
+          zIndex: 4,
+          maxWidth: "760px",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -165,10 +281,10 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
             margin: 0,
           }}
         >
-          {tmdb?.title || cleanTitle}
+          {tmdb?.title || cleanTitle || post.title}
         </h1>
 
-        {/* Meta Line: ★ 7.9  2026  Movie */}
+        {/* Meta Line: ★ 7.9 • 2026 • Movie */}
         <div
           style={{
             display: "flex",
@@ -247,6 +363,7 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
               fontWeight: 700,
               cursor: "pointer",
               boxShadow: "0 6px 24px rgba(229, 9, 20, 0.5)",
+              border: "none",
               transition: "transform 0.2s, background 0.2s, box-shadow 0.2s",
             }}
             onMouseEnter={(e) => {

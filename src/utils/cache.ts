@@ -11,7 +11,7 @@ interface CacheEntry<T> {
 
 class CacheManager {
   private memCache = new Map<string, CacheEntry<any>>();
-  private prefix = "cinema_cache_v6_";
+  private prefix = "cinema_cache_v9_";
 
   constructor() {
     this.pruneExpiredSession();

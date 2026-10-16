@@ -389,7 +389,7 @@ const TrailerPage = ({
     <iframe
       src="${trailerUrl}"
       title="Trailer"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       referrerpolicy="no-referrer-when-downgrade"
       allowfullscreen>
     </iframe>

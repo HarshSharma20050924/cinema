@@ -25,11 +25,48 @@ if (!gotTheLock) {
   process.exit(0);
 }
 
-app.on('second-instance', () => {
+// Register protocols for cross-platform desktop stream handoff
+try {
+  app.setAsDefaultProtocolClient('cinema');
+  app.setAsDefaultProtocolClient('vlc');
+} catch (_) {}
+
+function handleProtocolUrl(urlStr) {
+  if (!urlStr) return;
+  const match = urlStr.match(/^(?:cinema|vlc):\/\/(.+)$/i);
+  if (match && match[1]) {
+    let rawUrl = match[1].replace(/^\/\//, '');
+    if (rawUrl.startsWith('https//')) rawUrl = 'https://' + rawUrl.slice(7);
+    else if (rawUrl.startsWith('http//')) rawUrl = 'http://' + rawUrl.slice(6);
+    else if (rawUrl.startsWith('https/')) rawUrl = 'https://' + rawUrl.slice(6);
+    else if (rawUrl.startsWith('http/')) rawUrl = 'http://' + rawUrl.slice(5);
+    else if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) rawUrl = 'https://' + rawUrl;
+
+    try {
+      if (rawUrl.includes('%3f') || rawUrl.includes('%3F') || rawUrl.includes('%26')) {
+        rawUrl = decodeURIComponent(rawUrl);
+      }
+    } catch (_) {}
+
+    try {
+      const { playInVlc } = require('./server/controllers/vlcController.cjs');
+      playInVlc({ body: { streamUrl: rawUrl, title: 'Cinema Stream' } }, { json: () => {}, status: () => ({ json: () => {} }) });
+    } catch (_) {}
+  }
+}
+
+app.on('second-instance', (_, commandLine) => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   }
+  const protocolArg = (commandLine || []).find((arg) => /^(?:cinema|vlc):\/\//i.test(arg));
+  if (protocolArg) handleProtocolUrl(protocolArg);
+});
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleProtocolUrl(url);
 });
 
 // 2. Self-Contained Local Scraper Server

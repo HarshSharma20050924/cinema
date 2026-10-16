@@ -28,7 +28,7 @@ export function getBackendUrl(): string {
 const BACKEND_URL = getBackendUrl();
 
 const TTL = {
-  PROVIDERS: 30 * 60 * 1000,
+  PROVIDERS: 5 * 1000,
   CATALOG: 15 * 60 * 1000,
   POSTS: 5 * 60 * 1000,
   SEARCH: 3 * 60 * 1000,
@@ -51,18 +51,28 @@ async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 150
 }
 
 export const api = {
-  async getProviders(forceRefresh = false): Promise<Provider[]> {
+  async getProviders(_forceRefresh = true): Promise<Provider[]> {
     const cacheKey = "api:providers";
-    if (!forceRefresh) {
+    try {
+      const res = await fetchWithTimeout(`${BACKEND_URL}/api/providers?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
+        },
+      }, 8000);
+      if (!res.ok) throw new Error("Failed to load providers");
+      const data: Provider[] = await res.json();
+      const active = data.filter((p) => !p.disabled);
+      appCache.set(cacheKey, active, TTL.PROVIDERS);
+      return active;
+    } catch (err) {
       const cached = appCache.get<Provider[]>(cacheKey);
-      if (cached && cached.length > 0) return cached;
+      if (cached && cached.length > 0) {
+        return cached;
+      }
+      throw err;
     }
-    const res = await fetchWithTimeout(`${BACKEND_URL}/api/providers`);
-    if (!res.ok) throw new Error("Failed to load providers");
-    const data: Provider[] = await res.json();
-    const filtered = data.filter((p) => !p.disabled);
-    appCache.set(cacheKey, filtered, TTL.PROVIDERS);
-    return filtered;
   },
 
   async getCatalog(provider: string, forceRefresh = false): Promise<CatalogData> {
@@ -216,6 +226,91 @@ export const api = {
       return data;
     } catch {
       return { letterboxdRating: null, letterboxdUrl: null };
+    }
+  },
+
+  async search(provider: string, query: string, page = 1, forceRefresh = false): Promise<Post[]> {
+    return this.searchPosts(provider, query, page, forceRefresh);
+  },
+
+  async getLetterboxdFilms(params: {
+    decade?: string;
+    genre?: string;
+    sort?: string;
+    page?: number;
+    search?: string;
+    list?: string;
+  }): Promise<any[]> {
+    const { decade = "all", genre = "all", sort = "rating-highest", page = 1, search = "", list = "" } = params;
+    const cleanSearch = (search || "").trim();
+    const cleanList = (list || "").trim();
+    const cacheKey = cleanList
+      ? `api:letterboxd:list:${cleanList}:p${page}`
+      : cleanSearch
+      ? `api:letterboxd:search:${cleanSearch.toLowerCase()}:p${page}`
+      : `api:letterboxd:${decade}:${genre}:${sort}:p${page}`;
+    const cached = appCache.get<any[]>(cacheKey);
+    if (cached && cached.length > 0) return cached;
+
+    try {
+      const qParams: Record<string, string> = {
+        decade,
+        genre,
+        sort,
+        page: String(page),
+      };
+      if (cleanSearch) qParams.search = cleanSearch;
+      if (cleanList) qParams.list = cleanList;
+
+      const q = new URLSearchParams(qParams).toString();
+      const res = await fetchWithTimeout(`${BACKEND_URL}/api/letterboxd?${q}`);
+      if (!res.ok) return [];
+      const list = await res.json();
+      if (Array.isArray(list) && list.length > 0) {
+        appCache.set(cacheKey, list, 15 * 60 * 1000);
+        return list;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  async getImdbFilms(params: {
+    decade?: string;
+    genre?: string;
+    sort?: string;
+    page?: number;
+    search?: string;
+  }): Promise<any[]> {
+    const { decade = "all", genre = "all", sort = "highest", page = 1, search = "" } = params;
+    const cleanSearch = (search || "").trim();
+    const cacheKey = cleanSearch
+      ? `api:imdb:search:${cleanSearch.toLowerCase()}:p${page}`
+      : `api:imdb:${decade}:${genre}:${sort}:p${page}`;
+    const cached = appCache.get<any[]>(cacheKey);
+    if (cached && cached.length > 0) return cached;
+
+    try {
+      const qParams: Record<string, string> = {
+        decade,
+        genre,
+        sort,
+        page: String(page),
+      };
+      if (cleanSearch) qParams.search = cleanSearch;
+
+      const q = new URLSearchParams(qParams).toString();
+      const res = await fetchWithTimeout(`${BACKEND_URL}/api/imdb/films?${q}`);
+      if (!res.ok) return [];
+      const list = await res.json();
+      if (Array.isArray(list) && list.length > 0) {
+        appCache.set(cacheKey, list, 15 * 60 * 1000);
+        return list;
+      }
+      return [];
+    } catch {
+      return [];
     }
   },
 };

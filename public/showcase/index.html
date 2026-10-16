@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cinema • 35+ Streaming Extensions</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(18, 24, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover-border: rgba(229, 9, 20, 0.6);
+      --primary: #e50914;
+      --text: #ffffff;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(229, 9, 20, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 90% 20%, rgba(56, 189, 248, 0.1) 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(229, 9, 20, 0.08) 0%, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .brand-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 24px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      backdrop-filter: blur(12px);
+      margin-bottom: 14px;
+    }
+
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+    }
+
+    .brand-name {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #ffffff;
+    }
+
+    .brand-badge {
+      background: rgba(229, 9, 20, 0.2);
+      border: 1px solid rgba(229, 9, 20, 0.4);
+      color: #ff4d58;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 999px;
+    }
+
+    .title {
+      font-size: clamp(28px, 4.5vw, 46px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
+
+    .title span {
+      background: linear-gradient(135deg, #ff4d58 0%, #e50914 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: clamp(13px, 1.6vw, 16px);
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* EXTENSIONS GRID - JUST LOGO AND NAME */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 20px 14px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 12px;
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      cursor: default;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    }
+
+    .card:hover {
+      transform: translateY(-4px) scale(1.02);
+      border-color: var(--card-hover-border);
+      background: rgba(25, 33, 52, 0.85);
+      box-shadow: 0 12px 28px -8px rgba(229, 9, 20, 0.35);
+    }
+
+    .logo-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+
+    .card:hover .logo-box {
+      transform: scale(1.08);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+
+    .card-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.3;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* FOOTER BADGE */
+    .bottom-bar {
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .feature-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #34d399;
+    }
+
+    /* RESPONSIVE LAYOUT */
+    @media (max-width: 1100px) {
+      .grid {
+        grid-template-columns: repeat(5, 1fr);
+      }
+    }
+
+    @media (max-width: 860px) {
+      .grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .logo-box {
+        width: 48px;
+        height: 48px;
+      }
+      .card-name {
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .card {
+        padding: 14px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    
+    <!-- HEADER -->
+    <header class="header">
+      <div class="brand-pill">
+        <img src="/logo.png" alt="Cinema" class="brand-logo" onerror="this.onerror=null; this.src='/favicon.svg';">
+        <span class="brand-name">CINEMA</span>
+        <span class="brand-badge">36 EXTENSIONS</span>
+      </div>
+      <h1 class="title">
+        35+ Streaming Sources. <span>One Hub.</span>
+      </h1>
+      <p class="subtitle">
+        Unified search & direct 1-click VLC playback across all major streaming engines.
+      </p>
+    </header>
+
+    <!-- GRID: JUST REAL LOGO AND REAL NAME -->
+    <main class="grid" id="grid">
+      <!-- Generated via JS -->
+    </main>
+
+    <!-- FOOTER TAGLINE -->
+    <div class="bottom-bar">
+      <div class="feature-item">
+        <span class="dot"></span>
+        <span>1-Click VLC Streaming</span>
+      </div>
+      <div class="feature-item">
+        <span class="dot"></span>
+        <span>Self-Hosted Runner Node</span>
+      </div>
+      <div class="feature-item">
+        <span class="dot"></span>
+        <span>Zero Ads</span>
+      </div>
+      <div class="feature-item">
+        <span class="dot"></span>
+        <span>cinema-dwh.pages.dev</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Real Extensions List with Real Logos and Names
+    const EXTENSIONS = [
+      {
+        name: "HdHub4u",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/hdhub4u.png",
+      },
+      {
+        name: "VegaMovies",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/vega.png",
+      },
+      {
+        name: "OlaMovies",
+        icon: "/icons/olamovies.svg",
+        fallback: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/hdhub4u.png",
+      },
+      {
+        name: "ThePirateBay",
+        icon: "/icons/tpb.svg",
+        fallback: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/torrentio.png",
+      },
+      {
+        name: "KatMoviesHD",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/katmovies.png",
+      },
+      {
+        name: "MoviesMod",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/mod.png",
+      },
+      {
+        name: "4kHdHub",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/4khdhub.png",
+      },
+      {
+        name: "Cinewood",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/1cinevood.png",
+      },
+      {
+        name: "World4uFree",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/world4u.png",
+      },
+      {
+        name: "UHDMovies",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/uhd.webp",
+      },
+      {
+        name: "Torrentio",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/torrentio.png",
+      },
+      {
+        name: "GramCinema",
+        icon: "https://bollywood.eu.org/images/favicon.svg",
+      },
+      {
+        name: "ShowBox",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/showbox.png",
+      },
+      {
+        name: "KissKh",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kissKh.png",
+      },
+      {
+        name: "Anikoto",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/anikoto.png",
+      },
+      {
+        name: "KickAssAnime",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kickAssAnime.png",
+      },
+      {
+        name: "AnimeSalt",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/animesalt.png",
+      },
+      {
+        name: "AnimeWorld",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/animeworld.png",
+      },
+      {
+        name: "MultiStream",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/autoEmbed.png",
+      },
+      {
+        name: "MoviesDrive",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/drive.png",
+      },
+      {
+        name: "GokuHD",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/gokuHD.png",
+      },
+      {
+        name: "DramaCool",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/dramacool.png",
+      },
+      {
+        name: "EonMovies",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/eonMovies.png",
+      },
+      {
+        name: "Movies4U",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movies4u.png",
+      },
+      {
+        name: "KmMovies",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/kmMovies.png",
+      },
+      {
+        name: "Zeefliz",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/zeefliz.jpg",
+      },
+      {
+        name: "MoviezWap",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/moviezwap.png",
+      },
+      {
+        name: "RogMovies",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/luxMovies.png",
+      },
+      {
+        name: "TopMovies",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/topmovies.png",
+      },
+      {
+        name: "Castle TV",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/castle.png",
+      },
+      {
+        name: "Everything",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/everything.png",
+      },
+      {
+        name: "MovieLinkBD",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movielinkdb.png",
+      },
+      {
+        name: "MX Player",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/mxplayer.png",
+      },
+      {
+        name: "YouTube",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/youtube.png",
+      },
+      {
+        name: "MovieBox Web",
+        icon: "https://cdn.jsdelivr.net/gh/Zenda-Cross/vega-providers@main/assets/movieBoxWeb.png",
+      },
+      {
+        name: "AnimeSub+",
+        icon: "https://animesub.duckdns.org/assets/logo.png",
+      }
+    ];
+
+    const gridEl = document.getElementById('grid');
+
+    gridEl.innerHTML = EXTENSIONS.map(ext => `
+      <div class="card">
+        <div class="logo-box">
+          <img 
+            src="${ext.icon}" 
+            alt="${ext.name}" 
+            class="logo-img" 
+            onerror="this.onerror=null; ${ext.fallback ? `this.src='${ext.fallback}';` : "this.parentElement.innerHTML='<span style=\\'font-size:20px\\'>🎬</span>';"}"
+          />
+        </div>
+        <div class="card-name">${ext.name}</div>
+      </div>
+    `).join('');
+  </script>
+</body>
+</html>
