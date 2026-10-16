@@ -1,12 +1,12 @@
 {
-  "version": "2.2.0",
-  "versionCode": 220,
-  "downloadUrl": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.8/Cinema-Runner.apk",
+  "version": "2.2.1",
+  "versionCode": 221,
+  "downloadUrl": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.1.0/Cinema-Runner.apk",
   "desktop": {
     "macDmg": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0-arm64.dmg",
     "windowsSetup": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.Setup.2.2.0.exe",
     "windowsPortable": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.2.2.0.exe",
     "linuxAppImage": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0.AppImage"
   },
-  "releaseNotes": "Desktop Node Runner (macOS .dmg, Windows .exe, Linux .AppImage) & Android Background Runner v2.2.0"
+  "releaseNotes": "Automatic tunnel resurrection, instant failover recovery, and background persistence v2.2.1"
 }

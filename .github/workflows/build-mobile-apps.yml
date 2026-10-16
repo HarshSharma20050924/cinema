@@ -85,7 +85,7 @@ jobs:
       - name: Build Cinema Alternative Native App
         run: |
           if [ ! -d "vega-app" ]; then
-            git clone --depth 1 -b vega-main https://github.com/HarshSharma20050924/cinema.git vega-app || true
+            git clone --depth 1 -b cinema-main https://github.com/HarshSharma20050924/cinema.git vega-app || true
           fi
           if [ -d "vega-app" ] && [ -f "vega-app/package.json" ]; then
             cd vega-app
