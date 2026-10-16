@@ -8,14 +8,14 @@ const BOT_TOKEN = "8887103348:AAHjlYSV1s8uFQ2x_6B--3FwNmvlL12GYvk";
 const ADMIN_IDS = [1872734142];
 const DEFAULT_WEB_URL = "https://cinema-dwh.pages.dev";
 
-// Default enabled extensions
+// Default enabled extensions (Prioritizing high-reliability providers first)
 const DEFAULT_ENABLED_PROVIDERS = [
+  "drive",
   "vega",
   "hdhub4u",
   "4khdhub",
   "movieBoxWeb",
-  "autoEmbed",
-  "drive"
+  "autoEmbed"
 ];
 
 const ALL_EXTENSIONS = [
@@ -350,26 +350,67 @@ async function handleMessage(msg, token, db, requestUrl) {
   }
   if (!query) return;
 
-  await tgCall(token, 'sendMessage', {
+  const searchingRes = await tgCall(token, 'sendMessage', {
     chat_id: chatId,
     text: `🔍 Searching <b>"${escapeHtml(query)}"</b> across active extensions...`,
     parse_mode: 'HTML'
   });
+  const searchMsgId = searchingRes?.result?.message_id;
 
   const enabled = await getEnabledProviders(db);
-  const data = await callCinemaApi(requestUrl, '/global-search', {
-    q: query,
-    providers: enabled.join(',')
-  });
+  let results = [];
 
-  const results = Array.isArray(data) ? data : [];
+  // 1. Try global-search first
+  try {
+    const data = await callCinemaApi(requestUrl, '/global-search', {
+      q: query,
+      providers: enabled.join(',')
+    });
+    if (Array.isArray(data) && data.length > 0) {
+      results = data;
+    }
+  } catch (_) {}
+
+  // 2. If global-search returned empty or was unsupported by runner, query active providers in parallel
+  if (results.length === 0) {
+    const searchTargets = enabled.slice(0, 8);
+    const searches = searchTargets.map(prov =>
+      callCinemaApi(requestUrl, '/search', { provider: prov, q: query })
+        .then(res => (Array.isArray(res) ? res : []))
+        .catch(() => [])
+    );
+    const allRes = await Promise.all(searches);
+    const seen = new Set();
+    for (const list of allRes) {
+      for (const item of list) {
+        if (item && item.link) {
+          const key = `${item.provider || ''}::${item.link}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            results.push(item);
+          }
+        }
+      }
+    }
+  }
+
   const formatted = await formatSearchResults(results, query, 1, db);
-  return tgCall(token, 'sendMessage', {
-    chat_id: chatId,
-    text: formatted.text,
-    parse_mode: 'HTML',
-    reply_markup: formatted.keyboard
-  });
+  if (searchMsgId) {
+    return tgCall(token, 'editMessageText', {
+      chat_id: chatId,
+      message_id: searchMsgId,
+      text: formatted.text,
+      parse_mode: 'HTML',
+      reply_markup: formatted.keyboard
+    });
+  } else {
+    return tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: formatted.text,
+      parse_mode: 'HTML',
+      reply_markup: formatted.keyboard
+    });
+  }
 }
 
 // Callback Query Handler (Inline Buttons)

@@ -92910,6 +92910,65 @@ app.get("/api/search", async (req, res) => {
     res.json([]);
   }
 });
+app.get(["/api/global-search", "/api/search/global"], async (req, res) => {
+  try {
+    const query = (req.query.query || req.query.q || "").trim();
+    const page = parseInt(req.query.page || 1, 10);
+    const providersParam = req.query.providers || "";
+    if (!query) return res.json([]);
+
+    let provs = providersParam ? providersParam.split(",").map(p => p.trim()).filter(Boolean) : [];
+    if (provs.length === 0) {
+      provs = ["drive", "vega", "hdhub4u", "4khdhub", "movieBoxWeb", "autoEmbed"];
+    }
+
+    const searchPromises = provs.map(async (provider) => {
+      try {
+        const postsMod = await getProviderModule(provider, "posts");
+        if (!postsMod || !postsMod.getSearchPosts) return [];
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6500);
+        const posts = await postsMod.getSearchPosts({
+          searchQuery: query,
+          page,
+          providerValue: provider,
+          providerContext,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        const pName = getProviderDisplayName(provider);
+        return Array.isArray(posts) ? posts.map(item => ({
+          ...item,
+          provider: item.provider || provider,
+          providerName: item.providerName || pName
+        })) : [];
+      } catch (_) {
+        return [];
+      }
+    });
+
+    const settled = await Promise.allSettled(searchPromises);
+    const combined = [];
+    const seen = new Set();
+    for (const r of settled) {
+      if (r.status === "fulfilled" && Array.isArray(r.value)) {
+        for (const item of r.value) {
+          if (item && item.link) {
+            const key = `${item.provider || ""}::${item.link}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              combined.push(item);
+            }
+          }
+        }
+      }
+    }
+    res.json(combined);
+  } catch (error) {
+    log("Global search error:", error.message);
+    res.json([]);
+  }
+});
 async function resolveProviderEpisodes(provider, meta, context) {
   const hasEpisodesLink = Array.isArray(meta?.linkList) && meta.linkList.some((g) => g && g.episodesLink) || meta?.episodesLink;
   if (!hasEpisodesLink) return null;
