@@ -65,9 +65,9 @@ export async function onRequestPost(context) {
     }
     if (!Array.isArray(pool)) pool = [];
 
-    // Filter out stale tunnels older than 10 minutes (600,000ms)
+    // Filter out stale tunnels older than 3 minutes (180,000ms)
     const now = Date.now();
-    pool = pool.filter(p => now - (p.lastSeen || 0) < 600000);
+    pool = pool.filter(p => now - (p.lastSeen || 0) < 180000);
 
     // Add or update current device in cluster pool
     const devKey = deviceId || cleanUrl;
@@ -85,7 +85,10 @@ export async function onRequestPost(context) {
       pool.push(entry);
     }
 
-    const primaryUrl = pool[0]?.url || cleanUrl;
+    // Sort by freshest lastSeen first so the newest live device is primary
+    pool.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+
+    const primaryUrl = cleanUrl;
 
     // Persist to D1 database (100k daily writes free!)
     if (env?.cinema_db) {

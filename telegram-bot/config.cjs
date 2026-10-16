@@ -7,7 +7,7 @@ const defaultConfig = {
   BOT_TOKEN: process.env.BOT_TOKEN || '8887103348:AAHjlYSV1s8uFQ2x_6B--3FwNmvlL12GYvk',
   CHANNEL_ID: process.env.CHANNEL_ID || '-1004363607477',
   ADMIN_IDS: [1872734142],
-  CINEMA_API: process.env.CINEMA_API || 'http://127.0.0.1:3001/api',
+  CINEMA_API: process.env.CINEMA_API || 'https://cinema-dwh.pages.dev/api',
   WEB_URL: process.env.WEB_URL || 'https://cinema-dwh.pages.dev',
   TMDB_API_KEY: process.env.TMDB_API_KEY || 'cfe422613b250f702980a3bbf9e90716',
   // Interval for posting daily trending items (in hours)

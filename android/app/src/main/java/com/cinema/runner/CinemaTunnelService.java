@@ -239,6 +239,14 @@ public class CinemaTunnelService extends Service {
     private void startHeartbeat(String tunnelUrl) {
         heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
         heartbeatScheduler.scheduleAtFixedRate(() -> {
+            if (cloudflaredProcess == null || !cloudflaredProcess.isAlive()) {
+                Log.e(TAG, "cloudflared process died! Restarting tunnel...");
+                if (heartbeatScheduler != null) {
+                    heartbeatScheduler.shutdownNow();
+                }
+                Executors.newSingleThreadExecutor().execute(this::startTunnel);
+                return;
+            }
             registerTunnel(tunnelUrl);
             Log.d(TAG, "Heartbeat sent for: " + tunnelUrl);
         }, 25, 25, TimeUnit.SECONDS);

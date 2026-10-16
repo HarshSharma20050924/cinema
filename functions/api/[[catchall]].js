@@ -65,7 +65,7 @@ export async function onRequest(context) {
     const now = Date.now();
     if (Array.isArray(pool)) {
       for (const item of pool) {
-        const isFresh = !item.lastSeen || (now - item.lastSeen < 300000);
+        const isFresh = !item.lastSeen || (now - item.lastSeen < 180000);
         const u = typeof item === "string" ? item : item?.url;
         if (isFresh && u && /^https?:\/\//i.test(u) && !isSelfUrl(u)) {
           const clean = u.replace(/\/+$/, "");
