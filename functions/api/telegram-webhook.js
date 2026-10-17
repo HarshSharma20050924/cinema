@@ -161,14 +161,25 @@ function formatEpisodeButtonLabel(rawTitle, epCount) {
   const sMatch = str.match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
   if (sMatch) season = 'S' + (sMatch[1] || sMatch[2]);
 
+  let lang = '';
+  if (/dual\s*audio/i.test(str) || (/\bhindi\b/i.test(str) && /\benglish\b/i.test(str))) lang = 'Dual';
+  else if (/hindi\s*dub|\bhindi\b/i.test(str)) lang = 'Hin';
+  else if (/english|\boriginal\b/i.test(str)) lang = 'Orig';
+  else if (/arabic/i.test(str)) lang = 'Arab';
+  else if (/french/i.test(str)) lang = 'Fre';
+  else if (/spanish/i.test(str)) lang = 'Spa';
+  else if (/tamil/i.test(str)) lang = 'Tam';
+  else if (/telugu/i.test(str)) lang = 'Tel';
+
   let size = '';
   const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
   if (sizeMatch) size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
 
   const parts = [];
+  if (lang) parts.push(lang);
   if (season) parts.push(season);
   if (res) parts.push(res);
-  const main = parts.join(' ') || 'Eps';
+  const main = parts.join(' • ') || (season || 'Eps');
 
   let lbl = `📺 ${main}`;
   if (size) lbl += ` [${size}]`;
@@ -946,8 +957,24 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
         // Check if multiple qualities exist across allGroups for this episode index
         const altQualities = [];
-        if (allGroups.length > 1) {
+        const isMb = groupData.provider === 'movieBoxWeb' || groupData.provider === 'moviebox';
+
+        // For MovieBox, resolutions are retrieved per episode dynamically via /api/streams.
+        // Never cross-match seasons or languages in MovieBox!
+        if (!isMb && allGroups.length > 1) {
+          const currentSeasonMatch = String(groupData.title || '').match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
+          const currentSeason = currentSeasonMatch ? parseInt(currentSeasonMatch[1] || currentSeasonMatch[2], 10) : null;
+
           for (const g of allGroups) {
+            // STRICT CHECK: g must belong to the EXACT same season!
+            if (currentSeason !== null) {
+              const gSeasonMatch = String(g.title || '').match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
+              const gSeason = gSeasonMatch ? parseInt(gSeasonMatch[1] || gSeasonMatch[2], 10) : null;
+              if (gSeason !== null && gSeason !== currentSeason) {
+                continue; // Skip different seasons!
+              }
+            }
+
             const dList = g.directLinks || [];
             if (dList.length > 0) {
               const matchedEp = dList[startIndex + i + j] || dList.find(d => {
