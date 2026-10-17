@@ -1,10 +1,19 @@
 const fs = require('fs');
 const path = require('path');
 
+// Auto-load .env from project root or current directory if dotenv is installed
+try {
+  const dotenv = require('dotenv');
+  dotenv.config({ path: path.join(__dirname, '../.env') });
+  dotenv.config({ path: path.join(__dirname, '.env') });
+} catch (e) {
+  // dotenv optional
+}
+
 const CONFIG_FILE = path.join(__dirname, 'bot_settings.json');
 
 const defaultConfig = {
-  BOT_TOKEN: process.env.BOT_TOKEN || '8887103348:AAHjlYSV1s8uFQ2x_6B--3FwNmvlL12GYvk',
+  BOT_TOKEN: process.env.BOT_TOKEN || '',
   CHANNEL_ID: process.env.CHANNEL_ID || '-1004363607477',
   ADMIN_IDS: [1872734142],
   CINEMA_API: process.env.CINEMA_API || 'https://cinema-dwh.pages.dev/api',
@@ -25,16 +34,19 @@ const defaultConfig = {
 };
 
 function loadConfig() {
+  let fileConfig = {};
   if (fs.existsSync(CONFIG_FILE)) {
     try {
-      const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-      return { ...defaultConfig, ...data };
+      fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
     } catch (e) {
       console.error('Error reading bot_settings.json, using defaults:', e.message);
     }
   }
-  saveConfig(defaultConfig);
-  return defaultConfig;
+  const merged = { ...defaultConfig, ...fileConfig };
+  if (process.env.BOT_TOKEN) {
+    merged.BOT_TOKEN = process.env.BOT_TOKEN;
+  }
+  return merged;
 }
 
 function saveConfig(cfg) {

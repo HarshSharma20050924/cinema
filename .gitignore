@@ -55,6 +55,8 @@ server.log
 .env.*
 *.token
 .gramcinema_token
+telegram-bot/bot_settings.json
+telegram-bot/.env
 
 # Wrangler local state
 .wrangler/

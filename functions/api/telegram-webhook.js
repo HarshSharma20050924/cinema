@@ -4,7 +4,7 @@
  * Runs 24/7 without needing a laptop or separate VPS.
  */
 
-const BOT_TOKEN = "8887103348:AAHjlYSV1s8uFQ2x_6B--3FwNmvlL12GYvk";
+const BOT_TOKEN = ""; // Configured via Cloudflare Pages environment variables (BOT_TOKEN)
 const ADMIN_IDS = [1872734142];
 const DEFAULT_WEB_URL = "https://cinema-dwh.pages.dev";
 

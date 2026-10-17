@@ -4,7 +4,7 @@
  * Formats ultra-clean mobile cards with Quality & File Size highlights.
  */
 
-const BOT_TOKEN = "8887103348:AAHjlYSV1s8uFQ2x_6B--3FwNmvlL12GYvk";
+const BOT_TOKEN = ""; // Configured via Cloudflare Pages environment variables (BOT_TOKEN)
 const CHANNEL_ID = "-1004363607477";
 const DEFAULT_WEB_URL = "https://cinema-dwh.pages.dev";
 
