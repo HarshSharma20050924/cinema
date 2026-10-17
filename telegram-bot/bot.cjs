@@ -93,15 +93,25 @@ Use <b>@cinemaisherebtw_bot</b> to get fast, working download links.
 
 🎬 <i>Enjoy your movies & shows ad-free!</i>`;
 
+const TELEGRAM_APP_FILES = {
+  android_runner: "BQACAgUAAxkDAAIBaWrTipCb-_-q012OEDifzt5NG4DEAAKeIQACokyZVixMVT8C3CLYPQQ",
+  android_app: "BQACAgUAAxkDAAIBamrTisA9owxvz_qltfrVc6cu9BbOAAKfIQACokyZVhNpasclQJk_PQQ",
+  web_app: "BQACAgUAAxkDAAIBa2rTismbICbMl7YhtQS-U3MdNRsEAAKgIQACokyZVpMnnRAIz3UOPQQ"
+};
+
 const VLC_GUIDE_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: '⚡ Download Runner App', url: 'https://cinema-dwh.pages.dev/?tab=downloads' },
-      { text: '📥 Get VLC Player', url: 'https://www.videolan.org/vlc/' }
+      { text: '🌐 Cinema Web', url: 'https://cinema-dwh.pages.dev' },
+      { text: '📱 Runner APK', callback_data: 'send_file:android_runner' }
     ],
     [
-      { text: '🤖 Open Cinema Bot', url: 'https://t.me/cinemaisherebtw_bot' },
-      { text: '🌐 Open Website', url: loadConfig().WEB_URL }
+      { text: '📱 Cinema App', callback_data: 'send_file:android_app' },
+      { text: '🌐 Web APK', callback_data: 'send_file:web_app' }
+    ],
+    [
+      { text: '📥 VLC Player', url: 'https://www.videolan.org/vlc/' },
+      { text: '🌐 All Downloads', url: 'https://cinema-dwh.pages.dev/?tab=downloads' }
     ]
   ]
 };
@@ -114,7 +124,7 @@ async function pinMessage(chatId, messageId) {
   });
 }
 
-// Directly show release qualities and episodes from a specific extension with pagination
+// Directly show release qualities and episodes from a specific extension with pagination & poster
 async function showItemDetails(chatId, item, page = 1, messageId = null) {
   let meta = item.meta;
   if (!meta) {
@@ -129,11 +139,12 @@ async function showItemDetails(chatId, item, page = 1, messageId = null) {
   const pageSize = 8;
   const totalPages = Math.ceil(linkList.length / pageSize) || 1;
   const currentPage = Math.max(1, Math.min(page, totalPages));
+  const posterUrl = meta?.poster || meta?.image || item.image || item.poster || null;
 
   if (linkList.length > 0) {
     let itemText = `🎬 <b>${escapeHtml(meta.title || item.title)}</b>\n`;
     if (meta.synopsis) {
-      itemText += `\n📝 <i>${escapeHtml(meta.synopsis.slice(0, 240))}...</i>\n`;
+      itemText += `\n📝 <i>${escapeHtml(meta.synopsis.slice(0, 200))}...</i>\n`;
     }
     itemText += `\n🌐 <b>Source:</b> ${escapeHtml(item.provider)}`;
     if (totalPages > 1) {
@@ -148,22 +159,32 @@ async function showItemDetails(chatId, item, page = 1, messageId = null) {
     // Save item with meta in linkStore for fast in-memory page flipping
     const itemStoreId = storeLink(item.provider, item.link, item.title, { meta });
 
+    const rowBatch = [];
     pageItems.forEach((group, gIdx) => {
       const dLinks = group.directLinks || [];
       const isMultiEpisode = dLinks.length > 1;
 
       if (isMultiEpisode) {
-        const epGroupStoreId = storeLink(item.provider, dLinks, `${item.title} - ${group.title || 'Episodes'}`);
-        const label = `📺 ${group.title || 'Single Episodes'} (${dLinks.length} Ep)`;
-        keyboard.push([{ text: label, callback_data: `eps:${epGroupStoreId}` }]);
+        const epGroupStoreId = storeLink(item.provider, {
+          episodes: dLinks,
+          allGroups: linkList,
+          groupTitle: group.title,
+          seriesTitle: meta?.title || item.title
+        }, `${item.title} - ${group.title || 'Episodes'}`);
+        const label = `📺 ${group.title ? group.title.slice(0, 16) : 'Eps'} (${dLinks.length})`;
+        rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
       } else {
         const targetLink = dLinks[0]?.link || item.link;
         const qTitle = `${item.title} [${group.title || group.quality || `Quality ${startIndex + gIdx + 1}`}]`;
         const qStoreId = storeLink(item.provider, targetLink, qTitle);
-        const label = `⚡ ${group.title || group.quality || `Quality ${startIndex + gIdx + 1}`}`;
-        keyboard.push([{ text: label, callback_data: `resopt:${qStoreId}` }]);
+        const label = `⚡ ${(group.title || group.quality || `Q${startIndex + gIdx + 1}`).slice(0, 20)}`;
+        rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });
       }
     });
+
+    for (let i = 0; i < rowBatch.length; i += 2) {
+      keyboard.push(rowBatch.slice(i, i + 2));
+    }
 
     // Pagination row
     if (totalPages > 1) {
@@ -171,7 +192,7 @@ async function showItemDetails(chatId, item, page = 1, messageId = null) {
       if (currentPage > 1) {
         navRow.push({ text: '⬅️ Prev', callback_data: `qpage:${itemStoreId}:${currentPage - 1}` });
       }
-      navRow.push({ text: `📄 Page ${currentPage} of ${totalPages}`, callback_data: 'noop' });
+      navRow.push({ text: `📄 Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
       if (currentPage < totalPages) {
         navRow.push({ text: 'Next ➡️', callback_data: `qpage:${itemStoreId}:${currentPage + 1}` });
       }
@@ -179,8 +200,8 @@ async function showItemDetails(chatId, item, page = 1, messageId = null) {
     }
 
     keyboard.push([
-      { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` },
-      { text: '🌐 Open in Cinema Web', url: `${loadConfig().WEB_URL}` }
+      { text: '🌐 Cinema Web', url: `${loadConfig().WEB_URL}` },
+      { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` }
     ]);
 
     if (messageId) {
@@ -191,6 +212,17 @@ async function showItemDetails(chatId, item, page = 1, messageId = null) {
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: keyboard }
       });
+    }
+
+    if (posterUrl && (posterUrl.startsWith('http://') || posterUrl.startsWith('https://'))) {
+      const photoRes = await tgCall('sendPhoto', {
+        chat_id: chatId,
+        photo: posterUrl,
+        caption: itemText,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+      if (photoRes?.ok) return photoRes;
     }
 
     return sendMessage(chatId, itemText, { reply_markup: { inline_keyboard: keyboard } });
@@ -213,11 +245,22 @@ Choose an option below:`;
         { text: '⬇️ Direct Download', callback_data: `dl:${storeId}` }
       ],
       [
-        { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` },
-        { text: '🌐 View on Web', url: `${loadConfig().WEB_URL}` }
+        { text: '🌐 Cinema Web', url: `${loadConfig().WEB_URL}` },
+        { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` }
       ]
     ]
   };
+
+  if (posterUrl && (posterUrl.startsWith('http://') || posterUrl.startsWith('https://'))) {
+    const photoRes = await tgCall('sendPhoto', {
+      chat_id: chatId,
+      photo: posterUrl,
+      caption: itemText,
+      parse_mode: 'HTML',
+      reply_markup: keyboard
+    });
+    if (photoRes?.ok) return photoRes;
+  }
 
   return sendMessage(chatId, itemText, { reply_markup: keyboard });
 }
@@ -313,17 +356,47 @@ async function handleMessage(msg) {
           }
         }
 
+        // Instant interactive loading feedback
+        tgCall('sendChatAction', { chat_id: chatId, action: 'upload_photo' }).catch(() => {});
+        const loadingMsg = await sendMessage(chatId, `⏳ Loading media details from <b>${escapeHtml(provKey || 'extension')}</b>...`);
+        const loadingMsgId = loadingMsg?.result?.message_id;
+
         const item = getStoredLink(storeId);
         if (item) {
-          // DIRECTLY SHOW MEDIA FROM THIS EXACT EXTENSION (NO SEARCH NEEDED!)
+          if (loadingMsgId) {
+            tgCall('deleteMessage', { chat_id: chatId, message_id: loadingMsgId }).catch(() => {});
+          }
+          // DIRECTLY SHOW MEDIA FROM THIS EXACT EXTENSION WITH POSTER
           return showItemDetails(chatId, item);
         }
 
         // Fallback: search exclusively on the extension that was clicked (never all extensions)
         if (provKey && rawTitle) {
-          await sendMessage(chatId, `🔍 Finding <b>"${escapeHtml(rawTitle)}"</b> on <b>${escapeHtml(provKey)}</b>...`);
+          if (loadingMsgId) {
+            tgCall('editMessageText', {
+              chat_id: chatId,
+              message_id: loadingMsgId,
+              text: `🔍 Fetching <b>"${escapeHtml(rawTitle)}"</b> on <b>${escapeHtml(provKey)}</b>...`,
+              parse_mode: 'HTML'
+            }).catch(() => {});
+          }
           const results = await searchSingleProvider(rawTitle, provKey);
+          if (Array.isArray(results) && results.length > 0) {
+            if (loadingMsgId) {
+              tgCall('deleteMessage', { chat_id: chatId, message_id: loadingMsgId }).catch(() => {});
+            }
+            return showItemDetails(chatId, results[0]);
+          }
           const formatted = formatSearchResults(results, rawTitle, provKey);
+          if (loadingMsgId) {
+            return tgCall('editMessageText', {
+              chat_id: chatId,
+              message_id: loadingMsgId,
+              text: formatted.text,
+              parse_mode: 'HTML',
+              reply_markup: formatted.keyboard
+            });
+          }
           return sendMessage(chatId, formatted.text, { reply_markup: formatted.keyboard });
         }
       }
@@ -435,12 +508,27 @@ We strongly recommend installing <b>VLC Player</b> for ultra-smooth 4K/1080p pla
     }
   }
 
+  // /web command
+  if (text.startsWith('/web') || text === 'web') {
+    const webUrl = loadConfig().WEB_URL;
+    return sendMessage(chatId, `🌐 <b>Cinema Web App:</b> <a href="${webUrl}">${webUrl}</a>\n\nStream movies & series 100% ad-free directly in your browser!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '🌐 Open Cinema Web', url: webUrl },
+            { text: '📱 Runner APK', callback_data: 'send_file:android_runner' }
+          ]
+        ]
+      }
+    });
+  }
+
   // 5. /runner or /apk or /app command
   if (text.startsWith('/runner') || text.startsWith('/apk') || text.startsWith('/app')) {
     await sendMessage(chatId, VLC_GUIDE_TEXT, { reply_markup: VLC_GUIDE_KEYBOARD });
     return tgCall('sendDocument', {
       chat_id: chatId,
-      document: 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk',
+      document: 'BQACAgUAAxkDAAIBaWrTipCb-_-q012OEDifzt5NG4DEAAKeIQACokyZVixMVT8C3CLYPQQ',
       caption: '⚡ <b>Cinema Node Runner APK (v2.2.1)</b>\n\nRaw installer file. Tap to install directly on Android!',
       parse_mode: 'HTML'
     });
@@ -574,6 +662,29 @@ async function handleCallbackQuery(cq) {
     return sendMessage(chatId, VLC_GUIDE_TEXT, { reply_markup: VLC_GUIDE_KEYBOARD });
   }
 
+  // Direct raw APK file push into chat
+  if (data.startsWith('send_file:')) {
+    const fileType = data.replace('send_file:', '');
+    await answerCallbackQuery(cqId, 'Sending file directly into chat...');
+    let fileDoc = TELEGRAM_APP_FILES[fileType] || 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk';
+    let caption = '⚡ <b>Cinema Node Runner APK (v2.2.1)</b>\n\nRaw installer file. Keeps background scrapers active 24/7 on Android!';
+
+    if (fileType === 'android_app') {
+      fileDoc = TELEGRAM_APP_FILES.android_app || 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.apk';
+      caption = '📱 <b>Cinema Mobile App APK</b>\n\nRaw installer file. Tap to install directly and stream ad-free!';
+    } else if (fileType === 'web_app') {
+      fileDoc = TELEGRAM_APP_FILES.web_app;
+      caption = '🌐 <b>Cinema Web App APK</b>\n\nDirect progressive web container for Android!';
+    }
+
+    return tgCall('sendDocument', {
+      chat_id: chatId,
+      document: fileDoc,
+      caption,
+      parse_mode: 'HTML'
+    });
+  }
+
   // Admin toggle provider via button
   if (data.startsWith('adm_tog:')) {
     if (!isAdmin(userId)) {
@@ -657,7 +768,11 @@ async function handleCallbackQuery(cq) {
 
     await answerCallbackQuery(cqId);
 
-    const episodes = Array.isArray(groupData.link) ? groupData.link : [];
+    const groupDataObj = typeof groupData.link === 'object' && !Array.isArray(groupData.link) ? groupData.link : null;
+    const episodes = Array.isArray(groupData.link) ? groupData.link : (groupDataObj?.episodes || []);
+    const allGroups = groupDataObj?.allGroups || [];
+    const seriesTitle = groupDataObj?.seriesTitle || groupData.title;
+
     const pageSize = 18;
     const totalPages = Math.ceil(episodes.length / pageSize) || 1;
     const currentPage = Math.max(1, Math.min(page, totalPages));
@@ -666,7 +781,7 @@ async function handleCallbackQuery(cq) {
     if (totalPages > 1) {
       epText += `📄 <b>Page ${currentPage} of ${totalPages}</b> (${episodes.length} Total Episodes)\n`;
     }
-    epText += `\n<i>Select an Episode to Stream & Download:</i>`;
+    epText += `\n<i>Select an Episode to choose Quality / Stream:</i>`;
 
     const keyboard = [];
     const startIndex = (currentPage - 1) * pageSize;
@@ -679,11 +794,44 @@ async function handleCallbackQuery(cq) {
         const epIndex = startIndex + i + idx;
         const epNum = epIndex + 1;
         const epTitle = ep.title || `Episode ${epNum}`;
-        const epStoreId = storeLink(groupData.provider, ep.link, `${groupData.title} - ${epTitle}`);
-        return {
-          text: `▶️ Ep ${epNum}`,
-          callback_data: `resopt:${epStoreId}`
-        };
+
+        const altQualities = [];
+        if (allGroups.length > 1) {
+          for (const g of allGroups) {
+            const dList = g.directLinks || [];
+            if (dList.length > 0) {
+              const matchedEp = dList[epIndex] || dList.find(d => {
+                const num = (d.title || '').match(/\b(?:e|ep|episode)\s*(\d+)\b/i);
+                return num && parseInt(num[1], 10) === epNum;
+              });
+              if (matchedEp && matchedEp.link) {
+                altQualities.push({
+                  quality: g.title || g.quality || 'Option',
+                  link: matchedEp.link,
+                  title: `${seriesTitle} - Ep ${epNum} [${g.title || g.quality || 'Option'}]`
+                });
+              }
+            }
+          }
+        }
+
+        if (altQualities.length > 1) {
+          const epqStoreId = storeLink(groupData.provider, {
+            epNum,
+            seriesTitle,
+            qualities: altQualities
+          }, `${seriesTitle} - Ep ${epNum} Qualities`);
+          return {
+            text: `▶️ Ep ${epNum}`,
+            callback_data: `epq:${epqStoreId}`
+          };
+        } else {
+          const epStoreId = storeLink(groupData.provider, ep.link, `${groupData.title} - ${epTitle}`);
+          return {
+            text: `▶️ Ep ${epNum}`,
+            callback_data: `resopt:${epStoreId}`
+          };
+        }
       });
       keyboard.push(row);
     }
@@ -702,7 +850,7 @@ async function handleCallbackQuery(cq) {
     }
 
     keyboard.push([
-      { text: '🌐 Open in Cinema Web', url: `${loadConfig().WEB_URL}` }
+      { text: '🌐 Cinema Web', url: `${loadConfig().WEB_URL}` }
     ]);
 
     if (messageId && data.startsWith('epage:')) {
@@ -716,6 +864,38 @@ async function handleCallbackQuery(cq) {
     }
 
     return sendMessage(chatId, epText, { reply_markup: { inline_keyboard: keyboard } });
+  }
+
+  // Episode Quality Picker (epq:<epqStoreId>)
+  if (data.startsWith('epq:')) {
+    const epqStoreId = data.replace('epq:', '');
+    const epqData = getStoredLink(epqStoreId);
+    if (!epqData) return answerCallbackQuery(cqId, 'Session expired. Please search again.', true);
+    await answerCallbackQuery(cqId);
+
+    const info = epqData.link || {};
+    const qualities = info.qualities || [];
+    const epNum = info.epNum || 1;
+    const seriesTitle = info.seriesTitle || epqData.title;
+
+    let qText = `📺 <b>${escapeHtml(seriesTitle)} - Episode ${epNum}</b>\n\n`;
+    qText += `<i>Select your preferred resolution/quality for this episode:</i>\n`;
+
+    const keyboard = [];
+    const qButtons = [];
+    for (const q of qualities) {
+      const qStoreId = storeLink(epqData.provider, q.link, q.title);
+      const label = `⚡ ${(q.quality || 'Option').slice(0, 20)}`;
+      qButtons.push({ text: label, callback_data: `resopt:${qStoreId}` });
+    }
+
+    for (let i = 0; i < qButtons.length; i += 2) {
+      keyboard.push(qButtons.slice(i, i + 2));
+    }
+
+    keyboard.push([{ text: '🌐 Open in Cinema Web', url: `${loadConfig().WEB_URL}` }]);
+
+    return sendMessage(chatId, qText, { reply_markup: { inline_keyboard: keyboard } });
   }
 
   // Quality or Episode selected -> Resolve all Stream & Download mirrors

@@ -110,49 +110,44 @@ function formatQualityButtonLabel(rawTitle, defaultLabel = 'Option') {
 
   // 1. Extract resolution
   let res = '';
-  if (/\b(2160p|4k|uhd)\b/i.test(str)) res = '4K UHD';
+  if (/\b(2160p|4k|uhd)\b/i.test(str)) res = '4K';
   else if (/\b1080p\b/i.test(str)) res = '1080p';
   else if (/\b720p\b/i.test(str)) res = '720p';
   else if (/\b480p\b/i.test(str)) res = '480p';
 
   // 2. Extract codec / source type
   let tech = '';
-  if (/10bit/i.test(str)) tech = '10Bit';
+  if (/10bit/i.test(str)) tech = '10B';
   else if (/hevc|x265/i.test(str)) tech = 'HEVC';
-  else if (/bluray/i.test(str)) tech = 'BluRay';
-  else if (/web-?dl|webrip/i.test(str)) tech = 'WEB-DL';
-  else if (/hdtc|cam|hqrip/i.test(str)) tech = 'Pre-HD';
 
   // 3. Extract file size (e.g. 1.8GB, 450MB, 2.4 GB)
   let size = '';
   const sizeMatch = str.match(/\b(\d+(?:\.\d+)?\s*(?:gb|mb))\b/i);
   if (sizeMatch) {
-    size = sizeMatch[1].toUpperCase().replace(/\s+/, ' ');
+    size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
   }
 
   // 4. Extract audio/language
   let audio = '';
   if (/dual\s*audio/i.test(str) || (/\bhindi\b/i.test(str) && /\benglish\b/i.test(str))) {
-    audio = 'Dual Audio';
+    audio = 'Dual';
   } else if (/\bhindi\b/i.test(str)) {
-    audio = 'Hindi';
+    audio = 'Hin';
   } else if (/\benglish\b/i.test(str)) {
-    audio = 'English';
-  } else if (/multi/i.test(str)) {
-    audio = 'Multi';
+    audio = 'Eng';
   }
 
   const parts = [];
   if (res) parts.push(res);
-  if (tech && !res.includes(tech)) parts.push(tech);
+  if (tech) parts.push(tech);
   const mainBadge = parts.join(' ') || defaultLabel;
 
   let label = `⚡ ${mainBadge}`;
-  if (size) label += ` (${size})`;
+  if (size) label += ` [${size}]`;
   if (audio) label += ` • ${audio}`;
 
-  if (label.length > 42) {
-    label = label.slice(0, 41) + '…';
+  if (label.length > 28) {
+    label = label.slice(0, 27) + '…';
   }
   return label;
 }
@@ -162,14 +157,13 @@ function formatEpisodeButtonLabel(rawTitle, epCount) {
   let res = '';
   if (/\b(480p|720p|1080p|4k)\b/i.test(title)) {
     res = title.match(/\b(480p|720p|1080p|4k)\b/i)[1].toUpperCase();
-    if (/hevc|10bit/i.test(title)) res += ' HEVC';
   }
   let size = '';
   const sizeMatch = title.match(/\b(\d+(?:\.\d+)?\s*(?:gb|mb))\b/i);
-  if (sizeMatch) size = ` (${sizeMatch[1].toUpperCase()})`;
+  if (sizeMatch) size = ` [${sizeMatch[1].toUpperCase().replace(/\s+/, '')}]`;
 
-  let label = `📺 ${res ? res + ' ' : ''}Episodes (${epCount} Ep)${size}`;
-  if (label.length > 42) label = label.slice(0, 41) + '…';
+  let label = `📺 ${res ? res + ' ' : ''}Eps (${epCount})${size}`;
+  if (label.length > 28) label = label.slice(0, 27) + '…';
   return label;
 }
 
@@ -300,28 +294,39 @@ const RUNNER_LINKS = {
   mac: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner-2.2.0-arm64.dmg"
 };
 
-const VLC_GUIDE_TEXT = `🚀 <b>Cinema Apps & 24/7 Node Runner</b>\n\n` +
+// Raw Telegram persistent file_ids uploaded directly to Telegram servers
+const TELEGRAM_APP_FILES = {
+  android_runner: "BQACAgUAAxkDAAIBaWrTipCb-_-q012OEDifzt5NG4DEAAKeIQACokyZVixMVT8C3CLYPQQ",
+  android_app: "BQACAgUAAxkDAAIBamrTisA9owxvz_qltfrVc6cu9BbOAAKfIQACokyZVhNpasclQJk_PQQ",
+  web_app: "BQACAgUAAxkDAAIBa2rTismbICbMl7YhtQS-U3MdNRsEAAKgIQACokyZVpMnnRAIz3UOPQQ"
+};
+
+const VLC_GUIDE_TEXT = `🚀 <b>Cinema Web App & 24/7 Node Runner</b>\n\n` +
   `Keep Cinema active 24/7 or stream ad-free across all devices:\n\n` +
-  `📱 <b>Android:</b> <a href="${RUNNER_LINKS.android_runner}">Direct Runner APK (v2.2.1)</a> | <a href="${RUNNER_LINKS.android_app}">Cinema App APK</a>\n` +
+  `🌐 <b>Cinema Web:</b> <a href="${DEFAULT_WEB_URL}">cinema-dwh.pages.dev</a>\n` +
+  `📱 <b>Android:</b> <a href="${RUNNER_LINKS.android_runner}">Runner APK (v2.2.1)</a> | <a href="${RUNNER_LINKS.android_app}">Cinema App APK</a>\n` +
   `🪟 <b>Windows:</b> <a href="${RUNNER_LINKS.windows}">Windows Setup (.exe)</a>\n` +
   `🐧 <b>Linux:</b> <a href="${RUNNER_LINKS.linux_deb}">Debian/Ubuntu (.deb)</a> | <a href="${RUNNER_LINKS.linux}">AppImage</a>\n` +
   `🍏 <b>Mac:</b> <a href="${RUNNER_LINKS.mac}">macOS Apple Silicon (.dmg)</a>\n\n` +
-  `<i>💡 Tap buttons below to get raw files directly inside Telegram!</i>`;
+  `<i>💡 Tap buttons below to get raw files instantly inside Telegram!</i>`;
 
 const VLC_GUIDE_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: '📱 Send Runner APK', callback_data: 'send_file:android_runner' },
-      { text: '📱 Send Cinema App', callback_data: 'send_file:android_app' }
+      { text: '🌐 Cinema Web App', url: DEFAULT_WEB_URL },
+      { text: '📱 Runner APK', callback_data: 'send_file:android_runner' }
+    ],
+    [
+      { text: '📱 Cinema App', callback_data: 'send_file:android_app' },
+      { text: '🌐 Web APK', callback_data: 'send_file:web_app' }
     ],
     [
       { text: '🪟 Windows (.exe)', url: RUNNER_LINKS.windows },
-      { text: '🐧 Linux (.deb)', url: RUNNER_LINKS.linux_deb },
-      { text: '🐧 Linux (.AppImage)', url: RUNNER_LINKS.linux }
+      { text: '🐧 Linux (.deb)', url: RUNNER_LINKS.linux_deb }
     ],
     [
       { text: '🍏 Mac (.dmg)', url: RUNNER_LINKS.mac },
-      { text: '🌐 Web Downloads', url: `${DEFAULT_WEB_URL}/?tab=downloads` }
+      { text: '📥 Web Downloads', url: `${DEFAULT_WEB_URL}/?tab=downloads` }
     ]
   ]
 };
@@ -329,7 +334,8 @@ const VLC_GUIDE_KEYBOARD = {
 const HELP_TEXT = `🤖 <b>Cinema Streaming Bot - Command Directory</b>\n\n` +
   `Here are all valid commands available on this bot:\n\n` +
   `• 🔍 <b>Search Content:</b> Just type any movie or show title (or <code>/search &lt;name&gt;</code>)\n` +
-  `• ⚡ <b>/runner</b> or <b>/apk</b> or <b>/app</b>: Get Cinema Runner APK directly in chat & background runner links\n` +
+  `• 🌐 <b>/web</b>: Open Cinema Web tab directly (${DEFAULT_WEB_URL})\n` +
+  `• ⚡ <b>/runner</b> or <b>/apk</b> or <b>/app</b>: Get instant Cinema APKs & Runners directly in chat\n` +
   `• 📖 <b>/vlc</b> or <b>/guide</b>: Setup VLC player handoff & buffer-free streaming guide\n` +
   `• 🧩 <b>/providers</b>: View all 30+ extensions and check enabled scrapers\n` +
   `• 🏠 <b>/start</b>: Launch main interactive menu and quick shortcuts\n` +
@@ -342,15 +348,16 @@ const HELP_TEXT = `🤖 <b>Cinema Streaming Bot - Command Directory</b>\n\n` +
 const HELP_KEYBOARD = {
   inline_keyboard: [
     [
+      { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
+      { text: '⚡ Runner APK', callback_data: 'send_file:android_runner' }
+    ],
+    [
       { text: '🔍 Search Movie / Show', switch_inline_query_current_chat: '' },
-      { text: '⚡ Get Runner APK', callback_data: 'send_file:android_runner' }
+      { text: '🧩 Extensions', callback_data: 'view_providers' }
     ],
     [
-      { text: '🧩 Enabled Providers', callback_data: 'view_providers' },
-      { text: '📖 VLC Guide', callback_data: 'vlc_guide' }
-    ],
-    [
-      { text: '🌐 Open Cinema Web', url: DEFAULT_WEB_URL }
+      { text: '📖 VLC Guide', callback_data: 'vlc_guide' },
+      { text: '📱 Cinema App', callback_data: 'send_file:android_app' }
     ]
   ]
 };
@@ -448,25 +455,52 @@ async function handleMessage(msg, token, db, requestUrl) {
           }
         }
 
+        // Provide instant interactive loading feedback to the user
+        await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_photo' });
+        const loadingMsgRes = await tgCall(token, 'sendMessage', {
+          chat_id: chatId,
+          text: `⏳ Loading media details from <b>${escapeHtml(provKey || 'extension')}</b>...`,
+          parse_mode: 'HTML'
+        });
+        const loadingMsgId = loadingMsgRes?.result?.message_id;
+
         const item = await getStoredLink(db, storeId);
         if (item) {
-          // DIRECTLY SHOW MEDIA FROM THIS EXACT EXTENSION
+          if (loadingMsgId) {
+            tgCall(token, 'deleteMessage', { chat_id: chatId, message_id: loadingMsgId }).catch(() => {});
+          }
+          // DIRECTLY SHOW MEDIA FROM THIS EXACT EXTENSION WITH POSTER
           return showItemDetails(chatId, item, token, db, requestUrl, null);
         }
 
         // Fallback: search exclusively on the extension that was clicked
         if (provKey && rawTitle) {
-          await tgCall(token, 'sendMessage', {
-            chat_id: chatId,
-            text: `🔍 Finding <b>"${escapeHtml(rawTitle)}"</b> on <b>${escapeHtml(provKey)}</b>...`,
-            parse_mode: 'HTML'
-          });
+          if (loadingMsgId) {
+            await tgCall(token, 'editMessageText', {
+              chat_id: chatId,
+              message_id: loadingMsgId,
+              text: `🔍 Fetching <b>"${escapeHtml(rawTitle)}"</b> on <b>${escapeHtml(provKey)}</b>...`,
+              parse_mode: 'HTML'
+            });
+          }
           const dataRes = await callCinemaApi(requestUrl, '/search', { provider: provKey, q: rawTitle });
           const results = Array.isArray(dataRes) ? dataRes : [];
           if (results.length > 0) {
+            if (loadingMsgId) {
+              tgCall(token, 'deleteMessage', { chat_id: chatId, message_id: loadingMsgId }).catch(() => {});
+            }
             return showItemDetails(chatId, results[0], token, db, requestUrl, null);
           }
           const formatted = await formatSearchResults(results, rawTitle, 1, db);
+          if (loadingMsgId) {
+            return tgCall(token, 'editMessageText', {
+              chat_id: chatId,
+              message_id: loadingMsgId,
+              text: formatted.text,
+              parse_mode: 'HTML',
+              reply_markup: formatted.keyboard
+            });
+          }
           return tgCall(token, 'sendMessage', {
             chat_id: chatId,
             text: formatted.text,
@@ -525,6 +559,23 @@ async function handleMessage(msg, token, db, requestUrl) {
     });
   }
 
+  // /web command
+  if (text.startsWith('/web') || text === 'web') {
+    return tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: `🌐 <b>Cinema Web App:</b> <a href="${DEFAULT_WEB_URL}">${DEFAULT_WEB_URL}</a>\n\nStream movies & series 100% ad-free directly in your browser!`,
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '🌐 Open Cinema Web', url: DEFAULT_WEB_URL },
+            { text: '📱 Runner APK', callback_data: 'send_file:android_runner' }
+          ]
+        ]
+      }
+    });
+  }
+
   // /runner or /apk or /app
   if (text.startsWith('/runner') || text.startsWith('/apk') || text.startsWith('/app')) {
     await tgCall(token, 'sendMessage', {
@@ -535,7 +586,7 @@ async function handleMessage(msg, token, db, requestUrl) {
     });
     return tgCall(token, 'sendDocument', {
       chat_id: chatId,
-      document: RUNNER_LINKS.android_runner,
+      document: TELEGRAM_APP_FILES.android_runner || RUNNER_LINKS.android_runner,
       caption: '⚡ <b>Cinema Node Runner APK (v2.2.1)</b>\n\nRaw installer file. Tap to install directly on Android!',
       parse_mode: 'HTML'
     });
@@ -707,14 +758,21 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
   if (data.startsWith('send_file:')) {
     const fileType = data.replace('send_file:', '');
     await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Sending raw file directly into chat...' });
-    const isApp = fileType === 'android_app';
-    const docUrl = isApp ? RUNNER_LINKS.android_app : RUNNER_LINKS.android_runner;
-    const caption = isApp
-      ? '📱 <b>Cinema Mobile App APK</b>\n\nRaw installer file. Tap to install directly and stream ad-free!'
-      : '⚡ <b>Cinema Node Runner APK (v2.2.1)</b>\n\nRaw installer file. Keeps background scrapers active 24/7 on Android!';
+    
+    let fileDoc = TELEGRAM_APP_FILES[fileType] || RUNNER_LINKS[fileType];
+    let caption = '⚡ <b>Cinema Node Runner APK (v2.2.1)</b>\n\nRaw installer file. Keeps background scrapers active 24/7 on Android!';
+    
+    if (fileType === 'android_app') {
+      fileDoc = TELEGRAM_APP_FILES.android_app || RUNNER_LINKS.android_app;
+      caption = '📱 <b>Cinema Mobile App APK</b>\n\nRaw installer file. Tap to install directly and stream ad-free!';
+    } else if (fileType === 'web_app') {
+      fileDoc = TELEGRAM_APP_FILES.web_app;
+      caption = '🌐 <b>Cinema Web App APK</b>\n\nDirect progressive web container for Android!';
+    }
+
     return tgCall(token, 'sendDocument', {
       chat_id: chatId,
-      document: docUrl,
+      document: fileDoc,
       caption,
       parse_mode: 'HTML'
     });
@@ -849,7 +907,11 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     }
     await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
 
-    const episodes = Array.isArray(groupData.link) ? groupData.link : [];
+    const groupDataObj = typeof groupData.link === 'object' && !Array.isArray(groupData.link) ? groupData.link : null;
+    const episodes = Array.isArray(groupData.link) ? groupData.link : (groupDataObj?.episodes || []);
+    const allGroups = groupDataObj?.allGroups || [];
+    const seriesTitle = groupDataObj?.seriesTitle || groupData.title;
+
     const pageSize = 18;
     const totalPages = Math.ceil(episodes.length / pageSize) || 1;
     const currentPage = Math.max(1, Math.min(page, totalPages));
@@ -858,7 +920,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     if (totalPages > 1) {
       epText += `📄 <b>Page ${currentPage} of ${totalPages}</b> (${episodes.length} Episodes)\n`;
     }
-    epText += `\n<i>Select an Episode to Stream & Download:</i>`;
+    epText += `\n<i>Select an Episode to choose Quality / Stream:</i>`;
 
     const keyboard = [];
     const startIndex = (currentPage - 1) * pageSize;
@@ -871,8 +933,40 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         const ep = chunk[j];
         const epNum = startIndex + i + j + 1;
         const epTitle = ep.title || `Episode ${epNum}`;
-        const epStoreId = await storeLink(db, groupData.provider, ep.link, `${groupData.title} - ${epTitle}`);
-        row.push({ text: `▶️ Ep ${epNum}`, callback_data: `resopt:${epStoreId}` });
+
+        // Check if multiple qualities exist across allGroups for this episode index
+        const altQualities = [];
+        if (allGroups.length > 1) {
+          for (const g of allGroups) {
+            const dList = g.directLinks || [];
+            if (dList.length > 0) {
+              const matchedEp = dList[startIndex + i + j] || dList.find(d => {
+                const num = (d.title || '').match(/\b(?:e|ep|episode)\s*(\d+)\b/i);
+                return num && parseInt(num[1], 10) === epNum;
+              });
+              if (matchedEp && matchedEp.link) {
+                altQualities.push({
+                  quality: g.title || g.quality || 'Option',
+                  link: matchedEp.link,
+                  title: `${seriesTitle} - Ep ${epNum} [${g.title || g.quality || 'Option'}]`
+                });
+              }
+            }
+          }
+        }
+
+        if (altQualities.length > 1) {
+          // Store quality choice package
+          const epqStoreId = await storeLink(db, groupData.provider, {
+            epNum,
+            seriesTitle,
+            qualities: altQualities
+          }, `${seriesTitle} - Ep ${epNum} Qualities`);
+          row.push({ text: `▶️ Ep ${epNum}`, callback_data: `epq:${epqStoreId}` });
+        } else {
+          const epStoreId = await storeLink(db, groupData.provider, ep.link, `${groupData.title} - ${epTitle}`);
+          row.push({ text: `▶️ Ep ${epNum}`, callback_data: `resopt:${epStoreId}` });
+        }
       }
       keyboard.push(row);
     }
@@ -904,6 +998,46 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     return tgCall(token, 'sendMessage', {
       chat_id: chatId,
       text: epText,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: keyboard }
+    });
+  }
+
+  // Episode Quality Picker (epq:<epqStoreId>)
+  if (data.startsWith('epq:')) {
+    const epqStoreId = data.replace('epq:', '');
+    const epqData = await getStoredLink(db, epqStoreId);
+    if (!epqData) {
+      return tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Session expired.', show_alert: true });
+    }
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
+
+    const info = epqData.link || {};
+    const qualities = info.qualities || [];
+    const epNum = info.epNum || 1;
+    const seriesTitle = info.seriesTitle || epqData.title;
+
+    let qText = `📺 <b>${escapeHtml(seriesTitle)} - Episode ${epNum}</b>\n\n`;
+    qText += `<i>Select your preferred resolution/quality for this episode:</i>\n`;
+
+    const keyboard = [];
+    const qButtons = [];
+    for (const q of qualities) {
+      const qStoreId = await storeLink(db, epqData.provider, q.link, q.title);
+      const label = formatQualityButtonLabel(q.quality, 'Stream');
+      qButtons.push({ text: label, callback_data: `resopt:${qStoreId}` });
+    }
+
+    // Group into 2 buttons per row for mobile
+    for (let i = 0; i < qButtons.length; i += 2) {
+      keyboard.push(qButtons.slice(i, i + 2));
+    }
+
+    keyboard.push([{ text: '🌐 Open in Cinema Web', url: DEFAULT_WEB_URL }]);
+
+    return tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: qText,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard }
     });
@@ -950,23 +1084,24 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     let resMsg = `🎬 <b>${escapeHtml(item.title)}</b>\n`;
     resMsg += `🌐 <b>Provider:</b> ${escapeHtml(item.provider)}\n\n`;
-    resMsg += `<i>Tap below to stream directly in VLC or download verified files:</i>\n`;
+    resMsg += `<i>Tap below to stream directly in VLC or download:</i>\n`;
 
     const keyboard = [];
-    validMirrors.slice(0, 5).forEach((m, idx) => {
-      const sName = m.server || `Mirror ${idx + 1}`;
+    validMirrors.slice(0, 4).forEach((m, idx) => {
+      let sName = (m.server || `M${idx + 1}`).replace(/^Server\s*/i, 'Svr ').slice(0, 10);
       const url = m.link || m.url;
       const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(item.title)}`;
 
-      keyboard.push([{ text: `🎬 Open in VLC Player (${sName})`, url: vlcRedirectUrl }]);
+      const row = [{ text: `🎬 VLC (${sName})`, url: vlcRedirectUrl }];
       if (isRealDownloadLink(url)) {
-        keyboard.push([{ text: `⬇️ Direct Download (${sName})`, url: url }]);
+        row.push({ text: `⬇️ Download (${sName})`, url: url });
       }
+      keyboard.push(row);
     });
 
     keyboard.push([
-      { text: '🔄 Switch Provider', callback_data: `swprov:${item.title.slice(0, 30)}` },
-      { text: '🌐 View on Web', url: DEFAULT_WEB_URL }
+      { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
+      { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` }
     ]);
 
     return tgCall(token, 'sendMessage', {
@@ -1033,7 +1168,7 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   return { text, keyboard: { inline_keyboard: keyboard } };
 }
 
-// Show Item Qualities / Episodes (Mobile-Optimized Card)
+// Show Item Qualities / Episodes (Mobile-Optimized Card with Poster)
 async function showItemDetails(chatId, item, token, db, requestUrl, messageId = null, page = 1, itemStoreIdParam = null) {
   let meta = null;
   if (item.link) {
@@ -1046,6 +1181,7 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
   const yearStr = meta?.year ? ` (${meta.year})` : '';
   const ratingStr = meta?.rating ? `⭐ <b>Rating:</b> ${escapeHtml(meta.rating)}/10 • ` : '';
   const provDisplayName = item.providerName || (item.provider ? item.provider.toUpperCase() : 'CINEMA');
+  const posterUrl = meta?.poster || meta?.image || item.image || item.poster || null;
 
   let itemText = `🎬 <b>${escapeHtml(meta?.title || item.title)}${yearStr}</b>\n`;
   itemText += `━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -1069,20 +1205,32 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
     const startIndex = (currentPage - 1) * pageSize;
     const pageItems = rawGroups.slice(startIndex, startIndex + pageSize);
 
+    // Render quality / episode batches in compact mobile rows (up to 2 per row)
+    const rowBatch = [];
     for (let i = 0; i < pageItems.length; i++) {
       const group = pageItems[i];
       const dLinks = group.directLinks || [];
       if (dLinks.length > 1) {
-        const epGroupStoreId = await storeLink(db, item.provider, dLinks, `${item.title} - ${group.title || 'Episodes'}`);
+        // Group contains multiple single episodes
+        const epGroupStoreId = await storeLink(db, item.provider, {
+          episodes: dLinks,
+          allGroups: rawGroups,
+          groupTitle: group.title,
+          seriesTitle: meta?.title || item.title
+        }, `${item.title} - ${group.title || 'Episodes'}`);
         const label = formatEpisodeButtonLabel(group.title, dLinks.length);
-        keyboard.push([{ text: label, callback_data: `eps:${epGroupStoreId}` }]);
+        rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
       } else {
         const targetLink = dLinks[0]?.link || item.link;
         const qTitle = `${item.title} [${group.title || group.quality || `Quality ${startIndex + i + 1}`}]`;
         const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
         const label = formatQualityButtonLabel(group.title || group.quality, `Quality ${startIndex + i + 1}`);
-        keyboard.push([{ text: label, callback_data: `resopt:${qStoreId}` }]);
+        rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });
       }
+    }
+
+    for (let i = 0; i < rowBatch.length; i += 2) {
+      keyboard.push(rowBatch.slice(i, i + 2));
     }
 
     if (totalPages > 1) {
@@ -1098,10 +1246,11 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
   }
 
   keyboard.push([
-    { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` },
-    { text: '🌐 Open Web Player', url: DEFAULT_WEB_URL }
+    { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
+    { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` }
   ]);
 
+  // If editing an existing message without photo change
   if (messageId) {
     return tgCall(token, 'editMessageText', {
       chat_id: chatId,
@@ -1112,6 +1261,19 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
     });
   }
 
+  // If item has a poster image, send photo card with poster
+  if (posterUrl && (posterUrl.startsWith('http://') || posterUrl.startsWith('https://'))) {
+    const photoRes = await tgCall(token, 'sendPhoto', {
+      chat_id: chatId,
+      photo: posterUrl,
+      caption: itemText,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: keyboard }
+    });
+    if (photoRes?.ok) return photoRes;
+  }
+
+  // Fallback to text message
   return tgCall(token, 'sendMessage', {
     chat_id: chatId,
     text: itemText,

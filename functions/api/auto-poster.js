@@ -261,17 +261,21 @@ export async function runAutoPoster(env, requestUrl, force = false) {
         inline_keyboard: [
           [
             {
-              text: `⚡ Stream & Download [${escapeHtml(provDisplayName)}]`,
+              text: `▶️ Watch [${escapeHtml(provDisplayName.slice(0, 10))}]`,
               url: `https://t.me/cinemaisherebtw_bot?start=${directStartParam}`
+            },
+            {
+              text: `🌐 Cinema Web`,
+              url: DEFAULT_WEB_URL
             }
           ],
           [
             {
-              text: `🤖 Choose Quality & Episodes`,
+              text: `💿 Qualities & Eps`,
               url: `https://t.me/cinemaisherebtw_bot?start=${directStartParam}`
             },
             {
-              text: `📱 Download Runner APK`,
+              text: `📱 Runner APK`,
               url: `https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk`
             }
           ]

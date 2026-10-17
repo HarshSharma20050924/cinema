@@ -82,18 +82,22 @@ async function postExtensionCardToChannel(post, provInfo) {
     inline_keyboard: [
       [
         {
-          text: `⚡ Stream & Download [${escapeHtml(provDisplayName)}]`,
+          text: `▶️ Watch [${escapeHtml(provDisplayName.slice(0, 10))}]`,
           url: `https://t.me/cinemaisherebtw_bot?start=${directStartParam}`
+        },
+        {
+          text: '🌐 Cinema Web',
+          url: `${cfg.WEB_URL}`
         }
       ],
       [
         {
-          text: `🤖 Choose Quality [${escapeHtml(provDisplayName)}]`,
+          text: `💿 Qualities & Eps`,
           url: `https://t.me/cinemaisherebtw_bot?start=${directStartParam}`
         },
         {
-          text: '🌐 Open in Cinema Web',
-          url: `${cfg.WEB_URL}`
+          text: '📱 Runner APK',
+          url: 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk'
         }
       ]
     ]
