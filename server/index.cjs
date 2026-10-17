@@ -29,12 +29,18 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+const clusterSync = require('./services/clusterSync.cjs');
+
 async function startServer() {
   // Sync live domain mirrors on startup
   await domainResolver.syncUrls();
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🎬 Cinema Modular Engine listening on http://0.0.0.0:${PORT}`);
+    // Start automated 24/7 cluster registration if in cloud or auto-sync enabled
+    clusterSync.initClusterSync(PORT).catch((err) => {
+      console.warn('Cluster sync startup error:', err.message);
+    });
   });
 }
 

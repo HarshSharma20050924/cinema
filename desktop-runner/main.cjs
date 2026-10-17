@@ -504,10 +504,78 @@ ipcMain.handle('cinema:toggleAutoStart', async (_, enabled) => {
   return app.getLoginItemSettings().openAtLogin;
 });
 
+ipcMain.handle('cinema:getVersion', () => {
+  return app.getVersion();
+});
+
 ipcMain.handle('cinema:downloadAndInstall', async (_, data) => {
-  const url = data?.url || 'https://github.com/HarshSharma20050924/cinema/releases/latest';
-  shell.openExternal(url);
-  return { success: true };
+  const downloadUrl = data?.url;
+  if (!downloadUrl) return { error: 'No download URL specified' };
+
+  try {
+    let cleanPath = new URL(downloadUrl).pathname;
+    let filename = path.basename(cleanPath) || 'Cinema-Runner-Update';
+    if (!filename.includes('.')) filename += (process.platform === 'linux' ? '.deb' : process.platform === 'win32' ? '.exe' : '.dmg');
+
+    const downloadsFolder = app.getPath('downloads') || app.getPath('temp');
+    const targetPath = path.join(downloadsFolder, filename);
+
+    console.log(`[Updater] Downloading update in background: ${downloadUrl} -> ${targetPath}`);
+
+    const res = await fetch(downloadUrl, { headers: { 'User-Agent': 'CinemaRunner-Updater/2.2.1' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+    const total = parseInt(res.headers.get('content-length') || '0', 10);
+    const fileStream = fs.createWriteStream(targetPath);
+    let loaded = 0;
+    let lastNotify = 0;
+
+    const reader = res.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      fileStream.write(Buffer.from(value));
+      loaded += value.length;
+      const now = Date.now();
+      if (mainWindow && (now - lastNotify > 150)) {
+        lastNotify = now;
+        const progress = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 50;
+        mainWindow.webContents.send('cinema:updateProgress', {
+          progress,
+          bytes: loaded,
+          total: total || loaded
+        });
+      }
+    }
+    await new Promise((resolve) => fileStream.end(resolve));
+
+    if (mainWindow) {
+      mainWindow.webContents.send('cinema:updateProgress', {
+        progress: 100,
+        bytes: loaded,
+        total: loaded
+      });
+    }
+
+    // Make executable if AppImage
+    if (filename.toLowerCase().endsWith('.appimage')) {
+      try { fs.chmodSync(targetPath, 0o755); } catch (_) {}
+    }
+
+    // Launch package installer or reveal file without redirecting browser
+    setTimeout(() => {
+      try {
+        shell.openPath(targetPath);
+      } catch (_) {
+        shell.showItemInFolder(targetPath);
+      }
+    }, 400);
+
+    return { success: true, filePath: targetPath };
+  } catch (err) {
+    console.error('[Updater] Background download failed:', err);
+    return { error: err.message };
+  }
 });
 
 ipcMain.handle('cinema:windowAction', async (_, action) => {

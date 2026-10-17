@@ -137,8 +137,8 @@ export async function runAutoPoster(env, requestUrl, force = false) {
     errors: []
   };
 
-  // We post up to 2 items per run (1 fresh + 1 archive) to prevent flooding
-  const maxPosts = force ? 3 : 2;
+  // Rapid posting: allow up to 10 releases when forced or requested
+  const maxPosts = force ? 10 : 6;
   let postedCount = 0;
 
   for (const provKey of providers) {
@@ -168,7 +168,7 @@ export async function runAutoPoster(env, requestUrl, force = false) {
 
         const res = await fetch(postsUrl.toString(), {
           headers: { "User-Agent": "Cinema-AutoPoster/1.0" },
-          signal: AbortSignal.timeout(12000)
+          signal: AbortSignal.timeout(5000)
         });
 
         if (!res.ok) continue;
@@ -207,7 +207,7 @@ export async function runAutoPoster(env, requestUrl, force = false) {
         metaUrl.searchParams.set("link", candidatePost.link);
         const metaRes = await fetch(metaUrl.toString(), {
           headers: { "User-Agent": "Cinema-AutoPoster/1.0" },
-          signal: AbortSignal.timeout(12000)
+          signal: AbortSignal.timeout(4000)
         });
         if (metaRes.ok) meta = await metaRes.json();
       } catch (_) {}

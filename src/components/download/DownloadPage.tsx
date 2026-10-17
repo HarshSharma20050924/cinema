@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { DownloadIcon, GithubIcon } from "../../icons";
+import { DownloadIcon, GithubIcon, GlobeIcon, ExternalLinkIcon, CopyIcon, CheckIcon } from "../../icons";
 import { ShadedHeading } from "../common/ShadedHeading";
 import packageJson from "../../../package.json";
 
@@ -21,11 +21,21 @@ interface DownloadPageProps {
   onBack: () => void;
 }
 
-type TabType = "all" | "streams" | "runner";
+type TabType = "all" | "streams" | "runner" | "web";
 
 export const DownloadPage: React.FC<DownloadPageProps> = () => {
   const [release, setRelease] = useState<ReleaseData | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("all");
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const handleCopyWebUrl = () => {
+    const webUrl = "https://cinema-dwh.pages.dev";
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(webUrl);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    }
+  };
 
   // Fetch latest release dynamically from GitHub API
   useEffect(() => {
@@ -214,7 +224,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
           </div>
 
           <p style={{ fontSize: "15px", color: "#a3a3a3", margin: "0 0 24px 0", maxWidth: "680px" }}>
-            Select your platform below to download Cinema App or Cinema Runner helper.
+            Select your platform below to download Cinema App, Cinema Runner helper, or stream directly on Cinema Web.
           </p>
 
           {/* Clean Curvy Tab Filter Switcher */}
@@ -234,6 +244,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
               { id: "all", label: "All Downloads" },
               { id: "streams", label: "Cinema App" },
               { id: "runner", label: "Cinema Runner" },
+              { id: "web", label: "Cinema Web" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -983,7 +994,172 @@ export const DownloadPage: React.FC<DownloadPageProps> = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* SECTION 3: ALL FILES DIRECT FROM GITHUB RELEASE                           */}
+        {/* SECTION 3: CINEMA WEB (Instant In-Browser Streaming)                      */}
+        {/* ========================================================================= */}
+        {(activeTab === "all" || activeTab === "web") && (
+          <div style={{ marginBottom: "52px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px" }}>
+              <div
+                style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "14px",
+                  background: "linear-gradient(135deg, #e50914, #991b1b)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 14px rgba(229, 9, 20, 0.35)",
+                }}
+              >
+                <GlobeIcon size={24} color="#ffffff" />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    width: "4px",
+                    height: "22px",
+                    backgroundColor: "#e50914",
+                    borderRadius: "2px",
+                  }}
+                />
+                <div>
+                  <ShadedHeading
+                    text="Cinema Web"
+                    tag="h2"
+                    style={{ fontSize: "21px", fontWeight: 800 }}
+                  />
+                  <div style={{ fontSize: "12px", color: "#888888", marginTop: "2px" }}>
+                    Instant streaming directly in your browser. Zero setup required.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "linear-gradient(180deg, #131318 0%, #0c0c0f 100%)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "20px",
+                padding: "26px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "20px",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#e50914",
+                      background: "rgba(229, 9, 20, 0.12)",
+                      padding: "4px 12px",
+                      borderRadius: "14px",
+                      border: "1px solid rgba(229, 9, 20, 0.25)",
+                    }}
+                  >
+                    Zero Installation Required
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#a3a3a3",
+                      background: "rgba(255, 255, 255, 0.05)",
+                      padding: "4px 12px",
+                      borderRadius: "14px",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                    }}
+                  >
+                    PWA Supported
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#10b981",
+                      background: "rgba(16, 185, 129, 0.1)",
+                      padding: "4px 12px",
+                      borderRadius: "14px",
+                      border: "1px solid rgba(16, 185, 129, 0.2)",
+                    }}
+                  >
+                    Mobile, PC, Mac & TV
+                  </span>
+                </div>
+
+                <p style={{ fontSize: "14px", color: "#a3a3a3", margin: "4px 0 0 0", maxWidth: "780px", lineHeight: "1.6" }}>
+                  Stream movies and series directly in your web browser on any device (PC, Mac, Linux, iPhone, Android, or Smart TV). No download, installation, or setup required. Always updated with the latest releases, extensions, and features.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "14px",
+                  flexWrap: "wrap",
+                  borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                  paddingTop: "18px",
+                }}
+              >
+                <a
+                  href="https://cinema-dwh.pages.dev"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "#e50914",
+                    color: "#ffffff",
+                    padding: "13px 24px",
+                    borderRadius: "14px",
+                    fontSize: "13px",
+                    fontWeight: 800,
+                    textDecoration: "none",
+                    boxShadow: "0 6px 18px rgba(229, 9, 20, 0.35)",
+                    transition: "transform 0.15s ease",
+                  }}
+                >
+                  <GlobeIcon size={16} />
+                  <span>Open Cinema Web</span>
+                  <ExternalLinkIcon size={15} />
+                </a>
+
+                <button
+                  onClick={handleCopyWebUrl}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "#18181c",
+                    border: "1px solid rgba(255, 255, 255, 0.14)",
+                    color: "#ffffff",
+                    padding: "13px 20px",
+                    borderRadius: "14px",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {copiedUrl ? <CheckIcon size={15} color="#e50914" /> : <CopyIcon size={15} />}
+                  <span>{copiedUrl ? "URL Copied" : "Copy Web URL"}</span>
+                </button>
+
+                <span style={{ fontSize: "13px", color: "#666666", paddingLeft: "4px" }}>
+                  cinema-dwh.pages.dev
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* SECTION 4: ALL FILES DIRECT FROM GITHUB RELEASE                           */}
         {/* ========================================================================= */}
         <div
           style={{

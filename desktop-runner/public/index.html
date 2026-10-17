@@ -650,9 +650,12 @@
             <div style="font-size: 11px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="updateVersionText">New version ready</div>
           </div>
         </div>
-        <button id="updateBtn" onclick="handleDownloadUpdate()" style="padding: 8px 16px; border-radius: 10px; background: linear-gradient(135deg, #2563eb, #3b82f6); border: none; color: #ffffff; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45); flex-shrink: 0; transition: all 0.2s;">
-          Download Now
-        </button>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <button id="updateBtn" onclick="handleDownloadUpdate()" style="padding: 8px 16px; border-radius: 10px; background: linear-gradient(135deg, #2563eb, #3b82f6); border: none; color: #ffffff; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45); flex-shrink: 0; transition: all 0.2s;">
+            Download Now
+          </button>
+          <button onclick="dismissUpdateBanner()" style="background: none; border: none; color: #94a3b8; font-size: 16px; cursor: pointer; padding: 4px 6px; line-height: 1;" title="Dismiss">✕</button>
+        </div>
       </div>
       <div id="updateProgressContainer" style="display: none; margin-top: 12px;">
         <div style="width: 100%; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden;">
@@ -1200,18 +1203,54 @@
     function closeGuide() { document.getElementById('guideModal').style.display = 'none'; }
 
     // In-App Background Auto-Updater
-    const RUNNER_APP_VERSION = "2.2.0";
+    let currentRunnerAppVersion = "2.2.1";
     let pendingUpdateUrl = "";
     let isDownloadingUpdate = false;
     let downloadedApkBase64 = null;
 
+    async function getLocalRunnerVersion() {
+      if (window.Capacitor?.Plugins?.Cinema?.getVersion) {
+        try {
+          const v = await window.Capacitor.Plugins.Cinema.getVersion();
+          if (v) {
+            currentRunnerAppVersion = String(v).replace(/^v/i, "").trim();
+            return currentRunnerAppVersion;
+          }
+        } catch (_) {}
+      }
+      try {
+        const res = await fetch('./runner-version.json', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.version) {
+            currentRunnerAppVersion = String(data.version).replace(/^v/i, "").trim();
+            return currentRunnerAppVersion;
+          }
+        }
+      } catch (_) {}
+      return currentRunnerAppVersion;
+    }
+
+    let pendingRemoteVersion = "";
+
+    function dismissUpdateBanner() {
+      if (pendingRemoteVersion) {
+        localStorage.setItem(`runner_dismissed_${pendingRemoteVersion}`, 'true');
+      }
+      localStorage.setItem('runner_dismissed_update', 'true');
+      const banner = document.getElementById('updateBanner');
+      if (banner) banner.style.display = 'none';
+    }
+
     async function checkForUpdates() {
       try {
+        const localVer = await getLocalRunnerVersion();
+        const appliedVer = localStorage.getItem('runner_applied_version') || '';
+
         const updateEndpoints = [
           'https://cinema-dwh.pages.dev/runner-version.json',
           './runner-version.json',
-          `${COORDINATOR_BASE}/runner-version.json`,
-          'https://api.github.com/repos/HarshSharma20050924/cinema/releases/latest'
+          `${COORDINATOR_BASE}/runner-version.json`
         ];
 
         let updateData = null;
@@ -1223,7 +1262,7 @@
             clearTimeout(tid);
             if (res.ok) {
               const data = await res.json();
-              if (data && (data.version || data.tag_name)) {
+              if (data && data.version) {
                 updateData = data;
                 break;
               }
@@ -1233,16 +1272,16 @@
 
         if (!updateData) return;
 
-        let remoteVer = (updateData.version || updateData.tag_name || "").replace(/^v/i, "").trim();
+        let remoteVer = (updateData.version || "").replace(/^v/i, "").trim();
         let downloadUrl = updateData.downloadUrl;
 
         // Auto-select binary matching host operating system
-        const platform = window.Capacitor?.getPlatform ? window.Capacitor.getPlatform() : 'android';
+        const platform = window.Capacitor?.getPlatform ? window.Capacitor.getPlatform() : 'linux';
         if (updateData.desktop) {
           if (platform === 'win32') {
             downloadUrl = updateData.desktop.windowsSetup || updateData.desktop.windowsPortable;
           } else if (platform === 'linux') {
-            downloadUrl = updateData.desktop.linuxAppImage;
+            downloadUrl = updateData.desktop.linuxDeb || updateData.desktop.linuxAppImage;
           } else if (platform === 'darwin') {
             downloadUrl = updateData.desktop.macDmg || updateData.desktop.macZip;
           }
@@ -1253,8 +1292,10 @@
             const exeAsset = updateData.assets.find(a => a.name && a.name.toLowerCase().endsWith('.exe'));
             if (exeAsset) downloadUrl = exeAsset.browser_download_url;
           } else if (platform === 'linux') {
+            const debAsset = updateData.assets.find(a => a.name && a.name.toLowerCase().endsWith('.deb'));
             const appImageAsset = updateData.assets.find(a => a.name && a.name.toLowerCase().endsWith('.appimage'));
-            if (appImageAsset) downloadUrl = appImageAsset.browser_download_url;
+            if (debAsset) downloadUrl = debAsset.browser_download_url;
+            else if (appImageAsset) downloadUrl = appImageAsset.browser_download_url;
           } else if (platform === 'darwin') {
             const dmgAsset = updateData.assets.find(a => a.name && (a.name.toLowerCase().endsWith('.dmg') || a.name.toLowerCase().endsWith('.zip')));
             if (dmgAsset) downloadUrl = dmgAsset.browser_download_url;
@@ -1268,14 +1309,28 @@
           downloadUrl = platform === 'win32'
             ? 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Node-Runner-Setup.exe'
             : platform === 'linux'
-            ? 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Node-Runner.AppImage'
+            ? 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Node-Runner.deb'
             : 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk';
         }
 
-        if (remoteVer && isNewerVersion(remoteVer, RUNNER_APP_VERSION)) {
+        if (appliedVer && !isNewerVersion(remoteVer, appliedVer)) {
+          const banner = document.getElementById('updateBanner');
+          if (banner) banner.style.display = 'none';
+          return;
+        }
+
+        if (localStorage.getItem(`runner_dismissed_${remoteVer}`) === 'true') {
+          return;
+        }
+
+        if (remoteVer && localVer && isNewerVersion(remoteVer, localVer)) {
           pendingUpdateUrl = downloadUrl;
+          pendingRemoteVersion = remoteVer;
           document.getElementById('updateVersionText').innerText = `Version ${remoteVer} is ready (${platform === 'win32' ? 'Windows' : platform === 'linux' ? 'Linux' : 'Android'})`;
           document.getElementById('updateBanner').style.display = 'block';
+        } else {
+          const banner = document.getElementById('updateBanner');
+          if (banner) banner.style.display = 'none';
         }
       } catch (err) {
         console.warn('Update check failed:', err);
@@ -1302,7 +1357,7 @@
       }
 
       if (!pendingUpdateUrl) {
-        pendingUpdateUrl = 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk';
+        pendingUpdateUrl = 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Node-Runner.deb';
       }
 
       isDownloadingUpdate = true;
@@ -1329,17 +1384,18 @@
                 progressBar.style.width = `${data.progress}%`;
                 progressPercent.innerText = `${data.progress}%`;
                 if (data.bytes && data.total) {
-                  progressStatus.innerText = `Downloading (${(data.bytes / 1048576).toFixed(1)} / ${(data.total / 1048576).toFixed(1)} MB)...`;
+                  progressStatus.innerText = `Downloading in background (${(data.bytes / 1048576).toFixed(1)} / ${(data.total / 1048576).toFixed(1)} MB)...`;
                 }
               }
             });
           }
-          await window.Capacitor.Plugins.Cinema.downloadAndInstall({ url: pendingUpdateUrl });
+          const res = await window.Capacitor.Plugins.Cinema.downloadAndInstall({ url: pendingUpdateUrl });
+          if (res?.error) throw new Error(res.error);
           progressBar.style.width = '100%';
           progressPercent.innerText = '100%';
-          progressStatus.innerText = 'Installer opened! Ready to install.';
+          progressStatus.innerText = 'Update downloaded to Downloads & opened!';
           btn.disabled = false;
-          btn.innerText = 'Install Now';
+          btn.innerText = 'Downloaded';
           btn.style.opacity = '1';
           btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
           isDownloadingUpdate = false;
@@ -1393,7 +1449,14 @@
           btn.style.opacity = '1';
           btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
           isDownloadingUpdate = false;
+          if (pendingRemoteVersion) {
+            localStorage.setItem('runner_applied_version', pendingRemoteVersion);
+          }
           triggerInstall();
+          setTimeout(() => {
+            const banner = document.getElementById('updateBanner');
+            if (banner) banner.style.display = 'none';
+          }, 1500);
         };
         readerB64.readAsDataURL(blob);
 
@@ -1409,9 +1472,14 @@
 
     async function triggerInstall() {
       if (!downloadedApkBase64) return;
+      if (pendingRemoteVersion) {
+        localStorage.setItem('runner_applied_version', pendingRemoteVersion);
+      }
       if (window.Capacitor?.Plugins?.Cinema?.installApk) {
         try {
           await window.Capacitor.Plugins.Cinema.installApk({ base64: downloadedApkBase64 });
+          const banner = document.getElementById('updateBanner');
+          if (banner) banner.style.display = 'none';
           return;
         } catch (e) {
           console.warn('Native installApk error:', e);

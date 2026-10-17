@@ -1,7 +1,7 @@
 {
   "name": "cinema-node-runner",
   "productName": "Cinema Node Runner",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Cross-Platform Desktop Node Runner for Cinema Streaming Platform",
   "author": "Harsh Sharma",
   "repository": {
@@ -11,6 +11,7 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
+    "dist:deb": "electron-builder --linux deb --publish never",
     "dist:linux": "electron-builder --linux AppImage deb --publish never",
     "dist:win": "electron-builder --win nsis portable --publish never",
     "dist:mac": "electron-builder --mac dmg --publish never",

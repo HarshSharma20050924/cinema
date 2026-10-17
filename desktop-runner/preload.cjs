@@ -14,6 +14,13 @@ contextBridge.exposeInMainWorld('Capacitor', {
       getAutoStart: () => ipcRenderer.invoke('cinema:getAutoStart'),
       toggleAutoStart: (val) => ipcRenderer.invoke('cinema:toggleAutoStart', val),
       downloadAndInstall: (data) => ipcRenderer.invoke('cinema:downloadAndInstall', data),
+      getVersion: () => ipcRenderer.invoke('cinema:getVersion'),
+      onUpdateProgress: (cb) => ipcRenderer.on('cinema:updateProgress', (_, data) => cb(data)),
+      addListener: (event, cb) => {
+        if (event === 'updateProgress') {
+          ipcRenderer.on('cinema:updateProgress', (_, data) => cb(data));
+        }
+      },
       windowAction: (action) => ipcRenderer.invoke('cinema:windowAction', action),
       onRevoked: (cb) => ipcRenderer.on('cinema:revoked', (_, data) => cb(data)),
     },

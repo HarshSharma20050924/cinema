@@ -1,7 +1,7 @@
 {
   "name": "cinema",
   "private": true,
-  "version": "4.1.0",
+  "version": "4.1.1",
   "type": "module",
   "scripts": {
     "start:server": "node server/index.cjs",
@@ -13,6 +13,7 @@
     "start:bot": "node telegram-bot/index.cjs",
     "bot": "node telegram-bot/index.cjs",
     "lint": "oxlint",
+    "build:runner:deb": "cd desktop-runner && npm run dist:deb",
     "preview": "vite preview"
   },
   "dependencies": {

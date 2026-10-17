@@ -296,6 +296,7 @@ const RUNNER_LINKS = {
   android_app: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.apk",
   windows: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner.Setup.2.2.0.exe",
   linux: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner-2.2.0.AppImage",
+  linux_deb: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Node-Runner.deb",
   mac: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner-2.2.0-arm64.dmg"
 };
 
@@ -303,7 +304,7 @@ const VLC_GUIDE_TEXT = `🚀 <b>Cinema Apps & 24/7 Node Runner</b>\n\n` +
   `Keep Cinema active 24/7 or stream ad-free across all devices:\n\n` +
   `📱 <b>Android:</b> <a href="${RUNNER_LINKS.android_runner}">Direct Runner APK (v2.2.1)</a> | <a href="${RUNNER_LINKS.android_app}">Cinema App APK</a>\n` +
   `🪟 <b>Windows:</b> <a href="${RUNNER_LINKS.windows}">Windows Setup (.exe)</a>\n` +
-  `🐧 <b>Linux:</b> <a href="${RUNNER_LINKS.linux}">Linux AppImage</a>\n` +
+  `🐧 <b>Linux:</b> <a href="${RUNNER_LINKS.linux_deb}">Debian/Ubuntu (.deb)</a> | <a href="${RUNNER_LINKS.linux}">AppImage</a>\n` +
   `🍏 <b>Mac:</b> <a href="${RUNNER_LINKS.mac}">macOS Apple Silicon (.dmg)</a>\n\n` +
   `<i>💡 Tap buttons below to get raw files directly inside Telegram!</i>`;
 
@@ -315,11 +316,41 @@ const VLC_GUIDE_KEYBOARD = {
     ],
     [
       { text: '🪟 Windows (.exe)', url: RUNNER_LINKS.windows },
+      { text: '🐧 Linux (.deb)', url: RUNNER_LINKS.linux_deb },
       { text: '🐧 Linux (.AppImage)', url: RUNNER_LINKS.linux }
     ],
     [
       { text: '🍏 Mac (.dmg)', url: RUNNER_LINKS.mac },
       { text: '🌐 Web Downloads', url: `${DEFAULT_WEB_URL}/?tab=downloads` }
+    ]
+  ]
+};
+
+const HELP_TEXT = `🤖 <b>Cinema Streaming Bot - Command Directory</b>\n\n` +
+  `Here are all valid commands available on this bot:\n\n` +
+  `• 🔍 <b>Search Content:</b> Just type any movie or show title (or <code>/search &lt;name&gt;</code>)\n` +
+  `• ⚡ <b>/runner</b> or <b>/apk</b> or <b>/app</b>: Get Cinema Runner APK directly in chat & background runner links\n` +
+  `• 📖 <b>/vlc</b> or <b>/guide</b>: Setup VLC player handoff & buffer-free streaming guide\n` +
+  `• 🧩 <b>/providers</b>: View all 30+ extensions and check enabled scrapers\n` +
+  `• 🏠 <b>/start</b>: Launch main interactive menu and quick shortcuts\n` +
+  `• ❓ <b>/help</b>: Show this complete command list\n\n` +
+  `👑 <b>Admin Controls:</b>\n` +
+  `• 🚀 <b>/post_daily</b> or <b>/sync</b>: Rapidly check extensions and post releases to channel\n` +
+  `• 🔀 <b>/toggle &lt;name&gt;</b>: Enable or disable an extension (e.g. <code>/toggle vega</code>)\n` +
+  `• 📌 <b>/pinvlc</b>: Pin VLC streaming guide to chat or channel`;
+
+const HELP_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: '🔍 Search Movie / Show', switch_inline_query_current_chat: '' },
+      { text: '⚡ Get Runner APK', callback_data: 'send_file:android_runner' }
+    ],
+    [
+      { text: '🧩 Enabled Providers', callback_data: 'view_providers' },
+      { text: '📖 VLC Guide', callback_data: 'vlc_guide' }
+    ],
+    [
+      { text: '🌐 Open Cinema Web', url: DEFAULT_WEB_URL }
     ]
   ]
 };
@@ -458,6 +489,9 @@ async function handleMessage(msg, token, db, requestUrl) {
         ],
         [
           { text: '📖 VLC & Download Guide', callback_data: 'vlc_guide' },
+          { text: '❓ Help & Commands', callback_data: 'help_guide' }
+        ],
+        [
           { text: '🌐 Open Web App', url: DEFAULT_WEB_URL }
         ]
       ]
@@ -468,6 +502,16 @@ async function handleMessage(msg, token, db, requestUrl) {
       text: welcomeText,
       parse_mode: 'HTML',
       reply_markup: keyboard
+    });
+  }
+
+  // /help command
+  if (text.startsWith('/help') || text === 'help') {
+    return tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: HELP_TEXT,
+      parse_mode: 'HTML',
+      reply_markup: HELP_KEYBOARD
     });
   }
 
@@ -641,6 +685,16 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       text: VLC_GUIDE_TEXT,
       parse_mode: 'HTML',
       reply_markup: VLC_GUIDE_KEYBOARD
+    });
+  }
+
+  if (data === 'help_guide') {
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
+    return tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: HELP_TEXT,
+      parse_mode: 'HTML',
+      reply_markup: HELP_KEYBOARD
     });
   }
 

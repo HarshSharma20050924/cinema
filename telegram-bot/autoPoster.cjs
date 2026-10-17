@@ -137,7 +137,7 @@ async function checkEnabledExtensionsAndPost(force = false) {
     const provMap = new Map(allProvs.map((p) => [p.value, p]));
 
     let totalPostedThisRun = 0;
-    const maxPostsPerCheck = force ? 3 : (cfg.MAX_DAILY_POSTS || 2);
+    const maxPostsPerCheck = force ? 10 : (cfg.MAX_DAILY_POSTS || 6);
 
     for (const provKey of enabledProviders) {
       if (totalPostedThisRun >= maxPostsPerCheck) break;
@@ -159,8 +159,8 @@ async function checkEnabledExtensionsAndPost(force = false) {
           try {
             await postExtensionCardToChannel(post, provInfo);
             totalPostedThisRun++;
-            // Pause 3 seconds between posts to respect Telegram flood limits
-            await new Promise((r) => setTimeout(r, 3000));
+            // Rapid posting with safe 600ms spacing
+            await new Promise((r) => setTimeout(r, 600));
           } catch (postErr) {
             console.error(`[AutoPoster] Failed posting from ${provKey}:`, postErr.response?.data?.description || postErr.message);
           }

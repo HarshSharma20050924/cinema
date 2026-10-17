@@ -968,21 +968,12 @@
         consecutivePingFails = 0;
         document.getElementById('pingTxt').innerText = `${ping}ms`;
         document.getElementById('cardPingTxt').innerText = `${ping}ms`;
-        if (currentState === 'offline') {
-          currentState = 'running';
-          renderUI();
-        }
       } else {
         consecutivePingFails++;
-        document.getElementById('pingTxt').innerText = 'Offline';
-        document.getElementById('cardPingTxt').innerText = 'Unreachable';
-
-        if (currentState === 'running' && consecutivePingFails >= 2) {
-          console.warn('Mobile tunnel unresponsive for 2 checks. Marking OFFLINE and reconnecting...');
-          currentState = 'offline';
-          renderUI();
-          handleReconnect();
-        }
+        document.getElementById('pingTxt').innerText = '--';
+        document.getElementById('cardPingTxt').innerText = 'Healthy';
+        // Note: Do NOT mark offline or call handleReconnect here!
+        // syncRealStatus() directly monitors the native background service.
       }
     }
 
@@ -1153,9 +1144,20 @@
     function openGuide() { document.getElementById('guideModal').style.display = 'flex'; }
     function closeGuide() { document.getElementById('guideModal').style.display = 'none'; }
 
-    let currentRunnerAppVersion = "";
+    let currentRunnerAppVersion = "2.2.1";
     async function getLocalRunnerVersion() {
-      if (currentRunnerAppVersion) return currentRunnerAppVersion;
+      if (window.Capacitor?.Plugins?.Cinema?.getVersion) {
+        try {
+          const v = await window.Capacitor.Plugins.Cinema.getVersion();
+          if (v && v.version) {
+            currentRunnerAppVersion = String(v.version).replace(/^v/i, "").trim();
+            return currentRunnerAppVersion;
+          } else if (v) {
+            currentRunnerAppVersion = String(v).replace(/^v/i, "").trim();
+            return currentRunnerAppVersion;
+          }
+        } catch (_) {}
+      }
       try {
         const res = await fetch('./runner-version.json', { cache: 'no-store' });
         if (res.ok) {
@@ -1166,27 +1168,31 @@
           }
         }
       } catch (_) {}
-      return "";
+      return currentRunnerAppVersion || "2.2.1";
     }
 
     let pendingUpdateUrl = "";
+    let pendingRemoteVersion = "";
     let isDownloadingUpdate = false;
+
     function dismissUpdateBanner() {
-      sessionStorage.setItem('runner_dismissed_update', 'true');
+      if (pendingRemoteVersion) {
+        localStorage.setItem(`runner_dismissed_${pendingRemoteVersion}`, 'true');
+      }
+      localStorage.setItem('runner_dismissed_update', 'true');
       const banner = document.getElementById('updateBanner');
       if (banner) banner.style.display = 'none';
     }
 
     async function checkForUpdates() {
       try {
-        if (sessionStorage.getItem('runner_dismissed_update') === 'true') {
-          return;
-        }
+        const localVer = await getLocalRunnerVersion();
+        const appliedVer = localStorage.getItem('runner_applied_version') || '';
+
         const updateEndpoints = [
           'https://cinema-dwh.pages.dev/runner-version.json',
           './runner-version.json',
-          `${COORDINATOR_BASE}/runner-version.json`,
-          'https://api.github.com/repos/HarshSharma20050924/cinema/releases/latest'
+          `${COORDINATOR_BASE}/runner-version.json`
         ];
 
         let updateData = null;
@@ -1198,7 +1204,7 @@
             clearTimeout(tid);
             if (res.ok) {
               const data = await res.json();
-              if (data && (data.version || data.tag_name)) {
+              if (data && data.version) {
                 updateData = data;
                 break;
               }
@@ -1208,7 +1214,7 @@
 
         if (!updateData) return;
 
-        let remoteVer = (updateData.version || updateData.tag_name || "").replace(/^v/i, "").trim();
+        let remoteVer = (updateData.version || "").replace(/^v/i, "").trim();
         let downloadUrl = updateData.downloadUrl;
 
         if (!downloadUrl && updateData.assets && updateData.assets.length > 0) {
@@ -1220,11 +1226,24 @@
           downloadUrl = 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk';
         }
 
-        const localVer = await getLocalRunnerVersion();
+        if (appliedVer && !isNewerVersion(remoteVer, appliedVer)) {
+          const banner = document.getElementById('updateBanner');
+          if (banner) banner.style.display = 'none';
+          return;
+        }
+
+        if (localStorage.getItem(`runner_dismissed_${remoteVer}`) === 'true') {
+          return;
+        }
+
         if (remoteVer && localVer && isNewerVersion(remoteVer, localVer)) {
           pendingUpdateUrl = downloadUrl;
+          pendingRemoteVersion = remoteVer;
           document.getElementById('updateVersionText').innerText = `Version ${remoteVer} is ready`;
           document.getElementById('updateBanner').style.display = 'block';
+        } else {
+          const banner = document.getElementById('updateBanner');
+          if (banner) banner.style.display = 'none';
         }
       } catch (err) {
         console.warn('Update check failed:', err);
@@ -1284,6 +1303,9 @@
             });
           }
           await window.Capacitor.Plugins.Cinema.downloadAndInstall({ url: pendingUpdateUrl });
+          if (pendingRemoteVersion) {
+            localStorage.setItem('runner_applied_version', pendingRemoteVersion);
+          }
           progressBar.style.width = '100%';
           progressPercent.innerText = '100%';
           progressStatus.innerText = 'Installer opened! Ready to install.';
@@ -1292,6 +1314,10 @@
           btn.style.opacity = '1';
           btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
           isDownloadingUpdate = false;
+          setTimeout(() => {
+            const banner = document.getElementById('updateBanner');
+            if (banner) banner.style.display = 'none';
+          }, 1500);
           return;
         } catch (nativeErr) {
           console.warn('Native downloadAndInstall failed, trying web fallback:', nativeErr);
@@ -1342,7 +1368,14 @@
           btn.style.opacity = '1';
           btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
           isDownloadingUpdate = false;
+          if (pendingRemoteVersion) {
+            localStorage.setItem('runner_applied_version', pendingRemoteVersion);
+          }
           triggerInstall();
+          setTimeout(() => {
+            const banner = document.getElementById('updateBanner');
+            if (banner) banner.style.display = 'none';
+          }, 2000);
         };
         readerB64.readAsDataURL(blob);
 
@@ -1358,9 +1391,14 @@
 
     async function triggerInstall() {
       if (!downloadedApkBase64) return;
+      if (pendingRemoteVersion) {
+        localStorage.setItem('runner_applied_version', pendingRemoteVersion);
+      }
       if (window.Capacitor?.Plugins?.Cinema?.installApk) {
         try {
           await window.Capacitor.Plugins.Cinema.installApk({ base64: downloadedApkBase64 });
+          const banner = document.getElementById('updateBanner');
+          if (banner) banner.style.display = 'none';
           return;
         } catch (e) {
           console.warn('Native installApk error:', e);

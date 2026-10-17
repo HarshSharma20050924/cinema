@@ -49,11 +49,10 @@ export const UpdateModal: React.FC = () => {
     let unbindDownloaded: (() => void) | undefined;
 
     const checkUpdates = async () => {
-      // Prevent repeated prompts if update was applied or dismissed during this session
-      if (
-        sessionStorage.getItem("cinema_update_applied") ||
-        sessionStorage.getItem("cinema_dismissed_update")
-      ) {
+      // Prevent repeated prompts if update was applied or dismissed
+      const appliedVer = localStorage.getItem("cinema_update_applied") || sessionStorage.getItem("cinema_update_applied");
+      const dismissedVer = localStorage.getItem("cinema_dismissed_update") || sessionStorage.getItem("cinema_dismissed_update");
+      if (appliedVer && !isNewerVersion(appliedVer, currentAppVersion)) {
         return;
       }
 
@@ -62,6 +61,7 @@ export const UpdateModal: React.FC = () => {
         try {
           const res = await window.CinemaDesktop.checkForUpdates();
           if (res && res.updateAvailable && res.downloadUrl) {
+            if (appliedVer === res.version || dismissedVer === res.version) return;
             setUpdateInfo({
               version: res.version,
               notes: res.notes,
@@ -91,7 +91,7 @@ export const UpdateModal: React.FC = () => {
         // 2. Mobile (Capacitor) and Web Environments
         try {
           const endpoints = [
-            "https://api.github.com/repos/HarshSharma20050924/cinema/releases/latest",
+            "https://cinema-dwh.pages.dev/runner-version.json",
             "https://raw.githubusercontent.com/HarshSharma20050924/cinema/main/package.json"
           ];
           for (const ep of endpoints) {
@@ -99,25 +99,22 @@ export const UpdateModal: React.FC = () => {
               const res = await fetch(ep, { cache: "no-store" });
               if (!res.ok) continue;
               const data = await res.json();
-              const tag = data.tag_name || data.version || "";
+              const tag = data.version || data.tag_name || "";
               const remoteVer = tag.replace(/^v/i, "").trim();
               if (remoteVer && isNewerVersion(remoteVer, currentAppVersion)) {
-                let downloadUrl = "https://github.com/HarshSharma20050924/cinema/releases/latest";
+                if (appliedVer === remoteVer || dismissedVer === remoteVer) continue;
+                let downloadUrl = data.downloadUrl || "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Web.apk";
                 if (data.assets && Array.isArray(data.assets)) {
                   const webApk = data.assets.find((a: any) => a.name?.toLowerCase() === "cinema-web.apk");
                   const runnerApk = data.assets.find((a: any) => a.name?.toLowerCase() === "cinema-runner.apk");
                   const anyApk = data.assets.find((a: any) => a.name?.toLowerCase().endsWith(".apk"));
-                  if (webApk) {
-                    downloadUrl = webApk.browser_download_url;
-                  } else if (runnerApk) {
-                    downloadUrl = runnerApk.browser_download_url;
-                  } else if (anyApk) {
-                    downloadUrl = anyApk.browser_download_url;
-                  }
+                  if (webApk) downloadUrl = webApk.browser_download_url;
+                  else if (runnerApk) downloadUrl = runnerApk.browser_download_url;
+                  else if (anyApk) downloadUrl = anyApk.browser_download_url;
                 }
                 setUpdateInfo({
                   version: remoteVer,
-                  notes: data.body || "A new update for Cinema is available.",
+                  notes: data.releaseNotes || data.body || "A new update for Cinema is ready.",
                   downloadUrl,
                 });
                 setIsOpen(true);
@@ -140,6 +137,7 @@ export const UpdateModal: React.FC = () => {
   const handleStartUpdate = async () => {
     if (isReadyToApply) {
       if (window.CinemaDesktop?.applyUpdate) {
+        localStorage.setItem("cinema_update_applied", updateInfo?.version || "true");
         sessionStorage.setItem("cinema_update_applied", updateInfo?.version || "true");
         setStatusText("Applying update and relaunching Cinema...");
         await window.CinemaDesktop.applyUpdate();
@@ -160,9 +158,82 @@ export const UpdateModal: React.FC = () => {
         setStatusText("Download failed. Please try again.");
       }
     } else {
-      // Mobile / Web: Open download link directly
-      window.open(updateInfo.downloadUrl, "_blank");
-      setIsOpen(false);
+      // In-App Background Updater for Mobile & Web (NO REDIRECT to release page!)
+      setIsDownloading(true);
+      setProgress(5);
+      setStatusText("Starting in-app download...");
+
+      const ver = updateInfo.version;
+      localStorage.setItem("cinema_update_applied", ver);
+
+      // 1. Native Capacitor download & install
+      if (window.Capacitor?.Plugins?.Cinema?.downloadAndInstall) {
+        try {
+          if (window.Capacitor.Plugins.Cinema.addListener) {
+            window.Capacitor.Plugins.Cinema.addListener("updateProgress", (data: any) => {
+              if (data && data.progress !== undefined) {
+                setProgress(data.progress);
+                setStatusText(`Downloading in-app (${data.progress}%)...`);
+              }
+            });
+          }
+          await window.Capacitor.Plugins.Cinema.downloadAndInstall({ url: updateInfo.downloadUrl });
+          setProgress(100);
+          setStatusText("Installer launched! Closing updater...");
+          setTimeout(() => setIsOpen(false), 1200);
+          return;
+        } catch (nativeErr) {
+          console.warn("Native downloadAndInstall failed, using web stream fallback:", nativeErr);
+        }
+      }
+
+      // 2. In-App Web Stream Fallback (Never redirect to release page)
+      try {
+        const resp = await fetch(updateInfo.downloadUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        const contentLength = resp.headers.get("content-length");
+        const total = contentLength ? parseInt(contentLength, 10) : 0;
+        let loaded = 0;
+        const reader = resp.body ? resp.body.getReader() : null;
+        const chunks: Uint8Array[] = [];
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            loaded += value.length;
+            if (total > 0) {
+              const pct = Math.min(99, Math.round((loaded / total) * 100));
+              setProgress(pct);
+              setStatusText(`Downloading in-app (${pct}%)...`);
+            }
+          }
+        } else {
+          const blob = await resp.blob();
+          chunks.push(new Uint8Array(await blob.arrayBuffer()));
+        }
+
+        const fullBlob = new Blob(chunks as BlobPart[], { type: "application/vnd.android.package-archive" });
+        const blobUrl = URL.createObjectURL(fullBlob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `Cinema-v${ver}.apk`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setProgress(100);
+        setStatusText("Update package ready! Tap notification or download to finish installing.");
+        setTimeout(() => {
+          setIsOpen(false);
+          setIsDownloading(false);
+        }, 2000);
+      } catch (err: any) {
+        setIsDownloading(false);
+        setStatusText("Download failed. Please check connection and retry.");
+      }
     }
   };
 

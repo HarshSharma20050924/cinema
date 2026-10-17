@@ -60,6 +60,19 @@ public class CinemaPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getVersion(PluginCall call) {
+        try {
+            android.content.pm.PackageInfo pInfo = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+            JSObject ret = new JSObject();
+            ret.put("version", pInfo.versionName);
+            ret.put("versionCode", pInfo.versionCode);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to get version: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void reconnect(PluginCall call) {
         NodeJSService.reconnect(getContext());
         JSObject ret = new JSObject();

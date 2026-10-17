@@ -1,12 +1,13 @@
 {
   "version": "2.2.1",
   "versionCode": 221,
-  "downloadUrl": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.1.0/Cinema-Runner.apk",
+  "downloadUrl": "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk",
   "desktop": {
-    "macDmg": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0-arm64.dmg",
-    "windowsSetup": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.Setup.2.2.0.exe",
-    "windowsPortable": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner.2.2.0.exe",
-    "linuxAppImage": "https://github.com/HarshSharma20050924/cinema/releases/download/v4.0.9/Cinema.Node.Runner-2.2.0.AppImage"
+    "macDmg": "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner-2.2.0-arm64.dmg",
+    "windowsSetup": "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner.Setup.2.2.0.exe",
+    "windowsPortable": "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner.2.2.0.exe",
+    "linuxAppImage": "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner-2.2.0.AppImage",
+    "linuxDeb": "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Node-Runner.deb"
   },
-  "releaseNotes": "Automatic tunnel resurrection, instant failover recovery, and background persistence v2.2.1"
+  "releaseNotes": "Automatic tunnel resurrection, instant failover recovery, background persistence, and Debian package support v2.2.1"
 }

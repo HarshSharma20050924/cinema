@@ -435,12 +435,23 @@ We strongly recommend installing <b>VLC Player</b> for ultra-smooth 4K/1080p pla
     }
   }
 
-  // 5. /post_daily or /sync (Admin Only: Force check enabled extensions & post new releases to channel)
+  // 5. /runner or /apk or /app command
+  if (text.startsWith('/runner') || text.startsWith('/apk') || text.startsWith('/app')) {
+    await sendMessage(chatId, VLC_GUIDE_TEXT, { reply_markup: VLC_GUIDE_KEYBOARD });
+    return tgCall('sendDocument', {
+      chat_id: chatId,
+      document: 'https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk',
+      caption: '⚡ <b>Cinema Node Runner APK (v2.2.1)</b>\n\nRaw installer file. Tap to install directly on Android!',
+      parse_mode: 'HTML'
+    });
+  }
+
+  // 6. /post_daily or /sync (Admin Only: Force check enabled extensions & post new releases to channel)
   if (text.startsWith('/post_daily') || text.startsWith('/sync')) {
     if (!isAdmin(userId)) {
       return sendMessage(chatId, '⛔ Admin only command.');
     }
-    await sendMessage(chatId, '🚀 Checking all enabled extensions for new releases to post to channel...');
+    await sendMessage(chatId, '🚀 Checking all enabled extensions for new releases to post rapidly to channel...');
     try {
       await checkEnabledExtensionsAndPost(true);
       return sendMessage(chatId, '✅ Checked enabled extensions and posted new releases to channel!');
@@ -449,17 +460,39 @@ We strongly recommend installing <b>VLC Player</b> for ultra-smooth 4K/1080p pla
     }
   }
 
-  // 6. /help command
-  if (text.startsWith('/help')) {
+  // 7. /help command
+  if (text.startsWith('/help') || text === 'help') {
     const helpText = 
-`📖 <b>Cinema Bot Commands:</b>
+`🤖 <b>Cinema Streaming Bot - Command Directory</b>
 
-• <b>Search:</b> Just type any title or <code>/search &lt;name&gt;</code>
-• <b>Extensions:</b> <code>/providers</code> to check or switch providers
-• <b>VLC Handoff:</b> Click "▶️ Stream / VLC" to play on PC/Android VLC
+Here are all valid commands available on this bot:
 
-${isAdmin(userId) ? '<b>Admin Controls:</b>\n• <code>/toggle &lt;name&gt;</code> - Turn extension on/off\n• <code>/post_daily</code> - Force post new card to channel' : ''}`;
-    return sendMessage(chatId, helpText);
+• 🔍 <b>Search Content:</b> Just type any movie or show title (or <code>/search &lt;name&gt;</code>)
+• ⚡ <b>/runner</b> or <b>/apk</b> or <b>/app</b>: Get Cinema Runner APK directly in chat & background runner links
+• 📖 <b>/vlc</b> or <b>/guide</b>: Setup VLC player handoff & buffer-free streaming guide
+• 🧩 <b>/providers</b>: View all 30+ extensions and check enabled scrapers
+• 🏠 <b>/start</b>: Launch main interactive menu and quick shortcuts
+• ❓ <b>/help</b>: Show this complete command list
+
+${isAdmin(userId) ? '<b>Admin Controls:</b>\n• 🚀 <code>/post_daily</code> or <code>/sync</code> - Rapidly check extensions and post releases to channel\n• 🔀 <code>/toggle &lt;name&gt;</code> - Enable or disable an extension\n• 📌 <code>/pinvlc</code> - Pin VLC guide to channel' : ''}`;
+
+    const helpKeyboard = {
+      inline_keyboard: [
+        [
+          { text: '🔍 Search Movie / Show', switch_inline_query_current_chat: '' },
+          { text: '⚡ Download Runner', url: 'https://cinema-dwh.pages.dev/?tab=downloads' }
+        ],
+        [
+          { text: '🧩 Enabled Providers', callback_data: 'view_providers' },
+          { text: '📖 VLC Guide', callback_data: 'vlc_guide' }
+        ],
+        [
+          { text: '🌐 Open Cinema Web', url: loadConfig().WEB_URL }
+        ]
+      ]
+    };
+
+    return sendMessage(chatId, helpText, { reply_markup: helpKeyboard });
   }
 
   // 7. Any other text message -> Treat directly as search query!

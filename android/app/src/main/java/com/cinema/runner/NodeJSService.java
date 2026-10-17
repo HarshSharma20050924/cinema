@@ -361,7 +361,21 @@ public class NodeJSService extends Service {
     private void startHeartbeat(String tUrl) {
         if (heartbeat != null) heartbeat.shutdownNow();
         heartbeat = Executors.newSingleThreadScheduledExecutor();
-        heartbeat.scheduleAtFixedRate(() -> registerTunnelWithCoordinator(tUrl), 30, 30, TimeUnit.SECONDS);
+        heartbeat.scheduleAtFixedRate(() -> {
+            if (!isRunning) return;
+            // Verify cloudflared process health
+            if (cloudflaredProcess == null || !cloudflaredProcess.isAlive()) {
+                Log.w(TAG, "⚠️ Cloudflared process died in heartbeat check! Auto-reconnecting tunnel...");
+                tunnelUrl = null;
+                File nativeCf = new File(getApplicationInfo().nativeLibraryDir, "libcloudflared.so");
+                String cfPath = nativeCf.exists() ? nativeCf.getAbsolutePath() : getFilesDir().getAbsolutePath() + "/cloudflared";
+                startCloudflaredTunnel(cfPath);
+                return;
+            }
+            if (tunnelUrl != null) {
+                registerTunnelWithCoordinator(tunnelUrl);
+            }
+        }, 25, 25, TimeUnit.SECONDS);
     }
 
     private void extractCloudflared(String destPath) {
@@ -508,6 +522,7 @@ public class NodeJSService extends Service {
 
     private Notification buildNotification(String title, String text, boolean isConnected) {
         Intent openApp = new Intent(this, MainActivity.class);
+        openApp.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pi = PendingIntent.getActivity(this, 0, openApp,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
