@@ -124,6 +124,68 @@ async function pinMessage(chatId, messageId) {
   });
 }
 
+// Cleanly extract Resolution, Codec, File Size and Episode badge for compact mobile buttons
+function formatButtonLabel(rawTitle, qualityFallback, isEpisodeGroup = false, epCount = 0) {
+  const str = String(rawTitle || qualityFallback || '');
+
+  // 1. Extract resolution (4K, 1080p, 720p, 480p, 360p)
+  let res = '';
+  if (/\b(2160p|4k|uhd)\b/i.test(str)) res = '4K';
+  else if (/\b1080p\b/i.test(str)) res = '1080p';
+  else if (/\b720p\b/i.test(str)) res = '720p';
+  else if (/\b480p\b/i.test(str)) res = '480p';
+  else if (/\b360p\b/i.test(str)) res = '360p';
+  else if (qualityFallback && /\b(2160p|4k|1080p|720p|480p)\b/i.test(qualityFallback)) {
+    res = qualityFallback.toUpperCase();
+  }
+
+  // 2. Extract codec / quality tag (HEVC, HQ-Rip, HQ, HDR, 10Bit)
+  let tech = '';
+  if (/hevc|x265|10bit/i.test(str)) tech = 'HEVC';
+  else if (/hq[- ]?rip/i.test(str)) tech = 'HQ-Rip';
+  else if (/\bhq\b/i.test(str) && !/hq-hdtc/i.test(str)) tech = 'HQ';
+  else if (/hdr/i.test(str)) tech = 'HDR';
+
+  // 3. Extract file size (e.g. [200MB/E], 470MB, 1.1GB, 7GB, 13.8GB, 450 MB)
+  let size = '';
+  const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
+  if (sizeMatch) {
+    size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
+  }
+
+  // 4. Season prefix if series
+  let season = '';
+  const sMatch = str.match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
+  if (sMatch) {
+    season = 'S' + (sMatch[1] || sMatch[2]);
+  }
+
+  const parts = [];
+  if (isEpisodeGroup && season) parts.push(season);
+  if (res) parts.push(res);
+  if (tech) parts.push(tech);
+
+  const main = parts.join(' ');
+
+  if (isEpisodeGroup) {
+    let lbl = '📺 ' + (main || 'Eps');
+    if (size) lbl += ' [' + size + ']';
+    if (epCount > 0) lbl += ' (' + epCount + ')';
+    if (lbl.length > 28) lbl = lbl.slice(0, 27) + '…';
+    return lbl;
+  } else {
+    let lbl = '⚡ ' + (main || 'Quality');
+    if (size) lbl += ' [' + size + ']';
+    if (!main && !size) {
+      let clean = str.replace(/.*?\[/g, '[').trim();
+      if (clean.length > 20) clean = clean.slice(-20).trim();
+      lbl = '⚡ ' + (clean || qualityFallback || 'Option');
+    }
+    if (lbl.length > 28) lbl = lbl.slice(0, 27) + '…';
+    return lbl;
+  }
+}
+
 // Directly show release qualities and episodes from a specific extension with pagination & poster
 async function showItemDetails(chatId, item, page = 1, messageId = null) {
   let meta = item.meta;
@@ -171,13 +233,13 @@ async function showItemDetails(chatId, item, page = 1, messageId = null) {
           groupTitle: group.title,
           seriesTitle: meta?.title || item.title
         }, `${item.title} - ${group.title || 'Episodes'}`);
-        const label = `📺 ${group.title ? group.title.slice(0, 16) : 'Eps'} (${dLinks.length})`;
+        const label = formatButtonLabel(group.title, group.quality, true, dLinks.length);
         rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
       } else {
         const targetLink = dLinks[0]?.link || item.link;
         const qTitle = `${item.title} [${group.title || group.quality || `Quality ${startIndex + gIdx + 1}`}]`;
         const qStoreId = storeLink(item.provider, targetLink, qTitle);
-        const label = `⚡ ${(group.title || group.quality || `Q${startIndex + gIdx + 1}`).slice(0, 20)}`;
+        const label = formatButtonLabel(group.title, group.quality, false, 0);
         rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });
       }
     });
@@ -885,7 +947,7 @@ async function handleCallbackQuery(cq) {
     const qButtons = [];
     for (const q of qualities) {
       const qStoreId = storeLink(epqData.provider, q.link, q.title);
-      const label = `⚡ ${(q.quality || 'Option').slice(0, 20)}`;
+      const label = formatButtonLabel(q.quality, q.quality, false, 0);
       qButtons.push({ text: label, callback_data: `resopt:${qStoreId}` });
     }
 

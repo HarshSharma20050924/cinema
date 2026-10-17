@@ -40,8 +40,11 @@ export async function onRequest(context) {
   } else if (isMxPlayer) {
     m3u += '#EXTVLCOPT:http-referrer=https://www.mxplayer.in/\n';
     m3u += '#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\n';
+  let streamTarget = targetUrl;
+  if (isMovieBox && !targetUrl.includes('/api/proxy')) {
+    streamTarget = `${origin}/api/proxy?url=${encodeURIComponent(targetUrl)}`;
   }
-  m3u += `${targetUrl}\n`;
+  m3u += `${streamTarget}\n`;
 
   const safeName = cleanTitle.replace(/[^a-zA-Z0-9_-]/g, '_');
 

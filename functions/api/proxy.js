@@ -137,40 +137,51 @@ export async function onRequest(context) {
     return null;
   }
 
-  // MovieBox CDN strictly blocks datacenter IPs with 427, route through tunnel directly
-  if (isMovieBox) {
-    const tunnelResult = await fetchViaTunnel();
-    if (tunnelResult) return tunnelResult;
-  }
-
+  // 1. Try direct fetch first with authentic headers (handles MovieBox CDN directly)
   try {
     const upstream = await fetch(targetUrl, {
       method: request.method,
       headers: forwardHeaders,
     });
 
+    if (upstream.ok || upstream.status === 206) {
+      const responseHeaders = new Headers();
+      for (const key of ['Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges', 'Last-Modified', 'ETag']) {
+        const val = upstream.headers.get(key);
+        if (val) responseHeaders.set(key, val);
+      }
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      responseHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      responseHeaders.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: responseHeaders,
+      });
+    }
+
+    // If datacenter block (427, 403), fall back to residential phone tunnel
     if (upstream.status === 427 || upstream.status === 403 || upstream.status === 401 || upstream.status === 429) {
       const tunnelResult = await fetchViaTunnel();
       if (tunnelResult) return tunnelResult;
-      return Response.redirect(targetUrl, 302);
     }
 
-    const responseHeaders = new Headers();
-    for (const key of ['Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges', 'Last-Modified', 'ETag']) {
-      const val = upstream.headers.get(key);
-      if (val) responseHeaders.set(key, val);
-    }
-    responseHeaders.set('Access-Control-Allow-Origin', '*');
-    responseHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    responseHeaders.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
-
+    // Return upstream error response with CORS rather than 302 redirect which causes VLC location error
+    const errHeaders = new Headers();
+    errHeaders.set('Access-Control-Allow-Origin', '*');
     return new Response(upstream.body, {
       status: upstream.status,
-      headers: responseHeaders,
+      headers: errHeaders,
     });
   } catch (err) {
     const tunnelResult = await fetchViaTunnel();
     if (tunnelResult) return tunnelResult;
-    return Response.redirect(targetUrl, 302);
+    return new Response(JSON.stringify({ error: 'Proxy fetch failed', message: err.message }), {
+      status: 502,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
   }
 }

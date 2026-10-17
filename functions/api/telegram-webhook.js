@@ -103,68 +103,78 @@ function isRealDownloadLink(url) {
   );
 }
 
-// Format compact mobile button label with Resolution, File Size & Audio
+// Cleanly extract Resolution, Codec, File Size and Episode badge for compact mobile buttons
 function formatQualityButtonLabel(rawTitle, defaultLabel = 'Option') {
-  if (!rawTitle) return defaultLabel;
+  if (!rawTitle) return `⚡ ${defaultLabel}`;
   const str = String(rawTitle);
 
-  // 1. Extract resolution
+  // 1. Extract resolution (4K, 1080p, 720p, 480p, 360p)
+  let res = '';
+  if (/\b(2160p|4k|uhd)\b/i.test(str)) res = '4K';
+  else if (/\b1080p\b/i.test(str)) res = '1080p';
+  else if (/\b720p\b/i.test(str)) res = '720p';
+  else if (/\b480p\b/i.test(str)) res = '480p';
+  else if (/\b360p\b/i.test(str)) res = '360p';
+
+  // 2. Extract codec / quality tag (HEVC, HQ-Rip, HQ, HDR, 10Bit)
+  let tech = '';
+  if (/hevc|x265|10bit/i.test(str)) tech = 'HEVC';
+  else if (/hq[- ]?rip/i.test(str)) tech = 'HQ-Rip';
+  else if (/\bhq\b/i.test(str) && !/hq-hdtc/i.test(str)) tech = 'HQ';
+  else if (/hdr/i.test(str)) tech = 'HDR';
+
+  // 3. Extract file size (e.g. [200MB/E], 470MB, 1.1GB, 7GB, 13.8GB, 450 MB)
+  let size = '';
+  const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
+  if (sizeMatch) {
+    size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
+  }
+
+  const parts = [];
+  if (res) parts.push(res);
+  if (tech) parts.push(tech);
+
+  const main = parts.join(' ');
+  let lbl = '⚡ ' + (main || 'Quality');
+  if (size) lbl += ` [${size}]`;
+
+  if (!main && !size) {
+    let clean = str.replace(/.*?\[/g, '[').trim();
+    if (clean.length > 20) clean = clean.slice(-20).trim();
+    lbl = '⚡ ' + (clean || defaultLabel);
+  }
+
+  if (lbl.length > 28) lbl = lbl.slice(0, 27) + '…';
+  return lbl;
+}
+
+function formatEpisodeButtonLabel(rawTitle, epCount) {
+  const str = String(rawTitle || 'Episodes');
+
   let res = '';
   if (/\b(2160p|4k|uhd)\b/i.test(str)) res = '4K';
   else if (/\b1080p\b/i.test(str)) res = '1080p';
   else if (/\b720p\b/i.test(str)) res = '720p';
   else if (/\b480p\b/i.test(str)) res = '480p';
 
-  // 2. Extract codec / source type
-  let tech = '';
-  if (/10bit/i.test(str)) tech = '10B';
-  else if (/hevc|x265/i.test(str)) tech = 'HEVC';
+  let season = '';
+  const sMatch = str.match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
+  if (sMatch) season = 'S' + (sMatch[1] || sMatch[2]);
 
-  // 3. Extract file size (e.g. 1.8GB, 450MB, 2.4 GB)
   let size = '';
-  const sizeMatch = str.match(/\b(\d+(?:\.\d+)?\s*(?:gb|mb))\b/i);
-  if (sizeMatch) {
-    size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
-  }
-
-  // 4. Extract audio/language
-  let audio = '';
-  if (/dual\s*audio/i.test(str) || (/\bhindi\b/i.test(str) && /\benglish\b/i.test(str))) {
-    audio = 'Dual';
-  } else if (/\bhindi\b/i.test(str)) {
-    audio = 'Hin';
-  } else if (/\benglish\b/i.test(str)) {
-    audio = 'Eng';
-  }
+  const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
+  if (sizeMatch) size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
 
   const parts = [];
+  if (season) parts.push(season);
   if (res) parts.push(res);
-  if (tech) parts.push(tech);
-  const mainBadge = parts.join(' ') || defaultLabel;
+  const main = parts.join(' ') || 'Eps';
 
-  let label = `⚡ ${mainBadge}`;
-  if (size) label += ` [${size}]`;
-  if (audio) label += ` • ${audio}`;
-
-  if (label.length > 28) {
-    label = label.slice(0, 27) + '…';
-  }
-  return label;
-}
-
-function formatEpisodeButtonLabel(rawTitle, epCount) {
-  let title = rawTitle || 'Episodes';
-  let res = '';
-  if (/\b(480p|720p|1080p|4k)\b/i.test(title)) {
-    res = title.match(/\b(480p|720p|1080p|4k)\b/i)[1].toUpperCase();
-  }
-  let size = '';
-  const sizeMatch = title.match(/\b(\d+(?:\.\d+)?\s*(?:gb|mb))\b/i);
-  if (sizeMatch) size = ` [${sizeMatch[1].toUpperCase().replace(/\s+/, '')}]`;
-
-  let label = `📺 ${res ? res + ' ' : ''}Eps (${epCount})${size}`;
-  if (label.length > 28) label = label.slice(0, 27) + '…';
-  return label;
+  let lbl = `📺 ${main}`;
+  if (size) lbl += ` [${size}]`;
+  if (epCount > 0) lbl += ` (${epCount})`;
+  if (lbl.length > 28) lbl = lbl.slice(0, 27) + '…';
+  return lbl;
 }
 
 // Extract overall badges for item card header

@@ -50,6 +50,11 @@ export const launchExternalPlayer = (
     playableUrl = `${origin}${playableUrl}`;
   }
 
+  // MovieBox streams require custom Referer headers; route through /api/proxy so VLC and external players never get "The location cannot be played"
+  if (isMovieBox && !playableUrl.includes("/api/proxy") && origin) {
+    playableUrl = `${origin}/api/proxy?url=${encodeURIComponent(playableUrl)}`;
+  }
+
   // Auto-copy link to clipboard so user can instantly paste into VLC's Stream box if needed
   try {
     if (navigator?.clipboard?.writeText) {

@@ -6,9 +6,21 @@ export async function onRequest(context) {
 
   const cleanStreamUrl = streamUrl ? decodeURIComponent(streamUrl) : '';
   const safeTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const vlcProtocol = 'vlc://' + cleanStreamUrl;
-  const androidIntent = `intent:${cleanStreamUrl}#Intent;action=android.intent.action.VIEW;type=video/*;package=org.videolan.vlc;end`;
-  const universalVideoIntent = `intent:${cleanStreamUrl}#Intent;action=android.intent.action.VIEW;type=video/*;end`;
+
+  const isMovieBox =
+    cleanStreamUrl.includes('hakunaymatata.com') ||
+    cleanStreamUrl.includes('moviebox') ||
+    cleanStreamUrl.includes('inmoviebox') ||
+    cleanStreamUrl.includes('aoneroom') ||
+    cleanStreamUrl.includes('sssrr.org');
+
+  const playableStreamUrl = isMovieBox && !cleanStreamUrl.includes('/api/proxy')
+    ? `${reqUrl.origin}/api/proxy?url=${encodeURIComponent(cleanStreamUrl)}`
+    : cleanStreamUrl;
+
+  const vlcProtocol = 'vlc://' + playableStreamUrl;
+  const androidIntent = `intent:${playableStreamUrl}#Intent;action=android.intent.action.VIEW;type=video/*;package=org.videolan.vlc;end`;
+  const universalVideoIntent = `intent:${playableStreamUrl}#Intent;action=android.intent.action.VIEW;type=video/*;end`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
