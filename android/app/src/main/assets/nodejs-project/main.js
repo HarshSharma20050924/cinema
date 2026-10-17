@@ -1,3 +1,97 @@
+
+async function enrichHdhubEpisodes(link, meta, context) {
+  if (!meta) return meta;
+  const isSeries =
+    meta.type === "series" ||
+    /season|episodes|tvseries|series/i.test(meta.title || "") ||
+    /season|episodes|tvseries/i.test(link || "");
+
+  if (!isSeries) return meta;
+
+  try {
+    const baseUrl = "https://hdhub4u.com.se";
+    const pageUrl = link.startsWith("http")
+      ? link
+      : `${baseUrl.replace(/\/+$/, "")}/${link.replace(/^\/+/, "")}`;
+
+    const res = await (context.axios || axios).get(pageUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Cookie: "xla=s4t",
+      },
+      timeout: 10000,
+    });
+
+    const cheerioMod = context.cheerio || cheerio;
+    const $ = cheerioMod.load(res.data);
+    const container = $(".entry-content").length ? $(".entry-content") : $("body");
+    const singleEpisodes = [];
+
+    container.find("h1, h2, h3, h4, h5, p, div").each((_, el) => {
+      const text = $(el).text().trim();
+      if (!text) return;
+
+      const epMatch = text.match(/^(E|EP|Episode)\s*0*(\d+)\b/i);
+      if (epMatch) {
+        const epNum = parseInt(epMatch[2], 10);
+        const epTitle = `Episode ${epNum}`;
+
+        const servers = [];
+        $(el).find("a").each((_a, aEl) => {
+          const href = $(aEl).attr("href");
+          const aText = $(aEl).text().trim() || "Download";
+          if (href && (href.startsWith("http") || href.startsWith("/"))) {
+            servers.push({
+              server: aText,
+              link: href,
+            });
+          }
+        });
+
+        if (servers.length > 0 && !singleEpisodes.some((e) => e.title === epTitle)) {
+          const primaryLink =
+            servers.find((s) => /instant|drive|hubcdn/i.test(s.server))?.link || servers[0].link;
+          singleEpisodes.push({
+            title: epTitle,
+            link: primaryLink,
+            servers: servers,
+          });
+        }
+      }
+    });
+
+    if (singleEpisodes.length > 0) {
+      singleEpisodes.sort((a, b) => {
+        const nA = parseInt(a.title.replace(/\D/g, ""), 10) || 0;
+        const nB = parseInt(b.title.replace(/\D/g, ""), 10) || 0;
+        return nA - nB;
+      });
+
+      const existingPacks = Array.isArray(meta.linkList)
+        ? meta.linkList.filter(
+            (g) =>
+              /pack|zip|batch|complete|all episodes/i.test(g.title || "") ||
+              (!Array.isArray(g.directLinks) || g.directLinks.length <= 1)
+          )
+        : [];
+
+      meta.seasonPacks = existingPacks;
+      meta.linkList = [
+        {
+          title: "Single Episodes",
+          quality: "HD",
+          directLinks: singleEpisodes,
+        },
+        ...existingPacks,
+      ];
+    }
+  } catch (err) {
+    log("enrichHdhubEpisodes error:", err.message);
+  }
+
+  return meta;
+}
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   try {
@@ -93061,10 +93155,14 @@ app.get("/api/meta", async (req, res) => {
       providerContext,
       signal: new AbortController().signal
     });
+
     if (meta) {
       const resolvedEpisodes = await resolveProviderEpisodes(provider, meta, providerContext);
       if (resolvedEpisodes) {
         meta.linkList = resolvedEpisodes;
+      }
+      if (provider.toLowerCase().includes("hdhub")) {
+        meta = await enrichHdhubEpisodes(link, meta, providerContext);
       }
     }
     res.json(meta);

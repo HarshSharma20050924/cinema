@@ -103,6 +103,126 @@ function isRealDownloadLink(url) {
   );
 }
 
+// Format compact mobile button label with Resolution, File Size & Audio
+function formatQualityButtonLabel(rawTitle, defaultLabel = 'Option') {
+  if (!rawTitle) return defaultLabel;
+  const str = String(rawTitle);
+
+  // 1. Extract resolution
+  let res = '';
+  if (/\b(2160p|4k|uhd)\b/i.test(str)) res = '4K UHD';
+  else if (/\b1080p\b/i.test(str)) res = '1080p';
+  else if (/\b720p\b/i.test(str)) res = '720p';
+  else if (/\b480p\b/i.test(str)) res = '480p';
+
+  // 2. Extract codec / source type
+  let tech = '';
+  if (/10bit/i.test(str)) tech = '10Bit';
+  else if (/hevc|x265/i.test(str)) tech = 'HEVC';
+  else if (/bluray/i.test(str)) tech = 'BluRay';
+  else if (/web-?dl|webrip/i.test(str)) tech = 'WEB-DL';
+  else if (/hdtc|cam|hqrip/i.test(str)) tech = 'Pre-HD';
+
+  // 3. Extract file size (e.g. 1.8GB, 450MB, 2.4 GB)
+  let size = '';
+  const sizeMatch = str.match(/\b(\d+(?:\.\d+)?\s*(?:gb|mb))\b/i);
+  if (sizeMatch) {
+    size = sizeMatch[1].toUpperCase().replace(/\s+/, ' ');
+  }
+
+  // 4. Extract audio/language
+  let audio = '';
+  if (/dual\s*audio/i.test(str) || (/\bhindi\b/i.test(str) && /\benglish\b/i.test(str))) {
+    audio = 'Dual Audio';
+  } else if (/\bhindi\b/i.test(str)) {
+    audio = 'Hindi';
+  } else if (/\benglish\b/i.test(str)) {
+    audio = 'English';
+  } else if (/multi/i.test(str)) {
+    audio = 'Multi';
+  }
+
+  const parts = [];
+  if (res) parts.push(res);
+  if (tech && !res.includes(tech)) parts.push(tech);
+  const mainBadge = parts.join(' ') || defaultLabel;
+
+  let label = `⚡ ${mainBadge}`;
+  if (size) label += ` (${size})`;
+  if (audio) label += ` • ${audio}`;
+
+  if (label.length > 42) {
+    label = label.slice(0, 41) + '…';
+  }
+  return label;
+}
+
+function formatEpisodeButtonLabel(rawTitle, epCount) {
+  let title = rawTitle || 'Episodes';
+  let res = '';
+  if (/\b(480p|720p|1080p|4k)\b/i.test(title)) {
+    res = title.match(/\b(480p|720p|1080p|4k)\b/i)[1].toUpperCase();
+    if (/hevc|10bit/i.test(title)) res += ' HEVC';
+  }
+  let size = '';
+  const sizeMatch = title.match(/\b(\d+(?:\.\d+)?\s*(?:gb|mb))\b/i);
+  if (sizeMatch) size = ` (${sizeMatch[1].toUpperCase()})`;
+
+  let label = `📺 ${res ? res + ' ' : ''}Episodes (${epCount} Ep)${size}`;
+  if (label.length > 42) label = label.slice(0, 41) + '…';
+  return label;
+}
+
+// Extract overall badges for item card header
+function extractQualityBadges(title, linkList = []) {
+  const allTexts = [title || ''];
+  if (Array.isArray(linkList)) {
+    for (const g of linkList) {
+      if (g.title) allTexts.push(g.title);
+      if (g.quality) allTexts.push(g.quality);
+      if (Array.isArray(g.directLinks)) {
+        for (const dl of g.directLinks.slice(0, 5)) {
+          if (dl.title) allTexts.push(dl.title);
+        }
+      }
+    }
+  }
+  const combined = allTexts.join(' ');
+
+  const resolutions = [];
+  if (/\b(480p)\b/i.test(combined)) resolutions.push('480p');
+  if (/\b(720p)\b/i.test(combined)) {
+    const isHevc = /hevc|10bit/i.test(combined);
+    resolutions.push(isHevc ? '720p HEVC' : '720p');
+  }
+  if (/\b(1080p)\b/i.test(combined)) {
+    const is10Bit = /10bit|fhd/i.test(combined);
+    resolutions.push(is10Bit ? '1080p 10Bit' : '1080p');
+  }
+  if (/\b(2160p|4k|uhd)\b/i.test(combined)) resolutions.push('4K UHD');
+
+  const sizes = [];
+  const sizeMatches = combined.matchAll(/\b(\d+(?:\.\d+)?\s*(?:GB|MB))\b/gi);
+  for (const m of sizeMatches) {
+    const s = m[1].toUpperCase().replace(/\s+/, '');
+    if (!sizes.includes(s) && sizes.length < 3) sizes.push(s);
+  }
+
+  let audio = 'Hindi + English';
+  if (/dual\s*audio/i.test(combined)) audio = 'Dual Audio [Hin/Eng]';
+  else if (/org\s*2\.0/i.test(combined) || /org\s*5\.1/i.test(combined)) audio = 'Hindi (ORG) + English';
+  else if (/hindi\s*dub/i.test(combined)) audio = 'Hindi Dubbed';
+  else if (/sub|english/i.test(combined) && !/hindi/i.test(combined)) audio = 'English Audio';
+
+  let badgeStr = resolutions.join(' • ');
+  if (!badgeStr) badgeStr = 'HD • 720p • 1080p';
+  if (sizes.length > 0) {
+    badgeStr += ` [${sizes.join(' | ')}]`;
+  }
+
+  return { resolutions: badgeStr, audio };
+}
+
 // Telegram API Helper
 async function tgCall(token, method, payload = {}) {
   const url = `https://api.telegram.org/bot${token}/${method}`;
@@ -171,23 +291,35 @@ async function saveEnabledProviders(db, list) {
   } catch (_) {}
 }
 
-const VLC_GUIDE_TEXT = `🚀 <b>Smooth Streaming & Download Guide</b>\n\n` +
-  `For the best experience without buffering or download errors:\n\n` +
-  `1️⃣ <b>Install VLC Media Player</b>\n` +
-  `• Tap any <b>"Open in VLC"</b> button to stream instantly.\n` +
-  `• Supports 4K HDR, multi-audio (Hindi/English), and subtitle switching.\n\n` +
-  `2️⃣ <b>Download Files Directly</b>\n` +
-  `• Tap <b>"Direct Download"</b> to get full movie files at high speed.\n\n` +
-  `3️⃣ <b>Need Cinema Apps?</b>\n` +
-  `• Download the Cinema App or Runner App here:\n` +
-  `👉 <a href="https://cinema-dwh.pages.dev/?tab=downloads">https://cinema-dwh.pages.dev/?tab=downloads</a>\n\n` +
-  `<i>Enjoy smooth, 100% ad-free entertainment!</i>`;
+const RUNNER_LINKS = {
+  android_runner: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema-Runner.apk",
+  android_app: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.apk",
+  windows: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner.Setup.2.2.0.exe",
+  linux: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner-2.2.0.AppImage",
+  mac: "https://github.com/HarshSharma20050924/cinema/releases/latest/download/Cinema.Node.Runner-2.2.0-arm64.dmg"
+};
+
+const VLC_GUIDE_TEXT = `🚀 <b>Cinema Apps & 24/7 Node Runner</b>\n\n` +
+  `Keep Cinema active 24/7 or stream ad-free across all devices:\n\n` +
+  `📱 <b>Android:</b> <a href="${RUNNER_LINKS.android_runner}">Direct Runner APK (v2.2.1)</a> | <a href="${RUNNER_LINKS.android_app}">Cinema App APK</a>\n` +
+  `🪟 <b>Windows:</b> <a href="${RUNNER_LINKS.windows}">Windows Setup (.exe)</a>\n` +
+  `🐧 <b>Linux:</b> <a href="${RUNNER_LINKS.linux}">Linux AppImage</a>\n` +
+  `🍏 <b>Mac:</b> <a href="${RUNNER_LINKS.mac}">macOS Apple Silicon (.dmg)</a>\n\n` +
+  `<i>💡 Tap buttons below to get raw files directly inside Telegram!</i>`;
 
 const VLC_GUIDE_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: '📥 Get Cinema Apps & Runners', url: 'https://cinema-dwh.pages.dev/?tab=downloads' },
-      { text: '🌐 Open Web Player', url: 'https://cinema-dwh.pages.dev' }
+      { text: '📱 Send Runner APK', callback_data: 'send_file:android_runner' },
+      { text: '📱 Send Cinema App', callback_data: 'send_file:android_app' }
+    ],
+    [
+      { text: '🪟 Windows (.exe)', url: RUNNER_LINKS.windows },
+      { text: '🐧 Linux (.AppImage)', url: RUNNER_LINKS.linux }
+    ],
+    [
+      { text: '🍏 Mac (.dmg)', url: RUNNER_LINKS.mac },
+      { text: '🌐 Web Downloads', url: `${DEFAULT_WEB_URL}/?tab=downloads` }
     ]
   ]
 };
@@ -269,14 +401,47 @@ async function handleMessage(msg, token, db, requestUrl) {
       if (param.startsWith('p_')) {
         const payload = param.slice(2);
         const firstUnderscore = payload.indexOf('_');
+        const secondUnderscore = payload.indexOf('_', firstUnderscore + 1);
+
         let storeId = payload;
+        let provKey = null;
+        let rawTitle = null;
+
         if (firstUnderscore > -1) {
           storeId = payload.slice(0, firstUnderscore);
+          if (secondUnderscore > -1) {
+            provKey = payload.slice(firstUnderscore + 1, secondUnderscore);
+            rawTitle = decodeURIComponent(payload.slice(secondUnderscore + 1)).replace(/_/g, ' ');
+          } else {
+            provKey = payload.slice(firstUnderscore + 1);
+          }
         }
 
         const item = await getStoredLink(db, storeId);
         if (item) {
-          return showItemDetails(chatId, item, token, db, requestUrl);
+          // DIRECTLY SHOW MEDIA FROM THIS EXACT EXTENSION
+          return showItemDetails(chatId, item, token, db, requestUrl, null);
+        }
+
+        // Fallback: search exclusively on the extension that was clicked
+        if (provKey && rawTitle) {
+          await tgCall(token, 'sendMessage', {
+            chat_id: chatId,
+            text: `🔍 Finding <b>"${escapeHtml(rawTitle)}"</b> on <b>${escapeHtml(provKey)}</b>...`,
+            parse_mode: 'HTML'
+          });
+          const dataRes = await callCinemaApi(requestUrl, '/search', { provider: provKey, q: rawTitle });
+          const results = Array.isArray(dataRes) ? dataRes : [];
+          if (results.length > 0) {
+            return showItemDetails(chatId, results[0], token, db, requestUrl, null);
+          }
+          const formatted = await formatSearchResults(results, rawTitle, 1, db);
+          return tgCall(token, 'sendMessage', {
+            chat_id: chatId,
+            text: formatted.text,
+            parse_mode: 'HTML',
+            reply_markup: formatted.keyboard
+          });
         }
       }
     }
@@ -316,6 +481,22 @@ async function handleMessage(msg, token, db, requestUrl) {
     });
   }
 
+  // /runner or /apk or /app
+  if (text.startsWith('/runner') || text.startsWith('/apk') || text.startsWith('/app')) {
+    await tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: VLC_GUIDE_TEXT,
+      parse_mode: 'HTML',
+      reply_markup: VLC_GUIDE_KEYBOARD
+    });
+    return tgCall(token, 'sendDocument', {
+      chat_id: chatId,
+      document: RUNNER_LINKS.android_runner,
+      caption: '⚡ <b>Cinema Node Runner APK (v2.2.1)</b>\n\nRaw installer file. Tap to install directly on Android!',
+      parse_mode: 'HTML'
+    });
+  }
+
   // /providers
   if (text.startsWith('/providers')) {
     return showProvidersMenu(chatId, userId, token, db);
@@ -340,6 +521,33 @@ async function handleMessage(msg, token, db, requestUrl) {
       enabled.push(provName);
       await saveEnabledProviders(db, enabled);
       return tgCall(token, 'sendMessage', { chat_id: chatId, text: `🟢 Enabled: <b>${escapeHtml(provName)}</b>`, parse_mode: 'HTML' });
+    }
+  }
+
+  // /post_daily or /sync (Admin Only: Force check enabled extensions & post releases to channel)
+  if (text.startsWith('/post_daily') || text.startsWith('/sync')) {
+    if (!isAdmin) {
+      return tgCall(token, 'sendMessage', { chat_id: chatId, text: '⛔ Admin only command.' });
+    }
+    await tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: '🚀 Checking active extensions and posting new releases & archive posts to channel...',
+      parse_mode: 'HTML'
+    });
+    try {
+      const { runAutoPoster } = await import('./auto-poster.js');
+      const posterRes = await runAutoPoster({ cinema_db: db, BOT_TOKEN: token, CHANNEL_ID: '-1004363607477' }, requestUrl, true);
+      const count = posterRes?.posted?.length || 0;
+      let reply = `✅ <b>Posted ${count} release(s) to channel!</b>\n`;
+      if (posterRes?.posted?.length > 0) {
+        reply += posterRes.posted.map(p => `• 🎬 <b>${escapeHtml(p.title)}</b> [${escapeHtml(p.provider)}]`).join('\n');
+      }
+      if (posterRes?.errors?.length > 0) {
+        reply += `\n⚠️ Notes: ${escapeHtml(posterRes.errors[0])}`;
+      }
+      return tgCall(token, 'sendMessage', { chat_id: chatId, text: reply, parse_mode: 'HTML' });
+    } catch (e) {
+      return tgCall(token, 'sendMessage', { chat_id: chatId, text: `❌ Failed to post: ${escapeHtml(e.message)}` });
     }
   }
 
@@ -441,6 +649,23 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     return showProvidersMenu(chatId, userId, token, db, messageId);
   }
 
+  // Direct raw APK file push into chat
+  if (data.startsWith('send_file:')) {
+    const fileType = data.replace('send_file:', '');
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Sending raw file directly into chat...' });
+    const isApp = fileType === 'android_app';
+    const docUrl = isApp ? RUNNER_LINKS.android_app : RUNNER_LINKS.android_runner;
+    const caption = isApp
+      ? '📱 <b>Cinema Mobile App APK</b>\n\nRaw installer file. Tap to install directly and stream ad-free!'
+      : '⚡ <b>Cinema Node Runner APK (v2.2.1)</b>\n\nRaw installer file. Keeps background scrapers active 24/7 on Android!';
+    return tgCall(token, 'sendDocument', {
+      chat_id: chatId,
+      document: docUrl,
+      caption,
+      parse_mode: 'HTML'
+    });
+  }
+
   // Toggle Provider from inline menu
   if (data.startsWith('prov_toggle:')) {
     if (!isAdmin) {
@@ -454,6 +679,18 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     await saveEnabledProviders(db, enabled);
     await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: `Updated ${provKey}` });
     return showProvidersMenu(chatId, userId, token, db, messageId);
+  }
+
+  // Movie item clicked from search results -> Open qualities as a NEW MESSAGE below
+  if (data.startsWith('item:')) {
+    const storeId = data.replace('item:', '');
+    const item = await getStoredLink(db, storeId);
+    if (!item) {
+      return tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Session expired. Search again.', show_alert: true });
+    }
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Fetching qualities...' });
+    // Pass null for messageId so search results remain intact above!
+    return showItemDetails(chatId, item, token, db, requestUrl, null, 1, storeId);
   }
 
   // Search Results Pagination: spage:<searchStoreId>:<page>
@@ -722,7 +959,7 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
     const prov = item.provider || 'default';
     const storeId = await storeLink(db, prov, item.link, item.title);
     const label = `🎬 ${item.title.slice(0, 34)}${item.title.length > 34 ? '…' : ''} [${prov}]`;
-    keyboard.push([{ text: label, callback_data: `qpage:${storeId}:1` }]);
+    keyboard.push([{ text: label, callback_data: `item:${storeId}` }]);
   }
 
   if (totalPages > 1) {
@@ -742,24 +979,33 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   return { text, keyboard: { inline_keyboard: keyboard } };
 }
 
-// Show Item Qualities / Episodes
+// Show Item Qualities / Episodes (Mobile-Optimized Card)
 async function showItemDetails(chatId, item, token, db, requestUrl, messageId = null, page = 1, itemStoreIdParam = null) {
   let meta = null;
   if (item.link) {
     meta = await callCinemaApi(requestUrl, '/meta', { provider: item.provider, link: item.link });
   }
 
-  let itemText = `🎬 <b>${escapeHtml(item.title)}</b>\n`;
-  itemText += `🌐 <b>Provider:</b> ${escapeHtml(item.provider)}\n`;
-  if (meta?.year) itemText += `📅 <b>Year:</b> ${escapeHtml(meta.year)}\n`;
-  if (meta?.rating) itemText += `⭐ <b>Rating:</b> ${escapeHtml(meta.rating)}\n`;
+  const rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
+  const { resolutions, audio } = extractQualityBadges(meta?.title || item.title, rawGroups);
+
+  const yearStr = meta?.year ? ` (${meta.year})` : '';
+  const ratingStr = meta?.rating ? `⭐ <b>Rating:</b> ${escapeHtml(meta.rating)}/10 • ` : '';
+  const provDisplayName = item.providerName || (item.provider ? item.provider.toUpperCase() : 'CINEMA');
+
+  let itemText = `🎬 <b>${escapeHtml(meta?.title || item.title)}${yearStr}</b>\n`;
+  itemText += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  itemText += `${ratingStr}🌐 <b>Source:</b> <b>${escapeHtml(provDisplayName)}</b>\n`;
+  itemText += `🔊 <b>Audio:</b> ${escapeHtml(audio)}\n`;
+  itemText += `💿 <b>Releases:</b> <code>${escapeHtml(resolutions)}</code>\n`;
   if (meta?.synopsis) {
-    itemText += `\n📝 <i>${escapeHtml(meta.synopsis.slice(0, 260))}${meta.synopsis.length > 260 ? '…' : ''}</i>\n`;
+    let syn = meta.synopsis.trim();
+    if (syn.length > 180) syn = syn.slice(0, 177) + '…';
+    itemText += `\n📝 <i>${escapeHtml(syn)}</i>\n`;
   }
-  itemText += `\n<i>Select Quality or Episode to Stream / Download:</i>`;
+  itemText += `\n<i>Select Quality / Episode to Stream & Download:</i>`;
 
   const keyboard = [];
-  const rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
 
   if (rawGroups.length > 0) {
     const itemStoreId = itemStoreIdParam || (await storeLink(db, item.provider, item.link, item.title));
@@ -774,12 +1020,14 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       const dLinks = group.directLinks || [];
       if (dLinks.length > 1) {
         const epGroupStoreId = await storeLink(db, item.provider, dLinks, `${item.title} - ${group.title || 'Episodes'}`);
-        keyboard.push([{ text: `📺 ${group.title || 'Episodes'} (${dLinks.length} Ep)`, callback_data: `eps:${epGroupStoreId}` }]);
+        const label = formatEpisodeButtonLabel(group.title, dLinks.length);
+        keyboard.push([{ text: label, callback_data: `eps:${epGroupStoreId}` }]);
       } else {
         const targetLink = dLinks[0]?.link || item.link;
         const qTitle = `${item.title} [${group.title || group.quality || `Quality ${startIndex + i + 1}`}]`;
         const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
-        keyboard.push([{ text: `⚡ ${group.title || group.quality || `Option ${startIndex + i + 1}`}`, callback_data: `resopt:${qStoreId}` }]);
+        const label = formatQualityButtonLabel(group.title || group.quality, `Quality ${startIndex + i + 1}`);
+        keyboard.push([{ text: label, callback_data: `resopt:${qStoreId}` }]);
       }
     }
 
@@ -796,7 +1044,7 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
   }
 
   keyboard.push([
-    { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` },
+    { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` },
     { text: '🌐 Open Web Player', url: DEFAULT_WEB_URL }
   ]);
 

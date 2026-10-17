@@ -112,6 +112,25 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Trigger 24/7 Channel Auto-Poster in background (every 6-8 minutes)
+    if (context.waitUntil && env?.cinema_db) {
+      context.waitUntil((async () => {
+        try {
+          const now = Date.now();
+          const lastPostRow = await env.cinema_db.prepare("SELECT value FROM config WHERE key = 'LAST_AUTO_POST_TIME'").first();
+          const lastPostTime = lastPostRow?.value ? parseInt(lastPostRow.value, 10) : 0;
+          if (now - lastPostTime > 6 * 60 * 1000) {
+            await env.cinema_db.prepare("INSERT OR REPLACE INTO config (key, value, updated_at) VALUES ('LAST_AUTO_POST_TIME', ?, ?)")
+              .bind(String(now), now).run();
+            const { runAutoPoster } = await import('./auto-poster.js');
+            await runAutoPoster(env, request.url, false);
+          }
+        } catch (posterErr) {
+          console.warn("Background auto-poster error:", posterErr.message);
+        }
+      })());
+    }
+
     return new Response(JSON.stringify({
       success: true,
       url: cleanUrl,
