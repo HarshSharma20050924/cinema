@@ -18,6 +18,18 @@ declare global {
 }
 
 export const UpdateModal: React.FC = () => {
+  // CRITICAL: NEVER show update notifications on the web page / web browser!
+  // Web pages automatically get the latest version on deploy.
+  // Updates are strictly for installed Native Desktop (Electron) and Mobile (Capacitor APK).
+  const isDesktop = Boolean(window.CinemaDesktop?.isDesktop || window.CinemaDesktop?.checkForUpdates);
+  const isNativeMobile = Boolean(
+    window.Capacitor?.isNativePlatform?.() ||
+    (window.Capacitor?.getPlatform && window.Capacitor.getPlatform() !== "web") ||
+    window.location.protocol === "capacitor:" ||
+    window.location.protocol === "ionic:"
+  );
+  const isNativeApp = isDesktop || isNativeMobile;
+
   const [isOpen, setIsOpen] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<{
     version: string;
@@ -43,8 +55,10 @@ export const UpdateModal: React.FC = () => {
     return false;
   };
 
-  // Check for updates on startup
+  // Check for updates on startup (ONLY for native apps)
   useEffect(() => {
+    if (!isNativeApp) return;
+
     let unbindProgress: (() => void) | undefined;
     let unbindDownloaded: (() => void) | undefined;
 
@@ -237,7 +251,7 @@ export const UpdateModal: React.FC = () => {
     }
   };
 
-  if (!isOpen || !updateInfo) return null;
+  if (!isNativeApp || !isOpen || !updateInfo) return null;
 
   return (
     <div
