@@ -44,11 +44,12 @@ async function extractHubCloudMirrors(link) {
     const clean = rawLink.trim();
     if (!clean || seenUrls.has(clean)) return;
 
-    // Filter out advertising, navigation, and landing page URLs
+    // Filter out advertising, navigation, telegram bots, and landing page URLs
     const lower = clean.toLowerCase();
     if (
       lower.includes('telegram') ||
       lower.includes('t.me/') ||
+      lower.includes('/tg/bot') ||
       lower.includes('/admin/') ||
       lower.includes('contact') ||
       lower.includes('report') ||
@@ -111,6 +112,41 @@ async function extractHubCloudMirrors(link) {
         }
       } catch (err) {
         console.warn('Landing page redirect check error:', err.message);
+      }
+    }
+
+    // 2.5 Resolve HubCloud search-recover.php pages
+    if (targetLink.includes('search-recover.php')) {
+      try {
+        const u = new URL(targetLink);
+        let q = u.searchParams.get('q');
+        const from_ac = u.searchParams.get('from_ac') || '';
+        if (q) {
+          try {
+            if (!q.includes(' ') && q.length > 8) {
+              const b64 = Buffer.from(q, 'base64').toString('utf-8');
+              if (b64 && /[a-z0-9]/i.test(b64)) q = b64;
+            }
+          } catch (_) {}
+          const sApi = `https://${u.hostname}/drive/search-recover.php?api=search&q=${encodeURIComponent(q)}&page=1&from_ac=${encodeURIComponent(from_ac)}`;
+          const sRes = await axios.get(sApi, {
+            headers: { ...headers, Accept: 'application/json', Referer: targetLink },
+            timeout: 8000
+          });
+          const hits = sRes.data?.hits || [];
+          if (hits.length > 0) {
+            const matchedHit = hits.find(h => {
+              const fn = (h.file_name || '').toLowerCase();
+              return q.split(' ').every(word => fn.includes(word.toLowerCase()));
+            }) || hits[0];
+            const hitUrl = matchedHit?.url;
+            if (hitUrl && hitUrl.startsWith('http')) {
+              targetLink = hitUrl.replace('hubcloud.cx', 'hubcloud.ist');
+            }
+          }
+        }
+      } catch (srErr) {
+        console.warn('search-recover resolver error:', srErr.message);
       }
     }
 
@@ -370,7 +406,8 @@ async function getStreams(req, res) {
           !lower.includes('tickcounter.com') &&
           !lower.includes('countdown') &&
           !lower.includes('t.me/') &&
-          !lower.includes('telegram')
+          !lower.includes('telegram') &&
+          !lower.includes('/tg/bot')
         );
       });
 

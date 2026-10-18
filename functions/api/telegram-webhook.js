@@ -107,7 +107,11 @@ function extractActualSeason(str) {
   if (!str) return null;
   const s = String(str);
 
-  // 1. Look for season marker after standard delimiters (e.g. " - Season 2", " | S3", " [Season 4]")
+  // 1. Direct prefix match (e.g. "Season 8 [ORG...]", "S07 1080p...") - not a range
+  const startMatch = s.match(/^\s*(?:season\s*(\d{1,2})|s(\d{1,2}))\b(?!\s*[-+–—]\s*\d)/i);
+  if (startMatch) return parseInt(startMatch[1] || startMatch[2], 10);
+
+  // 2. Look for season marker after standard delimiters (e.g. " - Season 2", " | S3", " [Season 4]")
   const afterSepParts = s.split(/[-:|–—\[\]()]/).filter(Boolean);
   for (let i = afterSepParts.length - 1; i >= 0; i--) {
     const part = afterSepParts[i].trim();
@@ -118,7 +122,7 @@ function extractActualSeason(str) {
     }
   }
 
-  // 2. Fallback: match all seasons, check if last one is not a range
+  // 3. Fallback: match all seasons, check if last one is not a range
   const allMatches = [...s.matchAll(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/gi)];
   if (allMatches.length === 1) {
     const m = allMatches[0];
@@ -1243,12 +1247,19 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     const keyboard = [];
     validMirrors.slice(0, 4).forEach((m, idx) => {
-      let sName = (m.server || `M${idx + 1}`).replace(/^Server\s*/i, 'Svr ').slice(0, 10);
+      let rawServer = (m.server || `Mirror ${idx + 1}`).trim();
+      let isDownloadOnly = /download\s*only/i.test(rawServer) || /gdrive/i.test(rawServer);
+      let sName = rawServer.replace(/\s*\(download\s*only\)/i, '').replace(/^Server\s*/i, 'Svr ').trim().slice(0, 10);
       const url = m.link || m.url;
       const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(item.title)}`;
 
-      const row = [{ text: `🎬 VLC (${sName})`, url: vlcRedirectUrl }];
-      if (isRealDownloadLink(url)) {
+      const row = [];
+      if (isDownloadOnly) {
+        // Download only server (e.g. GDrive / instant downloads) - DO NOT make a VLC button!
+        row.push({ text: `⬇️ Download (${sName})`, url: url });
+      } else {
+        // Streamable cloud server (Pixeldrain, CF Storage, CF Worker, Gofile, FastDL)
+        row.push({ text: `🎬 VLC (${sName})`, url: vlcRedirectUrl });
         row.push({ text: `⬇️ Download (${sName})`, url: url });
       }
       keyboard.push(row);

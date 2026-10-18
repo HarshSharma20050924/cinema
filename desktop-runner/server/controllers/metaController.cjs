@@ -157,9 +157,12 @@ async function resolveProviderEpisodes(provider, meta, context) {
 
           if (Array.isArray(eps) && eps.length > 0) {
             // Group episodes by Season (e.g. "S01 E01" or "Season 1")
+            const gSeasonMatch = (g.title || '').match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
+            const parentSeasonNum = gSeasonMatch ? parseInt(gSeasonMatch[1] || gSeasonMatch[2], 10) : 1;
+
             const seasonMap = new Map();
             for (const ep of eps) {
-              let seasonNum = 1;
+              let seasonNum = parentSeasonNum;
               let epTitle = ep.title || 'Episode';
 
               if (typeof ep.link === 'string' && ep.link.startsWith('{')) {
@@ -172,10 +175,8 @@ async function resolveProviderEpisodes(provider, meta, context) {
                 } catch (_) {}
               }
 
-              if (seasonNum === 1) {
-                const sMatch = epTitle.match(/S0*(\d+)/i) || epTitle.match(/Season\s*0*(\d+)/i);
-                if (sMatch) seasonNum = parseInt(sMatch[1], 10);
-              }
+              const sMatch = epTitle.match(/\b(?:S(\d{1,2})E\d+|Season\s*(\d{1,2}))\b/i);
+              if (sMatch) seasonNum = parseInt(sMatch[1] || sMatch[2], 10);
 
               if (!seasonMap.has(seasonNum)) seasonMap.set(seasonNum, []);
               seasonMap.get(seasonNum).push({
@@ -185,11 +186,14 @@ async function resolveProviderEpisodes(provider, meta, context) {
             }
 
             const dubName = (g.title || g.language || '').trim();
-            const isMultiDub = groupsToProcess.length > 1 && dubName;
             const sortedSeasons = Array.from(seasonMap.keys()).sort((a, b) => a - b);
             for (const sNum of sortedSeasons) {
+              let finalTitle = dubName || `Season ${sNum}`;
+              if (!new RegExp(`\\b(season\\s*${sNum}|s0*${sNum})\\b`, 'i').test(finalTitle)) {
+                finalTitle = `${finalTitle} · Season ${sNum}`;
+              }
               resolvedGroups.push({
-                title: isMultiDub ? `${dubName} · Season ${sNum}` : `Season ${sNum}`,
+                title: finalTitle,
                 season: sNum,
                 dub: dubName || 'Default Audio',
                 quality: g.quality || 'HD',
