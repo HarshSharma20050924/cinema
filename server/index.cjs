@@ -41,6 +41,16 @@ async function startServer() {
     clusterSync.initClusterSync(PORT).catch((err) => {
       console.warn('Cluster sync startup error:', err.message);
     });
+
+    // Start 24/7 Rapid Channel Auto-Poster & Archive Backfill (Keeps Render active 24/7)
+    if (process.env.ENABLE_AUTO_POSTER !== 'false') {
+      try {
+        const { start247AutoPoster } = require('./services/channelPosterWorker.cjs');
+        start247AutoPoster();
+      } catch (err) {
+        console.warn('AutoPoster startup notice:', err.message);
+      }
+    }
   });
 }
 
