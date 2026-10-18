@@ -103,10 +103,81 @@ function isRealDownloadLink(url) {
   );
 }
 
+function extractActualSeason(str) {
+  if (!str) return null;
+  const s = String(str);
+
+  // 1. Look for season marker after standard delimiters (e.g. " - Season 2", " | S3", " [Season 4]")
+  const afterSepParts = s.split(/[-:|–—\[\]()]/).filter(Boolean);
+  for (let i = afterSepParts.length - 1; i >= 0; i--) {
+    const part = afterSepParts[i].trim();
+    if (/1\s*[-+–—]\s*[2-9]/i.test(part) || /[1-9]\s*\+\s*[1-9]/i.test(part)) continue;
+    const m = part.match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
+    if (m) {
+      return parseInt(m[1] || m[2], 10);
+    }
+  }
+
+  // 2. Fallback: match all seasons, check if last one is not a range
+  const allMatches = [...s.matchAll(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/gi)];
+  if (allMatches.length === 1) {
+    const m = allMatches[0];
+    return parseInt(m[1] || m[2], 10);
+  }
+  if (allMatches.length > 1) {
+    const last = allMatches[allMatches.length - 1];
+    return parseInt(last[1] || last[2], 10);
+  }
+  return null;
+}
+
+function extractCleanResolution(str) {
+  if (!str) return '';
+  const s = String(str);
+  let res = '';
+  if (/\b(2160p|4k|uhd)\b/i.test(s)) res = '4K';
+  else if (/\b1080p\b/i.test(s)) res = '1080p';
+  else if (/\b720p\b/i.test(s)) res = '720p';
+  else if (/\b480p\b/i.test(s)) res = '480p';
+  else if (/\b360p\b/i.test(s)) res = '360p';
+
+  let codec = '';
+  if (/hevc|10bit|x265/i.test(s)) codec = 'HEVC';
+
+  let size = '';
+  const sizeMatch = s.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
+  if (sizeMatch) size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
+
+  if (res && codec && !res.includes('HEVC')) res += ` ${codec}`;
+  if (size) res += ` [${size}]`;
+  return res;
+}
+
+function formatPackButtonLabel(rawTitle, defaultLabel = 'Season Pack') {
+  const str = String(rawTitle || defaultLabel);
+  const seasonNum = extractActualSeason(str);
+  const season = seasonNum !== null ? `S${seasonNum}` : '';
+
+  let res = extractCleanResolution(str);
+  const parts = [];
+  if (season) parts.push(season);
+  if (res) parts.push(res);
+  else parts.push('Pack');
+
+  let lbl = `📦 ${parts.join(' ')}`;
+  if (lbl.length > 28) lbl = lbl.slice(0, 27) + '…';
+  return lbl;
+}
+
 // Cleanly extract Resolution, Codec, File Size and Episode badge for compact mobile buttons
 function formatQualityButtonLabel(rawTitle, defaultLabel = 'Option') {
   if (!rawTitle) return `⚡ ${defaultLabel}`;
   const str = String(rawTitle);
+
+  // If this is a pack
+  if (/(pack|zip|batch|complete\s*pack|all\s*episodes\s*pack)/i.test(str)) {
+    return formatPackButtonLabel(str, defaultLabel);
+  }
 
   // 1. Extract resolution (4K, 1080p, 720p, 480p, 360p)
   let res = '';
@@ -148,39 +219,52 @@ function formatQualityButtonLabel(rawTitle, defaultLabel = 'Option') {
   return lbl;
 }
 
-function formatEpisodeButtonLabel(rawTitle, epCount) {
+function formatEpisodeButtonLabel(rawTitle, epCount, rawQuality = '', groupIndex = 0) {
   const str = String(rawTitle || 'Episodes');
+  const qStr = String(rawQuality || '');
 
+  const isPack = /(pack|zip|batch|complete\s*pack|all\s*episodes\s*pack)/i.test(str) || qStr.toLowerCase() === 'pack';
+  if (isPack) {
+    return formatPackButtonLabel(str, `Season Pack ${groupIndex + 1}`);
+  }
+
+  const seasonNum = extractActualSeason(str) || extractActualSeason(qStr);
+  const season = seasonNum !== null ? `S${seasonNum}` : '';
+
+  // Priority for resolution: rawQuality first if valid, then after separator, then str
   let res = '';
-  if (/\b(2160p|4k|uhd)\b/i.test(str)) res = '4K';
-  else if (/\b1080p\b/i.test(str)) res = '1080p';
-  else if (/\b720p\b/i.test(str)) res = '720p';
-  else if (/\b480p\b/i.test(str)) res = '480p';
+  const qResMatch = qStr.match(/\b(2160p|4k|1080p|720p|480p|360p)\b/i);
+  if (qResMatch) {
+    res = qResMatch[1].toUpperCase();
+    if (res === '2160P') res = '4K';
+  } else {
+    const afterSep = str.split(/[-:|–—\[\]()]/).filter(Boolean).pop() || '';
+    const sepResMatch = afterSep.match(/\b(2160p|4k|1080p|720p|480p|360p)\b/i) || str.match(/\b(2160p|4k|1080p|720p|480p|360p)\b/i);
+    if (sepResMatch) {
+      res = sepResMatch[1].toUpperCase();
+      if (res === '2160P') res = '4K';
+    }
+  }
 
-  let season = '';
-  const sMatch = str.match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
-  if (sMatch) season = 'S' + (sMatch[1] || sMatch[2]);
+  let codec = '';
+  if (/hevc|10bit|x265/i.test(str) || /hevc|10bit|x265/i.test(qStr)) codec = 'HEVC';
 
   let lang = '';
   if (/dual\s*audio/i.test(str) || (/\bhindi\b/i.test(str) && /\benglish\b/i.test(str))) lang = 'Dual';
   else if (/hindi\s*dub|\bhindi\b/i.test(str)) lang = 'Hin';
   else if (/english|\boriginal\b/i.test(str)) lang = 'Orig';
-  else if (/arabic/i.test(str)) lang = 'Arab';
-  else if (/french/i.test(str)) lang = 'Fre';
-  else if (/spanish/i.test(str)) lang = 'Spa';
-  else if (/tamil/i.test(str)) lang = 'Tam';
-  else if (/telugu/i.test(str)) lang = 'Tel';
 
   let size = '';
   const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
   if (sizeMatch) size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
 
   const parts = [];
-  if (lang) parts.push(lang);
   if (season) parts.push(season);
   if (res) parts.push(res);
-  const main = parts.join(' • ') || (season || 'Eps');
+  if (codec && !res.includes('HEVC')) parts.push(codec);
+  if (!season && !res && lang) parts.push(lang);
 
+  const main = parts.join(' • ') || (season || (epCount > 0 ? `Eps` : `Quality ${groupIndex + 1}`));
   let lbl = `📺 ${main}`;
   if (size) lbl += ` [${size}]`;
   if (epCount > 0) lbl += ` (${epCount})`;
@@ -400,7 +484,7 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
   try {
     const res = await fetch(url.toString(), {
       headers: { "User-Agent": "Cinema-Telegram-Bot/1.0" },
-      signal: AbortSignal.timeout(18000)
+      signal: AbortSignal.timeout(30000)
     });
     if (!res.ok) return null;
     return await res.json();
@@ -982,14 +1066,17 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         // For MovieBox, resolutions are retrieved per episode dynamically via /api/streams.
         // Never cross-match seasons or languages in MovieBox!
         if (!isMb && allGroups.length > 1) {
-          const currentSeasonMatch = String(groupData.title || '').match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
-          const currentSeason = currentSeasonMatch ? parseInt(currentSeasonMatch[1] || currentSeasonMatch[2], 10) : null;
+          const currentSeason = extractActualSeason(groupData.title || groupDataObj?.groupTitle);
 
           for (const g of allGroups) {
-            // STRICT CHECK: g must belong to the EXACT same season!
+            // 1. NEVER include full season packs as episode quality choices!
+            const gTitle = String(g.title || '');
+            const isPack = /(pack|zip|batch|complete|all\s*episodes\s*pack)/i.test(gTitle) || g.quality === 'Pack';
+            if (isPack) continue;
+
+            // 2. STRICT CHECK: g must belong to the EXACT same season!
             if (currentSeason !== null) {
-              const gSeasonMatch = String(g.title || '').match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
-              const gSeason = gSeasonMatch ? parseInt(gSeasonMatch[1] || gSeasonMatch[2], 10) : null;
+              const gSeason = extractActualSeason(gTitle);
               if (gSeason !== null && gSeason !== currentSeason) {
                 continue; // Skip different seasons!
               }
@@ -997,16 +1084,25 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
             const dList = g.directLinks || [];
             if (dList.length > 0) {
-              const matchedEp = dList[startIndex + i + j] || dList.find(d => {
-                const num = (d.title || '').match(/\b(?:e|ep|episode)\s*(\d+)\b/i);
+              // Match strictly by episode number! NEVER blindly fallback to dList[index]!
+              const matchedEp = dList.find(d => {
+                const num = (d.title || '').match(/\b(?:e|ep|episode)\s*0*(\d+)\b/i);
                 return num && parseInt(num[1], 10) === epNum;
-              });
+              }) || (dList.length === episodes.length && /episode/i.test(dList[startIndex + i + j]?.title || '') ? dList[startIndex + i + j] : null);
+
               if (matchedEp && matchedEp.link) {
-                altQualities.push({
-                  quality: g.title || g.quality || 'Option',
-                  link: matchedEp.link,
-                  title: `${seriesTitle} - Ep ${epNum} [${g.title || g.quality || 'Option'}]`
-                });
+                let qClean = extractCleanResolution(g.quality || g.title);
+                if (!qClean || qClean.toLowerCase() === 'option' || /single\s*episodes/i.test(qClean)) {
+                  qClean = extractCleanResolution(g.title) || `Quality ${altQualities.length + 1}`;
+                }
+
+                if (!altQualities.some(q => q.link === matchedEp.link || q.quality === qClean)) {
+                  altQualities.push({
+                    quality: qClean,
+                    link: matchedEp.link,
+                    title: `${seriesTitle} - Ep ${epNum} [${qClean}]`
+                  });
+                }
               }
             }
           }
@@ -1081,7 +1177,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     const qButtons = [];
     for (const q of qualities) {
       const qStoreId = await storeLink(db, epqData.provider, q.link, q.title);
-      const label = formatQualityButtonLabel(q.quality, 'Stream');
+      const cleanLabel = extractCleanResolution(q.quality) || formatQualityButtonLabel(q.quality, 'Stream');
+      const label = cleanLabel.startsWith('⚡') ? cleanLabel : `⚡ ${cleanLabel}`;
       qButtons.push({ text: label, callback_data: `resopt:${qStoreId}` });
     }
 
@@ -1267,7 +1364,17 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
     for (let i = 0; i < pageItems.length; i++) {
       const group = pageItems[i];
       const dLinks = group.directLinks || [];
-      if (dLinks.length > 1) {
+      const isPackGroup = group.quality === 'Pack' || /(full\s*season\s*packs?|season\s*packs?|batch\s*packs?|all\s*episodes\s*zip)/i.test(group.title || '');
+
+      if (isPackGroup && dLinks.length > 0) {
+        // Render each full season pack as an individual pack button
+        for (const pack of dLinks) {
+          const pTitle = `${item.title} [${pack.title || 'Season Pack'}]`;
+          const pStoreId = await storeLink(db, item.provider, pack.link, pTitle);
+          const pLabel = formatPackButtonLabel(pack.title);
+          rowBatch.push({ text: pLabel, callback_data: `resopt:${pStoreId}` });
+        }
+      } else if (dLinks.length > 1) {
         // Group contains multiple single episodes
         const epGroupStoreId = await storeLink(db, item.provider, {
           episodes: dLinks,
@@ -1275,7 +1382,7 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
           groupTitle: group.title,
           seriesTitle: meta?.title || item.title
         }, `${item.title} - ${group.title || 'Episodes'}`);
-        const label = formatEpisodeButtonLabel(group.title, dLinks.length);
+        const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, startIndex + i);
         rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
       } else {
         const targetLink = dLinks[0]?.link || item.link;

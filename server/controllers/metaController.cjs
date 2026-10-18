@@ -78,7 +78,7 @@ async function enhanceSeriesMeta(url, title, axios, cheerio) {
 
       if ((isPack || hasSize) && !isEp) {
         const label = text.length > 4 ? text : parentText;
-        if (!batchPacks.some((p) => p.link === href)) {
+        if (!batchPacks.some((p) => p.link === href || p.title === label)) {
           batchPacks.push({ title: label, link: href });
         }
       }
