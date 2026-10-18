@@ -9,6 +9,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   
+  <script>
+    (function() {
+      const origWarn = console.warn;
+      console.warn = function(...args) {
+        if (args[0] && typeof args[0] === 'string' && args[0].includes('in-browser Babel transformer')) return;
+        origWarn.apply(console, args);
+      };
+    })();
+  </script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -402,14 +411,29 @@
       const inspectItem = async (item) => {
         setSelectedItemStructure({ loading: true, title: item.title });
         try {
+          const domainMap = {
+            hdhub4u: 'https://hdhub4u.ms',
+            vega: 'https://vegamovies.im',
+            drive: 'https://moviesdrive.dad',
+            moviesmod: 'https://moviesmod.day',
+            movieBoxWeb: 'https://moviebox.ph',
+            katmoviehd: 'https://katmoviehd.dad',
+            '4khdhub': 'https://4khdhub.fit'
+          };
+          let link = item.link || '';
+          if (link && link.startsWith('/')) {
+            const b = domainMap[explorerSelectedExt] || 'https://hdhub4u.ms';
+            link = `${b.replace(/\/+$/, '')}/${link.replace(/^\/+/, '')}`;
+          }
+
           const params = new URLSearchParams({
-            url: item.link,
+            url: link,
             provider: explorerSelectedExt
           });
           const res = await fetch(`${getApiBase()}/api/scraper/crawl?${params.toString()}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: item.link, provider: explorerSelectedExt })
+            body: JSON.stringify({ url: link, provider: explorerSelectedExt })
           });
           const data = await res.json();
           setSelectedItemStructure(data);
@@ -862,62 +886,98 @@
                         </h2>
                       </div>
 
-                      {/* Quality Groups */}
-                      {selectedItemStructure.structure?.qualities && selectedItemStructure.structure.qualities.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                          {selectedItemStructure.structure.qualities.map((qGroup, qIdx) => (
-                            <div key={qIdx} className="solid-inner" style={{ padding: 16 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                                <span className="badge badge-blue">{qGroup.quality}</span>
-                                {qGroup.episodes && (
-                                  <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>
-                                    {qGroup.episodes.length} Episodes Found
-                                  </span>
-                                )}
-                              </div>
+                      {/* Quality & Season Groups */}
+                      {(() => {
+                        const groups = Array.isArray(selectedItemStructure.structure)
+                          ? selectedItemStructure.structure
+                          : (selectedItemStructure.structure?.qualities || selectedItemStructure.structure?.groups || []);
 
-                              {qGroup.episodes && qGroup.episodes.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
-                                  {qGroup.episodes.map((ep, epIdx) => (
-                                    <button
-                                      key={epIdx}
-                                      className="btn btn-solid"
-                                      style={{ padding: '8px 10px', fontSize: 12, justifyContent: 'space-between' }}
-                                      onClick={() => {
-                                        setActiveTab('crawler');
-                                        handleRunCrawl(ep.link);
-                                      }}
-                                    >
-                                      <span>Ep {ep.episodeNumber || ep.title || epIdx + 1}</span>
-                                      <Icons.ArrowRight />
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>Direct Movie / Single file link</span>
-                                  {qGroup.directLink && (
-                                    <button
-                                      className="btn btn-primary"
-                                      style={{ padding: '6px 14px', fontSize: 12 }}
-                                      onClick={() => {
-                                        setActiveTab('crawler');
-                                        handleRunCrawl(qGroup.directLink);
-                                      }}
-                                    >
-                                      Crawl Link
-                                    </button>
-                                  )}
-                                </div>
+                        if (groups.length === 0) {
+                          return (
+                            <div className="solid-inner" style={{ padding: 24, textAlign: 'center' }}>
+                              <p style={{ color: 'var(--text-sub)', fontSize: 13, marginBottom: 14 }}>
+                                Single stream item or direct post. No sub-episodes detected.
+                              </p>
+                              {selectedItemStructure.url && (
+                                <button
+                                  className="btn btn-primary"
+                                  onClick={() => {
+                                    setActiveTab('crawler');
+                                    handleRunCrawl(selectedItemStructure.url);
+                                  }}
+                                >
+                                  Deep Crawl Final Mirrors
+                                </button>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-sub)', fontSize: 13 }}>
-                          No nested qualities parsed. Check final mirrors in the Deep Crawler tab.
-                        </div>
-                      )}
+                          );
+                        }
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            {groups.map((qGroup, qIdx) => {
+                              const epList = qGroup.episodes || [];
+                              return (
+                                <div key={qIdx} className="solid-inner" style={{ padding: 16 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <span className="badge badge-blue">{qGroup.quality || 'HD'}</span>
+                                      {qGroup.size && <span className="badge badge-muted mono">{qGroup.size}</span>}
+                                      {qGroup.dub && qGroup.dub !== 'Default Audio' && (
+                                        <span className="badge badge-amber">{qGroup.dub}</span>
+                                      )}
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: '#ffffff' }}>
+                                        {qGroup.title}
+                                      </span>
+                                    </div>
+                                    <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>
+                                      {epList.length > 0 ? `${epList.length} Episodes` : 'Direct File'}
+                                    </span>
+                                  </div>
+
+                                  {epList.length > 0 ? (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+                                      {epList.map((ep, epIdx) => (
+                                        <button
+                                          key={epIdx}
+                                          className="btn btn-solid"
+                                          style={{ padding: '8px 10px', fontSize: 12, justifyContent: 'space-between' }}
+                                          title={ep.link}
+                                          onClick={() => {
+                                            setActiveTab('crawler');
+                                            handleRunCrawl(ep.link);
+                                          }}
+                                        >
+                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {ep.title || `Ep ${epIdx + 1}`}
+                                          </span>
+                                          <Icons.ArrowRight />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>Direct Movie / Single file link</span>
+                                      {(qGroup.link || qGroup.directLink) && (
+                                        <button
+                                          className="btn btn-primary"
+                                          style={{ padding: '6px 14px', fontSize: 12 }}
+                                          onClick={() => {
+                                            setActiveTab('crawler');
+                                            handleRunCrawl(qGroup.link || qGroup.directLink);
+                                          }}
+                                        >
+                                          Crawl Mirrors
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

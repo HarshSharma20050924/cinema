@@ -116,6 +116,13 @@ async function handleDeepCrawl(req, res) {
       else provider = 'custom';
     }
 
+    // Ensure relative URLs are resolved against provider base URL
+    if (effectiveUrl && effectiveUrl.startsWith('/')) {
+      const prov = provider || 'hdhub4u';
+      const bUrl = domainResolver.getBaseUrl(prov) || 'https://hdhub4u.ms';
+      effectiveUrl = `${bUrl.replace(/\/+$/, '')}/${effectiveUrl.replace(/^\/+/, '')}`;
+    }
+
     let searchResults = [];
     // If a search query was supplied without direct URL, search on provider
     if (!effectiveUrl && query && provider) {
