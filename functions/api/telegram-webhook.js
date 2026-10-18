@@ -240,6 +240,10 @@ function extractQualityBadges(title, linkList = []) {
 
 // Telegram API Helper
 async function tgCall(token, method, payload = {}) {
+  if (!token) {
+    console.error(`Telegram API [${method}] FAILED: No BOT_TOKEN found in env!`);
+    return null;
+  }
   const url = `https://api.telegram.org/bot${token}/${method}`;
   try {
     const res = await fetch(url, {
@@ -247,9 +251,13 @@ async function tgCall(token, method, payload = {}) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    return await res.json();
+    const data = await res.json();
+    if (!data.ok) {
+      console.error(`Telegram API [${method}] returned !ok:`, JSON.stringify(data));
+    }
+    return data;
   } catch (err) {
-    console.error(`Telegram API [${method}] error:`, err);
+    console.error(`Telegram API [${method}] fetch error:`, err);
     return null;
   }
 }
@@ -408,6 +416,14 @@ export async function onRequestPost(context) {
   const token = env?.BOT_TOKEN || BOT_TOKEN;
   const db = env?.cinema_db;
 
+  if (!token) {
+    console.error("FATAL: Webhook received update but env.BOT_TOKEN is missing!");
+    return new Response(JSON.stringify({ error: "BOT_TOKEN not configured in env" }), {
+      status: 200, // Return 200 to prevent Telegram retry storm while diagnosing
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
   try {
     const update = await request.json();
 
@@ -434,8 +450,12 @@ export async function onRequestPost(context) {
   }
 }
 
-export async function onRequestGet() {
-  return new Response("Cinema Telegram Webhook is Live (Cloudflare Edge 24/7)", {
+export async function onRequestGet(context) {
+  const { env } = context || {};
+  const tok = env?.BOT_TOKEN || BOT_TOKEN;
+  const db = env?.cinema_db ? 'CONNECTED' : 'MISSING';
+  const status = tok ? `OK (Prefix: ${tok.slice(0, 8)}...)` : 'MISSING';
+  return new Response(`Cinema Telegram Webhook is Live (Cloudflare Edge 24/7)\nBOT_TOKEN: ${status}\nDATABASE: ${db}\n`, {
     status: 200,
     headers: { "Content-Type": "text/plain" }
   });
