@@ -26,14 +26,25 @@ if (!fs.existsSync(DATA_DIR)) {
 const HISTORY_FILE = path.join(DATA_DIR, 'posted_history.json');
 const CURSOR_FILE = path.join(DATA_DIR, 'archive_cursors.json');
 
-const ENABLED_PROVIDERS = [
-  'vega',
-  'hdhub4u',
-  '4khdhub',
-  'movieBoxWeb',
-  'drive',
-  'autoEmbed'
-];
+// Dynamic Provider Pool (Synced from Cloudflare D1 /api/bot-providers)
+let dynamicBotProviders = [];
+let lastProviderSync = 0;
+
+async function getLiveBotProviders() {
+  const now = Date.now();
+  if (now - lastProviderSync < 30000 && dynamicBotProviders.length > 0) {
+    return dynamicBotProviders;
+  }
+  try {
+    const res = await axios.get(`${WEB_URL}/api/bot-providers`, { timeout: 6000 });
+    if (Array.isArray(res.data?.enabled) && res.data.enabled.length > 0) {
+      dynamicBotProviders = res.data.enabled;
+      lastProviderSync = now;
+      return dynamicBotProviders;
+    }
+  } catch (_) {}
+  return dynamicBotProviders.length > 0 ? dynamicBotProviders : ['vega', 'hdhub4u', '4khdhub', 'movieBoxWeb', 'drive', 'autoEmbed'];
+}
 
 function getHistory() {
   if (fs.existsSync(HISTORY_FILE)) {
@@ -139,8 +150,15 @@ async function processNextBatch() {
   isJobRunning = true;
 
   try {
-    const provKey = ENABLED_PROVIDERS[currentProviderIndex];
-    currentProviderIndex = (currentProviderIndex + 1) % ENABLED_PROVIDERS.length;
+    const enabled = await getLiveBotProviders();
+    if (!enabled || enabled.length === 0) {
+      isJobRunning = false;
+      return;
+    }
+
+    currentProviderIndex = currentProviderIndex % enabled.length;
+    const provKey = enabled[currentProviderIndex];
+    currentProviderIndex = (currentProviderIndex + 1) % enabled.length;
 
     const cursors = getCursors();
     const history = getHistory();

@@ -129,7 +129,21 @@ export async function runAutoPoster(env, requestUrl, force = false) {
   const channelId = env?.CHANNEL_ID || CHANNEL_ID;
 
   const origin = new URL(requestUrl).origin;
-  const providers = DEFAULT_POSTER_PROVIDERS;
+
+  // Dynamically load bot providers from D1 (No Hardcoding)
+  let providers = [];
+  if (db) {
+    try {
+      const row = await db.prepare("SELECT value FROM config WHERE key = 'BOT_ENABLED_PROVIDERS'").first();
+      if (row?.value) {
+        const parsed = JSON.parse(row.value);
+        if (Array.isArray(parsed) && parsed.length > 0) providers = parsed;
+      }
+    } catch (_) {}
+  }
+  if (providers.length === 0) {
+    providers = ["drive", "vega", "hdhub4u", "4khdhub", "movieBoxWeb", "autoEmbed"];
+  }
 
   const results = {
     posted: [],
