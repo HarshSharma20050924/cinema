@@ -210,12 +210,18 @@ export async function onRequest(context) {
         const timeoutMs = isLongReq ? 25000 : 8000;
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+        const reqHeaders = {
+          "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+          Accept: request.headers.get("Accept") || "*/*",
+        };
+        const incomingContentType = request.headers.get("Content-Type");
+        if (incomingContentType) reqHeaders["Content-Type"] = incomingContentType;
+        const incomingAuth = request.headers.get("Authorization");
+        if (incomingAuth) reqHeaders["Authorization"] = incomingAuth;
+
         const upstreamResp = await fetch(targetUrl, {
           method: request.method,
-          headers: {
-            "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
-            Accept: request.headers.get("Accept") || "*/*",
-          },
+          headers: reqHeaders,
           body: request.method !== "GET" && request.method !== "HEAD" ? request.body : undefined,
           signal: controller.signal,
         });
