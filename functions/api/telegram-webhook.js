@@ -475,21 +475,60 @@ const HELP_KEYBOARD = {
   ]
 };
 
-// Forward to Cinema API on the same domain
+const PRIMARY_RENDER_BACKEND = "https://cinema-4h7t.onrender.com";
+
+// Forward directly to dedicated Cinema 24/7 Backend Engine (avoids Cloudflare edge self-subrequest recursion)
 async function callCinemaApi(requestUrl, endpoint, params = {}) {
-  const url = new URL(`/api${endpoint}`, requestUrl);
+  let baseUrl = PRIMARY_RENDER_BACKEND;
+  // If requestUrl was explicitly a live external tunnel, we can use it, but avoid self pages.dev recursion
+  try {
+    const parsed = new URL(requestUrl);
+    if (!parsed.hostname.includes("pages.dev") && /^https?:\/\//i.test(requestUrl)) {
+      baseUrl = parsed.origin;
+    }
+  } catch (_) {}
+
+  const url = new URL(`/api${endpoint}`, baseUrl);
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
   });
+
   try {
     const res = await fetch(url.toString(), {
       headers: { "User-Agent": "Cinema-Telegram-Bot/1.0" },
-      signal: AbortSignal.timeout(30000)
+      signal: AbortSignal.timeout(25000)
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Automatic failover to Render if another node was attempted and returned non-ok
+      if (baseUrl !== PRIMARY_RENDER_BACKEND) {
+        const fbUrl = new URL(`/api${endpoint}`, PRIMARY_RENDER_BACKEND);
+        Object.entries(params).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) fbUrl.searchParams.set(k, String(v));
+        });
+        const fbRes = await fetch(fbUrl.toString(), {
+          headers: { "User-Agent": "Cinema-Telegram-Bot/1.0" },
+          signal: AbortSignal.timeout(25000)
+        });
+        if (fbRes.ok) return await fbRes.json();
+      }
+      return null;
+    }
     return await res.json();
   } catch (err) {
-    console.error(`API Call [${endpoint}] error:`, err);
+    if (baseUrl !== PRIMARY_RENDER_BACKEND) {
+      try {
+        const fbUrl = new URL(`/api${endpoint}`, PRIMARY_RENDER_BACKEND);
+        Object.entries(params).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) fbUrl.searchParams.set(k, String(v));
+        });
+        const fbRes = await fetch(fbUrl.toString(), {
+          headers: { "User-Agent": "Cinema-Telegram-Bot/1.0" },
+          signal: AbortSignal.timeout(25000)
+        });
+        if (fbRes.ok) return await fbRes.json();
+      } catch (_) {}
+    }
+    console.error(`API Call [${endpoint}] error:`, err.message);
     return null;
   }
 }
