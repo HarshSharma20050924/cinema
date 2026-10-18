@@ -20,6 +20,15 @@ const DEVICE_NAME = process.env.DEVICE_NAME || `JioPhone Next (Home Airtel)`;
 let currentPublicUrl = process.env.PUBLIC_URL || '';
 let heartbeatTimer = null;
 
+// Ensure Android Termux never sleeps (CPU WakeLock)
+try {
+  const { exec } = require('child_process');
+  exec('termux-wake-lock', (err) => {
+    if (err) console.log('⚠️ [WakeLock] Notice:', err.message);
+    else console.log('🔒 [Termux WakeLock] Acquired successfully. Phone CPU will stay awake 24/7.');
+  });
+} catch (_) {}
+
 // 1. Ultra-Lightweight Relay Server
 const server = http.createServer(async (req, res) => {
   // CORS
