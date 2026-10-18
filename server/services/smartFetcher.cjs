@@ -64,6 +64,24 @@ async function syncPhonePool() {
   return activePhonePool;
 }
 
+// Public APIs that never block datacenter IPs and should never be routed through phone relays
+const DIRECT_ONLY_DOMAINS = [
+  'theintrodb.org',
+  'strem.io',
+  'cinemeta',
+  'themoviedb.org',
+  'tmdb.org',
+  'imdb.com',
+  'raw.githubusercontent.com',
+  'githubusercontent.com'
+];
+
+function isDirectOnly(url) {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase();
+  return DIRECT_ONLY_DOMAINS.some(d => lower.includes(d));
+}
+
 // 2. Get next available healthy phone tunnel
 function getNextHealthyPhone() {
   const now = Date.now();
@@ -73,9 +91,7 @@ function getNextHealthyPhone() {
   });
 
   if (healthy.length === 0) {
-    // If all phones are marked dead, reset them and try again
-    deadPhones.clear();
-    return activePhonePool[0] || null;
+    return null; // Don't clear deadPhones and loop endlessly on dead nodes!
   }
 
   roundRobinIndex = (roundRobinIndex + 1) % healthy.length;
@@ -84,8 +100,8 @@ function getNextHealthyPhone() {
 
 function markPhoneFailed(url) {
   if (url) {
-    deadPhones.set(url, Date.now() + 45000); // Back off this phone for 45 seconds
-    console.warn(`⚠️ [SmartFetcher] Phone node ${url} timed out/failed. Switching to next phone node.`);
+    deadPhones.set(url, Date.now() + 5 * 60 * 1000); // Back off this phone for 5 minutes
+    console.warn(`⚠️ [SmartFetcher] Phone node ${url} timed out/failed. Backing off for 5 mins.`);
   }
 }
 
@@ -99,6 +115,14 @@ async function smartRequest(config) {
   const headers = config.headers || {};
   const timeout = config.timeout || 15000;
 
+  // Public APIs should always be fetched direct
+  if (isDirectOnly(targetUrl)) {
+    return axios({
+      ...config,
+      timeout: Math.min(timeout, 5000)
+    });
+  }
+
   await syncPhonePool();
 
   const needsResidential = isResidentialPreferred(targetUrl);
@@ -108,7 +132,7 @@ async function smartRequest(config) {
   const tryDirect = async () => {
     return axios({
       ...config,
-      timeout: Math.min(timeout, 8000),
+      timeout: Math.min(timeout, 6000),
       validateStatus: (status) => status < 500
     });
   };
@@ -120,7 +144,8 @@ async function smartRequest(config) {
       const isCloudflareBlocked = directRes.status === 403 || directRes.status === 503 ||
         (typeof directRes.data === 'string' && (directRes.data.includes('Just a moment...') || directRes.data.includes('Cloudflare Ray ID')));
 
-      if (!isCloudflareBlocked && directRes.status === 200) {
+      // Return immediately for successful responses or standard 404/400 (not a Cloudflare block!)
+      if (!isCloudflareBlocked) {
         return directRes;
       }
       console.log(`🛡️ [SmartFetcher] Direct request to ${targetUrl} hit Cloudflare check (${directRes.status}). Routing through residential phone...`);
@@ -133,7 +158,7 @@ async function smartRequest(config) {
   if (hasPhones) {
     const phonesToTry = [...activePhonePool];
 
-    for (let attempt = 0; attempt < Math.min(phonesToTry.length, 3); attempt++) {
+    for (let attempt = 0; attempt < Math.min(phonesToTry.length, 2); attempt++) {
       const phoneUrl = getNextHealthyPhone();
       if (!phoneUrl) break;
 
@@ -149,7 +174,7 @@ async function smartRequest(config) {
             headers,
             data: config.data
           },
-          timeout: 7000,
+          timeout: 3000,
           validateStatus: (status) => status < 500
         });
 
@@ -158,12 +183,10 @@ async function smartRequest(config) {
           return res;
         }
 
-        // If phone relay returned 4xx, 5xx or invalid error page
         markPhoneFailed(phoneUrl);
         continue;
       } catch (err) {
         markPhoneFailed(phoneUrl);
-        // Seamlessly continue loop to try next phone!
       }
     }
   }

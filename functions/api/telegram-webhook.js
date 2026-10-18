@@ -1098,67 +1098,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         const epNum = startIndex + i + j + 1;
         const epTitle = ep.title || `Episode ${epNum}`;
 
-        // Check if multiple qualities exist across allGroups for this episode index
-        const altQualities = [];
-        const isMb = groupData.provider === 'movieBoxWeb' || groupData.provider === 'moviebox';
-
-        // For MovieBox, resolutions are retrieved per episode dynamically via /api/streams.
-        // Never cross-match seasons or languages in MovieBox!
-        if (!isMb && allGroups.length > 1) {
-          const currentSeason = extractActualSeason(groupData.title || groupDataObj?.groupTitle);
-
-          for (const g of allGroups) {
-            // 1. NEVER include full season packs as episode quality choices!
-            const gTitle = String(g.title || '');
-            const isPack = /(pack|zip|batch|complete|all\s*episodes\s*pack)/i.test(gTitle) || g.quality === 'Pack';
-            if (isPack) continue;
-
-            // 2. STRICT CHECK: g must belong to the EXACT same season!
-            if (currentSeason !== null) {
-              const gSeason = extractActualSeason(gTitle);
-              if (gSeason !== null && gSeason !== currentSeason) {
-                continue; // Skip different seasons!
-              }
-            }
-
-            const dList = g.directLinks || [];
-            if (dList.length > 0) {
-              // Match strictly by episode number! NEVER blindly fallback to dList[index]!
-              const matchedEp = dList.find(d => {
-                const num = (d.title || '').match(/\b(?:e|ep|episode)\s*0*(\d+)\b/i);
-                return num && parseInt(num[1], 10) === epNum;
-              }) || (dList.length === episodes.length && /episode/i.test(dList[startIndex + i + j]?.title || '') ? dList[startIndex + i + j] : null);
-
-              if (matchedEp && matchedEp.link) {
-                let qClean = extractCleanResolution(g.quality || g.title);
-                if (!qClean || qClean.toLowerCase() === 'option' || /single\s*episodes/i.test(qClean)) {
-                  qClean = extractCleanResolution(g.title) || `Quality ${altQualities.length + 1}`;
-                }
-
-                if (!altQualities.some(q => q.link === matchedEp.link || q.quality === qClean)) {
-                  altQualities.push({
-                    quality: qClean,
-                    link: matchedEp.link,
-                    title: `${seriesTitle} - Ep ${epNum} [${qClean}]`
-                  });
-                }
-              }
-            }
-          }
-        }
-
-        if (altQualities.length > 1) {
-          // Store quality choice package
-          const epqStoreId = await storeLink(db, groupData.provider, {
-            epNum,
-            seriesTitle,
-            qualities: altQualities
-          }, `${seriesTitle} - Ep ${epNum} Qualities`);
-          row.push({ text: `▶️ Ep ${epNum}`, callback_data: `epq:${epqStoreId}` });
-        } else {
-          const epStoreId = await storeLink(db, groupData.provider, ep.link, `${groupData.title} - ${epTitle}`);
-          row.push({ text: `▶️ Ep ${epNum}`, callback_data: `resopt:${epStoreId}` });
-        }
+        const epStoreId = await storeLink(db, groupData.provider, ep.link, `${groupData.title} - ${epTitle}`);
+        row.push({ text: `▶️ Ep ${epNum}`, callback_data: `resopt:${epStoreId}` });
       }
       keyboard.push(row);
     }
@@ -1244,12 +1185,13 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       return tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Session expired.', show_alert: true });
     }
 
-    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Extracting mirrors...' });
-    await tgCall(token, 'sendMessage', {
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Resolving mirrors...' });
+    const waitMsg = await tgCall(token, 'sendMessage', {
       chat_id: chatId,
       text: `⏳ Resolving high-speed mirrors for <b>"${escapeHtml(item.title)}"</b>...`,
       parse_mode: 'HTML'
     });
+    const waitMsgId = waitMsg?.result?.message_id;
 
     let mirrors = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: true });
     if (!mirrors || mirrors.length === 0) {
@@ -1264,20 +1206,34 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       }
     });
 
+    const validMirrors = Array.from(uniqueMap.values());
+
     if (validMirrors.length === 0) {
+      const errText = `⚠️ <b>Could not extract streaming mirrors.</b>\n\n` +
+            `Please <b>tap again on the episode to retry</b>, or choose another extension below:`;
+      const errMarkup = {
+        inline_keyboard: [
+          [
+            { text: '🔁 Tap Again to Retry', callback_data: `resopt:${qStoreId}` },
+            { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` }
+          ]
+        ]
+      };
+
+      if (waitMsgId) {
+        return tgCall(token, 'editMessageText', {
+          chat_id: chatId,
+          message_id: waitMsgId,
+          text: errText,
+          parse_mode: 'HTML',
+          reply_markup: errMarkup
+        });
+      }
       return tgCall(token, 'sendMessage', {
         chat_id: chatId,
-        text: `⚠️ <b>Could not extract streaming mirrors.</b>\n\n` +
-              `Please <b>tap again on the episode to retry</b>, or choose another extension below.`,
+        text: errText,
         parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '🔁 Tap Again to Retry', callback_data: `resopt:${qStoreId}` },
-              { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` }
-            ]
-          ]
-        }
+        reply_markup: errMarkup
       });
     }
 
@@ -1300,8 +1256,18 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     keyboard.push([
       { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
-      { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` }
+      { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` }
     ]);
+
+    if (waitMsgId) {
+      return tgCall(token, 'editMessageText', {
+        chat_id: chatId,
+        message_id: waitMsgId,
+        text: resMsg,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    }
 
     return tgCall(token, 'sendMessage', {
       chat_id: chatId,
@@ -1370,8 +1336,13 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
 // Show Item Qualities / Episodes (Mobile-Optimized Card with Poster)
 async function showItemDetails(chatId, item, token, db, requestUrl, messageId = null, page = 1, itemStoreIdParam = null) {
   let meta = null;
-  if (item.link) {
-    meta = await callCinemaApi(requestUrl, '/meta', { provider: item.provider, link: item.link });
+  const itemLinkObj = typeof item.link === 'object' && !Array.isArray(item.link) ? item.link : null;
+  const actualLink = itemLinkObj?.url || (typeof item.link === 'string' ? item.link : null);
+
+  if (itemLinkObj?.cachedMeta) {
+    meta = itemLinkObj.cachedMeta;
+  } else if (actualLink) {
+    meta = await callCinemaApi(requestUrl, '/meta', { provider: item.provider, link: actualLink });
   }
 
   const rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
@@ -1397,7 +1368,10 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
   const keyboard = [];
 
   if (rawGroups.length > 0) {
-    const itemStoreId = itemStoreIdParam || (await storeLink(db, item.provider, item.link, item.title));
+    const itemStoreId = itemStoreIdParam || (await storeLink(db, item.provider, {
+      url: actualLink,
+      cachedMeta: meta
+    }, item.title));
     const pageSize = 8;
     const totalPages = Math.ceil(rawGroups.length / pageSize) || 1;
     const currentPage = Math.max(1, Math.min(page, totalPages));
@@ -1430,7 +1404,7 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
         const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, startIndex + i);
         rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
       } else {
-        const targetLink = dLinks[0]?.link || item.link;
+        const targetLink = dLinks[0]?.link || actualLink;
         const qTitle = `${item.title} [${group.title || group.quality || `Quality ${startIndex + i + 1}`}]`;
         const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
         const label = formatQualityButtonLabel(group.title || group.quality, `Quality ${startIndex + i + 1}`);
@@ -1450,7 +1424,7 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       keyboard.push(navRow);
     }
   } else {
-    const storeId = await storeLink(db, item.provider, item.link, item.title);
+    const storeId = await storeLink(db, item.provider, actualLink, item.title);
     keyboard.push([{ text: `▶️ Stream & Resolve Mirrors`, callback_data: `resopt:${storeId}` }]);
   }
 
@@ -1459,8 +1433,24 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
     { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` }
   ]);
 
-  // If editing an existing message without photo change
+  // If editing an existing message (e.g. Next / Prev page pagination on poster card)
   if (messageId) {
+    const markupRes = await tgCall(token, 'editMessageReplyMarkup', {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: { inline_keyboard: keyboard }
+    });
+    if (markupRes?.ok) return markupRes;
+
+    const capRes = await tgCall(token, 'editMessageCaption', {
+      chat_id: chatId,
+      message_id: messageId,
+      caption: itemText,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: keyboard }
+    });
+    if (capRes?.ok) return capRes;
+
     return tgCall(token, 'editMessageText', {
       chat_id: chatId,
       message_id: messageId,

@@ -107,10 +107,12 @@ export async function onRequestPost(context) {
       pool.push(entry);
     }
 
-    // Sort by freshest lastSeen first so the newest live device is primary
+    // Sort by freshest lastSeen first
     pool.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
 
-    const primaryUrl = cleanUrl;
+    // The dedicated 24/7 backend is Render. Temporary trycloudflare tunnels must NEVER hijack BACKEND_URL!
+    const RENDER_PRIMARY = "https://cinema-4h7t.onrender.com";
+    const primaryUrl = cleanUrl.includes("trycloudflare.com") ? RENDER_PRIMARY : cleanUrl;
 
     // Persist to D1 database (100k daily writes free!)
     if (env?.cinema_db) {
