@@ -42,12 +42,12 @@ async function syncPhonePool() {
 
   try {
     const res = await axios.get(CLUSTER_STATUS_URL, { timeout: 6000 });
-    const pool = res.data?.pool || [];
+    const pool = [...(res.data?.relays || []), ...(res.data?.pool || [])];
     const valid = [];
 
     for (const item of pool) {
       const u = typeof item === 'string' ? item : item?.url;
-      if (u && /^https?:\/\//i.test(u) && !u.includes('pages.dev')) {
+      if (u && /^https?:\/\//i.test(u) && !u.includes('pages.dev') && !u.includes('onrender.com')) {
         const clean = u.replace(/\/+$/, '');
         if (!valid.includes(clean)) valid.push(clean);
       }
@@ -153,16 +153,14 @@ async function smartRequest(config) {
           validateStatus: (status) => status < 500
         });
 
-        if (res.status === 200 && res.data) {
+        const isInvalidData = !res.data || (typeof res.data === 'string' && (res.data.includes('Cannot POST') || res.data.includes('Error code 52')));
+        if (res.status === 200 && !isInvalidData) {
           return res;
         }
 
-        // If phone relay returned 502/504 or error status
-        if (res.status >= 500) {
-          markPhoneFailed(phoneUrl);
-          continue;
-        }
-        return res;
+        // If phone relay returned 4xx, 5xx or invalid error page
+        markPhoneFailed(phoneUrl);
+        continue;
       } catch (err) {
         markPhoneFailed(phoneUrl);
         // Seamlessly continue loop to try next phone!

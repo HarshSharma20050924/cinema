@@ -1225,13 +1225,19 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       }
     });
 
-    const validMirrors = Array.from(uniqueMap.values());
     if (validMirrors.length === 0) {
       return tgCall(token, 'sendMessage', {
         chat_id: chatId,
-        text: `⚠️ Could not extract streaming mirrors.\nTry choosing another quality option or switching providers.`,
+        text: `⚠️ <b>Could not extract streaming mirrors.</b>\n\n` +
+              `Please <b>tap again on the episode to retry</b>, or choose another extension below.`,
+        parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: [[{ text: '🔄 Switch Provider', callback_data: `swprov:${item.title.slice(0, 30)}` }]]
+          inline_keyboard: [
+            [
+              { text: '🔁 Tap Again to Retry', callback_data: `resopt:${qStoreId}` },
+              { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` }
+            ]
+          ]
         }
       });
     }

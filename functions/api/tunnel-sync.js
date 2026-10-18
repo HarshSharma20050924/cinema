@@ -69,15 +69,37 @@ export async function onRequestPost(context) {
     const now = Date.now();
     pool = pool.filter(p => now - (p.lastSeen || 0) < 180000);
 
-    // Add or update current device in cluster pool
-    const devKey = deviceId || cleanUrl;
-    const existingIdx = pool.findIndex(p => p.deviceId === devKey || p.url === cleanUrl);
-    const entry = {
-      deviceId: devKey,
-      deviceName: deviceName || `Node-${devKey.slice(0, 6)}`,
-      url: cleanUrl,
-      lastSeen: now,
-    };
+    const isRelay = body?.role === "residential_relay" ||
+      (deviceName || "").toLowerCase().includes("relay") ||
+      (deviceId || "").toLowerCase().includes("relay") ||
+      (deviceId || "").startsWith("phone_jiophone");
+
+    // Handle Residential Proxy Relays separately from full API backends
+    if (isRelay) {
+      let relayPool = [];
+      if (env?.cinema_db) {
+        try {
+          const row = await env.cinema_db.prepare("SELECT value FROM config WHERE key = 'RELAY_POOL'").first();
+          if (row?.value) relayPool = JSON.parse(row.value);
+        } catch (_) {}
+      }
+      if (!Array.isArray(relayPool)) relayPool = [];
+      relayPool = relayPool.filter(p => now - (p.lastSeen || 0) < 180000);
+      const rIdx = relayPool.findIndex(p => p.deviceId === devKey || p.url === cleanUrl);
+      const rEntry = { deviceId: devKey, deviceName: deviceName || "Residential Relay", url: cleanUrl, lastSeen: now, role: "residential_relay" };
+      if (rIdx >= 0) relayPool[rIdx] = rEntry;
+      else relayPool.push(rEntry);
+
+      if (env?.cinema_db) {
+        try {
+          await env.cinema_db.prepare("INSERT OR REPLACE INTO config (key, value, updated_at) VALUES ('RELAY_POOL', ?, ?)").bind(JSON.stringify(relayPool), now).run();
+        } catch (_) {}
+      }
+      return new Response(JSON.stringify({ success: true, role: "residential_relay", relayPoolCount: relayPool.length }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
 
     if (existingIdx >= 0) {
       pool[existingIdx] = entry;

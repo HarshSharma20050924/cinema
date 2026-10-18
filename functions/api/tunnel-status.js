@@ -27,13 +27,23 @@ export async function onRequestGet(context) {
       } catch (_) {}
     }
 
+    let relayPool = [];
+    if (env?.cinema_db) {
+      try {
+        const relayRow = await env.cinema_db.prepare("SELECT value FROM config WHERE key = 'RELAY_POOL'").first();
+        if (relayRow?.value) relayPool = JSON.parse(relayRow.value);
+      } catch (_) {}
+    }
+
     const now = Date.now();
     const freshPool = (pool || []).filter(p => now - (p.lastSeen || 0) < 180000);
+    const freshRelays = (relayPool || []).filter(p => now - (p.lastSeen || 0) < 180000);
 
     return new Response(JSON.stringify({
-      ok: Boolean(backendUrl || freshPool.length > 0),
-      backendUrl: backendUrl || (freshPool[0]?.url || null),
-      pool: freshPool
+      ok: Boolean(backendUrl || freshPool.length > 0 || freshRelays.length > 0),
+      backendUrl: backendUrl || (freshPool[0]?.url || "https://cinema-4h7t.onrender.com"),
+      pool: freshPool,
+      relays: freshRelays
     }), {
       status: 200,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }

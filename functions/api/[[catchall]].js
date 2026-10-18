@@ -63,10 +63,21 @@ export async function onRequest(context) {
     // Build candidate URL list: live pool nodes first, then fallback
     const candidates = [];
     const now = Date.now();
+    const isRelayOnlyRoute = reqUrl.pathname === "/api/fetch" || reqUrl.pathname === "/fetch";
+
     if (Array.isArray(pool)) {
       for (const item of pool) {
         const isFresh = !item.lastSeen || (now - item.lastSeen < 180000);
         const u = typeof item === "string" ? item : item?.url;
+        const isRelay = (typeof item === "object") && (
+          item?.role === "residential_relay" ||
+          (item?.deviceName || "").toLowerCase().includes("relay") ||
+          (item?.deviceId || "").toLowerCase().includes("relay")
+        );
+
+        // Do not route general API endpoints (/meta, /streams, /posts, etc.) to residential relays!
+        if (isRelay && !isRelayOnlyRoute) continue;
+
         if (isFresh && u && /^https?:\/\//i.test(u) && !isSelfUrl(u)) {
           const clean = u.replace(/\/+$/, "");
           if (!candidates.includes(clean)) {
@@ -80,6 +91,19 @@ export async function onRequest(context) {
       if (!candidates.includes(clean)) {
         candidates.push(clean);
       }
+    }
+
+    // Always ensure 24/7 Render Cloud Engine is in candidate list
+    const RENDER_PRIMARY = "https://cinema-4h7t.onrender.com";
+    if (!candidates.includes(RENDER_PRIMARY)) {
+      candidates.push(RENDER_PRIMARY);
+    }
+
+    // For general API calls, prioritize Render (the 24/7 dedicated compute engine)
+    if (!isRelayOnlyRoute && candidates.includes(RENDER_PRIMARY)) {
+      const idx = candidates.indexOf(RENDER_PRIMARY);
+      candidates.splice(idx, 1);
+      candidates.unshift(RENDER_PRIMARY); // Place at top of candidate list
     }
 
     // Helper to fetch live providers directly from Zenda GitHub manifest
@@ -159,16 +183,16 @@ export async function onRequest(context) {
       );
     }
 
-    // Multi-Node Parallel Load Balancing across all live phone tunnels
+    // Multi-Node Parallel Load Balancing
     const orderedCandidates = [...candidates];
-    if (orderedCandidates.length > 1) {
+    if (orderedCandidates.length > 1 && isRelayOnlyRoute) {
       const shift = Math.floor(Math.random() * orderedCandidates.length);
       for (let s = 0; s < shift; s++) {
         orderedCandidates.push(orderedCandidates.shift());
       }
     }
 
-    // Iterate candidate nodes with fast 5s failover
+    // Iterate candidate nodes with fast failover
     let lastError = null;
     for (let i = 0; i < orderedCandidates.length; i++) {
       const candidateUrl = orderedCandidates[i];
@@ -197,8 +221,12 @@ export async function onRequest(context) {
         });
         clearTimeout(timeoutId);
 
-        // Accept if not an internal Cloudflare/tunnel 502/503/504 gateway breakdown
-        if (upstreamResp.status < 502) {
+        // Fail over to next node if an API endpoint returns 404 or >= 500 and more nodes exist
+        const isApiEndpoint = reqUrl.pathname.startsWith("/api/");
+        const isFailoverStatus = upstreamResp.status >= 500 || (isApiEndpoint && upstreamResp.status === 404);
+        const hasMoreCandidates = i < orderedCandidates.length - 1;
+
+        if (!isFailoverStatus || !hasMoreCandidates) {
           const respHeaders = new Headers(upstreamResp.headers);
           // Delete compression headers to avoid Worker decompression mismatches
           respHeaders.delete("content-encoding");

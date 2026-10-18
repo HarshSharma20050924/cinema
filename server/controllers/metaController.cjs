@@ -132,7 +132,14 @@ async function resolveProviderEpisodes(provider, meta, context) {
 
     // Prioritize popular tracks (Hindi first, then Original Audio, then English)
     const preferredLangs = ["hindi", "original", "english"];
-    const sortedGroups = [...rawGroups].sort((a, b) => {
+    const matchedPreferred = rawGroups.filter((g) => {
+      const aT = (g.title || "").toLowerCase();
+      return preferredLangs.some((l) => aT.includes(l));
+    });
+
+    // If Hindi or English tracks exist, strictly keep those; otherwise keep top 2 tracks
+    const candidateGroups = matchedPreferred.length > 0 ? matchedPreferred : rawGroups.slice(0, 2);
+    const groupsToProcess = [...candidateGroups].sort((a, b) => {
       const aT = (a.title || "").toLowerCase();
       const bT = (b.title || "").toLowerCase();
       const aP = preferredLangs.findIndex((l) => aT.includes(l));
@@ -142,9 +149,6 @@ async function resolveProviderEpisodes(provider, meta, context) {
       if (bP !== -1) return 1;
       return 0;
     });
-
-    // Keep top 4 audio tracks if there are many foreign subtitles/dubs
-    const groupsToProcess = sortedGroups.length > 4 ? sortedGroups.slice(0, 4) : sortedGroups;
     const resolvedGroups = [];
 
     for (const g of groupsToProcess) {
