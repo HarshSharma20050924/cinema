@@ -135,6 +135,58 @@ function extractActualSeason(str) {
   return null;
 }
 
+// Clean raw scraped media titles by stripping garbage tags, codecs, audio info, and repetitive season ranges
+function cleanMediaTitle(rawTitle) {
+  if (!rawTitle) return '';
+  let str = String(rawTitle);
+
+  // Strip leading emojis and symbols
+  str = str.replace(/^[\s🎬📺📥⚡📦⬇️▶️]+/gu, '').trim();
+
+  // Strip leading keywords
+  str = str.replace(/^(?:download|watch(?:\s+online)?|stream)\s+/i, '').trim();
+
+  // Strip age rating like [18+], (18+), [Adult]
+  str = str.replace(/\[\s*18\+\s*\]|\(\s*18\+\s*\)|\[Adult\]/gi, '').trim();
+
+  // Strip brackets with audio/codec info like {Hindi ORG 2.0...}, [Dual Audio], etc.
+  str = str.replace(/\{[^}]*\}/g, ' ');
+  str = str.replace(/\[\s*(?:dual\s*audio|hindi|eng|org|bluray|hevc|x264|x265|720p|1080p|480p|2160p|4k)[^\]]*\]/gi, ' ');
+
+  // Cut off bulk season range patterns like "(Season 1 - 8)" or "Season 1-8"
+  str = str.replace(/\((?:season\s*\d+\s*[-+–—]\s*\d+|seasons?\s*\d+[^)]*)\)/gi, ' ');
+  str = str.replace(/\b(?:season\s*\d+\s*[-+–—]\s*\d+)\b/gi, ' ');
+
+  // Stop at resolution list pattern like "480p | 720p | 1080p"
+  str = str.split(/\b(?:480p|720p|1080p|2160p|4k)\s*[|•·–—-]/i)[0];
+
+  // Stop at Dual Audio / Hindi Dubbed / Multi Audio keywords
+  str = str.split(/\b(?:dual\s*audio|multi\s*audio|hindi\s*dubbed|org\s*2\.0|org\s*5\.1|multi\s*sub)\b/i)[0];
+
+  // Stop at trailing resolutions (e.g. 1080p, 720p, 480p, 4k, 2160p)
+  str = str.replace(/\b(?:480p|720p|1080p|2160p|4k|bluray|web-dl|webrip|hdrip)\b.*$/i, '');
+
+  // Strip standalone language tags at end like "Hindi English", "Complete", "Hindi"
+  str = str.replace(/\b(?:complete|hindi|english|telugu|tamil|malayalam|kannada)\b.*$/i, '');
+
+  // Stop at Series / Movie keywords if used as delimiter
+  str = str.replace(/\b(?:series|complete\s*series|all\s*episodes)\b/gi, ' ');
+
+  // Clean trailing delimiters, dashes, pipes, bullet points
+  str = str.replace(/[\s|·–—\-_:]+$/g, '').trim();
+
+  // Clean double spaces
+  str = str.replace(/\s{2,}/g, ' ').trim();
+
+  // If title was stripped down too much, fallback to original sans leading emojis
+  if (str.length < 2) {
+    str = String(rawTitle).replace(/^[\s🎬📺📥⚡📦⬇️▶️]+/gu, '').trim();
+    if (str.length > 50) str = str.slice(0, 47) + '…';
+  }
+
+  return str.trim();
+}
+
 function extractCleanResolution(str) {
   if (!str) return '';
   const s = String(str);
@@ -155,6 +207,34 @@ function extractCleanResolution(str) {
   if (res && codec && !res.includes('HEVC')) res += ` ${codec}`;
   if (size) res += ` [${size}]`;
   return res;
+}
+
+// Cleanly format individual episode titles (e.g. "Game of Thrones • S8 Ep 1 [720p]")
+function formatCleanEpisodeTitle(seriesTitle, groupTitle, epTitle, epNum) {
+  const cleanSeries = cleanMediaTitle(seriesTitle) || 'Series';
+  
+  // Extract season number from groupTitle, epTitle, or seriesTitle
+  const seasonNum = extractActualSeason(groupTitle) || extractActualSeason(epTitle) || extractActualSeason(seriesTitle) || 1;
+  
+  // Extract episode number
+  let epNumber = epNum;
+  if (!epNumber && epTitle) {
+    const epMatch = String(epTitle).match(/(?:ep(?:isode)?\.?\s*|e)(\d{1,3})\b/i);
+    if (epMatch) epNumber = parseInt(epMatch[1], 10);
+  }
+  const epStr = epNumber ? `Ep ${epNumber}` : (epTitle || 'Episode');
+
+  // Extract clean resolution if present (e.g. 720p, 1080p, 4K, 480p)
+  let res = '';
+  const rMatch = (String(groupTitle || '') + ' ' + String(epTitle || '')).match(/\b(4k|2160p|1080p|720p|480p)\b/i);
+  if (rMatch) {
+    res = rMatch[1].toUpperCase();
+    if (res === '2160P') res = '4K';
+  }
+
+  let formatted = `${cleanSeries} • S${seasonNum} ${epStr}`;
+  if (res) formatted += ` [${res}]`;
+  return formatted;
 }
 
 function formatPackButtonLabel(rawTitle, defaultLabel = 'Season Pack') {
@@ -968,9 +1048,26 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     if (!item) {
       return tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Session expired. Search again.', show_alert: true });
     }
-    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Fetching qualities...' });
-    // Pass null for messageId so search results remain intact above!
-    return showItemDetails(chatId, item, token, db, requestUrl, null, 1, storeId);
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
+    await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_photo' });
+
+    const cleanTitle = cleanMediaTitle(item.title);
+    const loadMsg = await tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: `⚡ <b>Fetching Media Details...</b>\n` +
+            `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `⏳ <code>[▰▰▰▰▰▱▱▱▱▱] Loading...</code>\n` +
+            `🔍 <i>Retrieving seasons, episodes & available qualities...</i>`,
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [[{ text: '⏳ Loading media details...', callback_data: 'noop' }]]
+      }
+    });
+    const loadMsgId = loadMsg?.result?.message_id;
+
+    // Pass loadMsgId so showItemDetails deletes it smoothly once the photo card arrives
+    return showItemDetails(chatId, item, token, db, requestUrl, null, 1, storeId, loadMsgId);
   }
 
   // Search Results Pagination: spage:<searchStoreId>:<page>
@@ -1079,16 +1176,26 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     const episodes = Array.isArray(groupData.link) ? groupData.link : (groupDataObj?.episodes || []);
     const allGroups = groupDataObj?.allGroups || [];
     const seriesTitle = groupDataObj?.seriesTitle || groupData.title;
+    const groupSubTitle = groupDataObj?.groupTitle || '';
 
     const pageSize = 18;
     const totalPages = Math.ceil(episodes.length / pageSize) || 1;
     const currentPage = Math.max(1, Math.min(page, totalPages));
 
-    let epText = `📺 <b>${escapeHtml(groupData.title)}</b>\n`;
+    const cleanSeries = cleanMediaTitle(seriesTitle);
+    const seasonNum = extractActualSeason(groupSubTitle) || extractActualSeason(groupData.title);
+    const resLabel = extractCleanResolution(groupSubTitle);
+
+    let epHeader = cleanSeries;
+    if (seasonNum) epHeader += ` • Season ${seasonNum}`;
+    if (resLabel) epHeader += ` [${resLabel}]`;
+
+    let epText = `📺 <b>${escapeHtml(epHeader)}</b>\n`;
     if (totalPages > 1) {
       epText += `📄 <b>Page ${currentPage} of ${totalPages}</b> (${episodes.length} Episodes)\n`;
     }
-    epText += `\n<i>Select an Episode to choose Quality / Stream:</i>`;
+    epText += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    epText += `<i>Select an Episode to stream or download:</i>`;
 
     const keyboard = [];
     const startIndex = (currentPage - 1) * pageSize;
@@ -1102,7 +1209,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         const epNum = startIndex + i + j + 1;
         const epTitle = ep.title || `Episode ${epNum}`;
 
-        const epStoreId = await storeLink(db, groupData.provider, ep.link, `${groupData.title} - ${epTitle}`);
+        const cleanEpTitle = formatCleanEpisodeTitle(seriesTitle, groupSubTitle || groupData.title, epTitle, epNum);
+        const epStoreId = await storeLink(db, groupData.provider, ep.link, cleanEpTitle);
         row.push({ text: `▶️ Ep ${epNum}`, callback_data: `resopt:${epStoreId}` });
       }
       keyboard.push(row);
@@ -1189,18 +1297,60 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       return tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Session expired.', show_alert: true });
     }
 
-    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Resolving mirrors...' });
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
+    await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
+
+    const cleanTitle = cleanMediaTitle(item.title);
+    const initialLoader = `⚡ <b>Resolving Stream Mirrors...</b>\n` +
+      `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `⏳ <code>[▰▰▰▰▰▱▱▱▱▱] Connecting (50%)...</code>\n` +
+      `📡 <i>Searching high-speed cloud mirrors & bypasses...</i>`;
+
     const waitMsg = await tgCall(token, 'sendMessage', {
       chat_id: chatId,
-      text: `⏳ Resolving high-speed mirrors for <b>"${escapeHtml(item.title)}"</b>...`,
-      parse_mode: 'HTML'
+      text: initialLoader,
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [[{ text: '⏳ Extracting Streams... Please Wait', callback_data: 'noop' }]]
+      }
     });
     const waitMsgId = waitMsg?.result?.message_id;
 
-    let mirrors = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: true });
-    if (!mirrors || mirrors.length === 0) {
-      mirrors = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: false });
+    // Start extraction in background
+    const fetchPromise = (async () => {
+      let m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: true });
+      if (!m || m.length === 0) {
+        m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: false });
+      }
+      return m;
+    })();
+
+    // Dynamic animated stage 2 if extraction takes > 1.4s
+    const timerPromise = new Promise(resolve => setTimeout(resolve, 1400));
+    const raceRes = await Promise.race([
+      fetchPromise.then(res => ({ done: true, res })),
+      timerPromise.then(() => ({ done: false }))
+    ]);
+
+    if (!raceRes.done && waitMsgId) {
+      await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
+      await tgCall(token, 'editMessageText', {
+        chat_id: chatId,
+        message_id: waitMsgId,
+        text: `⚡ <b>Bypassing Cloud Gates & Verifying Mirrors...</b>\n` +
+          `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `⏳ <code>[▰▰▰▰▰▰▰▰▱▱] Finalizing (85%)...</code>\n` +
+          `🚀 <i>Direct high-speed streaming links found. Generating players...</i>`,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [[{ text: '⚡ Connecting to Stream Nodes...', callback_data: 'noop' }]]
+        }
+      });
     }
+
+    const mirrors = raceRes.done ? raceRes.res : await fetchPromise;
 
     const uniqueMap = new Map();
     (mirrors || []).forEach(s => {
@@ -1214,12 +1364,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     if (validMirrors.length === 0) {
       const errText = `⚠️ <b>Could not extract streaming mirrors.</b>\n\n` +
+            `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+            `<i>Cloud nodes were slow or link was blocked.</i>\n\n` +
             `Please <b>tap again on the episode to retry</b>, or choose another extension below:`;
       const errMarkup = {
         inline_keyboard: [
           [
             { text: '🔁 Tap Again to Retry', callback_data: `resopt:${qStoreId}` },
-            { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` }
+            { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
           ]
         ]
       };
@@ -1241,8 +1393,9 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       });
     }
 
-    let resMsg = `🎬 <b>${escapeHtml(item.title)}</b>\n`;
-    resMsg += `🌐 <b>Provider:</b> ${escapeHtml(item.provider)}\n\n`;
+    let resMsg = `🎬 <b>${escapeHtml(cleanTitle)}</b>\n`;
+    resMsg += `🌐 <b>Source:</b> <b>${escapeHtml(item.provider ? item.provider.toUpperCase() : 'CINEMA')}</b>\n`;
+    resMsg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     resMsg += `<i>Tap below to stream directly in VLC or download:</i>\n`;
 
     const keyboard = [];
@@ -1251,7 +1404,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       let isDownloadOnly = /download\s*only/i.test(rawServer) || /gdrive/i.test(rawServer);
       let sName = rawServer.replace(/\s*\(download\s*only\)/i, '').replace(/^Server\s*/i, 'Svr ').trim().slice(0, 10);
       const url = m.link || m.url;
-      const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(item.title)}`;
+      const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(cleanTitle)}`;
 
       const row = [];
       if (isDownloadOnly) {
@@ -1267,7 +1420,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     keyboard.push([
       { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
-      { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` }
+      { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
     ]);
 
     if (waitMsgId) {
@@ -1323,7 +1476,8 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
     const item = pageItems[i];
     const prov = item.provider || 'default';
     const storeId = await storeLink(db, prov, item.link, item.title);
-    const label = `🎬 ${item.title.slice(0, 34)}${item.title.length > 34 ? '…' : ''} [${prov}]`;
+    const clean = cleanMediaTitle(item.title);
+    const label = `🎬 ${clean.slice(0, 32)}${clean.length > 32 ? '…' : ''} [${prov}]`;
     keyboard.push([{ text: label, callback_data: `item:${storeId}` }]);
   }
 
@@ -1345,7 +1499,7 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
 }
 
 // Show Item Qualities / Episodes (Mobile-Optimized Card with Poster)
-async function showItemDetails(chatId, item, token, db, requestUrl, messageId = null, page = 1, itemStoreIdParam = null) {
+async function showItemDetails(chatId, item, token, db, requestUrl, messageId = null, page = 1, itemStoreIdParam = null, loadMsgId = null) {
   let meta = null;
   const itemLinkObj = typeof item.link === 'object' && !Array.isArray(item.link) ? item.link : null;
   const actualLink = itemLinkObj?.url || (typeof item.link === 'string' ? item.link : null);
@@ -1359,12 +1513,13 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
   const rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
   const { resolutions, audio } = extractQualityBadges(meta?.title || item.title, rawGroups);
 
+  const cleanTitle = cleanMediaTitle(meta?.title || item.title);
   const yearStr = meta?.year ? ` (${meta.year})` : '';
   const ratingStr = meta?.rating ? `⭐ <b>Rating:</b> ${escapeHtml(meta.rating)}/10 • ` : '';
   const provDisplayName = item.providerName || (item.provider ? item.provider.toUpperCase() : 'CINEMA');
   const posterUrl = meta?.poster || meta?.image || item.image || item.poster || null;
 
-  let itemText = `🎬 <b>${escapeHtml(meta?.title || item.title)}${yearStr}</b>\n`;
+  let itemText = `🎬 <b>${escapeHtml(cleanTitle)}${yearStr}</b>\n`;
   itemText += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   itemText += `${ratingStr}🌐 <b>Source:</b> <b>${escapeHtml(provDisplayName)}</b>\n`;
   itemText += `🔊 <b>Audio:</b> ${escapeHtml(audio)}\n`;
@@ -1399,24 +1554,33 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       if (isPackGroup && dLinks.length > 0) {
         // Render each full season pack as an individual pack button
         for (const pack of dLinks) {
-          const pTitle = `${item.title} [${pack.title || 'Season Pack'}]`;
+          const cleanBase = cleanMediaTitle(meta?.title || item.title);
+          const seasonNum = extractActualSeason(pack.title) || extractActualSeason(item.title);
+          const sStr = seasonNum ? `S${seasonNum} ` : '';
+          const pTitle = `${cleanBase} • ${sStr}Season Pack`;
           const pStoreId = await storeLink(db, item.provider, pack.link, pTitle);
           const pLabel = formatPackButtonLabel(pack.title);
           rowBatch.push({ text: pLabel, callback_data: `resopt:${pStoreId}` });
         }
       } else if (dLinks.length > 1) {
         // Group contains multiple single episodes
+        const cleanBase = cleanMediaTitle(meta?.title || item.title);
+        const seasonNum = extractActualSeason(group.title) || extractActualSeason(item.title);
+        const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
+        const groupStoredTitle = `${cleanBase} • ${sStr}`;
         const epGroupStoreId = await storeLink(db, item.provider, {
           episodes: dLinks,
           allGroups: rawGroups,
           groupTitle: group.title,
           seriesTitle: meta?.title || item.title
-        }, `${item.title} - ${group.title || 'Episodes'}`);
+        }, groupStoredTitle);
         const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, startIndex + i);
         rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
       } else {
         const targetLink = dLinks[0]?.link || actualLink;
-        const qTitle = `${item.title} [${group.title || group.quality || `Quality ${startIndex + i + 1}`}]`;
+        const cleanBase = cleanMediaTitle(meta?.title || item.title);
+        const resLabel = extractCleanResolution(group.title || group.quality) || `Quality ${startIndex + i + 1}`;
+        const qTitle = `${cleanBase} [${resLabel}]`;
         const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
         const label = formatQualityButtonLabel(group.title || group.quality, `Quality ${startIndex + i + 1}`);
         rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });
@@ -1435,13 +1599,14 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       keyboard.push(navRow);
     }
   } else {
-    const storeId = await storeLink(db, item.provider, actualLink, item.title);
+    const cleanBase = cleanMediaTitle(meta?.title || item.title);
+    const storeId = await storeLink(db, item.provider, actualLink, cleanBase);
     keyboard.push([{ text: `▶️ Stream & Resolve Mirrors`, callback_data: `resopt:${storeId}` }]);
   }
 
   keyboard.push([
     { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
-    { text: '🔄 Switch Extension', callback_data: `swprov:${(item.title || '').slice(0, 30)}` }
+    { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
   ]);
 
   // If editing an existing message (e.g. Next / Prev page pagination on poster card)
@@ -1471,6 +1636,7 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
     });
   }
 
+  let sendRes = null;
   // If item has a poster image, send photo card with poster
   if (posterUrl && (posterUrl.startsWith('http://') || posterUrl.startsWith('https://'))) {
     const photoRes = await tgCall(token, 'sendPhoto', {
@@ -1480,16 +1646,25 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard }
     });
-    if (photoRes?.ok) return photoRes;
+    if (photoRes?.ok) sendRes = photoRes;
   }
 
   // Fallback to text message
-  return tgCall(token, 'sendMessage', {
-    chat_id: chatId,
-    text: itemText,
-    parse_mode: 'HTML',
-    reply_markup: { inline_keyboard: keyboard }
-  });
+  if (!sendRes) {
+    sendRes = await tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: itemText,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: keyboard }
+    });
+  }
+
+  // Delete the temporary loader message now that the poster card has arrived
+  if (loadMsgId) {
+    await tgCall(token, 'deleteMessage', { chat_id: chatId, message_id: loadMsgId });
+  }
+
+  return sendRes;
 }
 
 // Providers Menu
