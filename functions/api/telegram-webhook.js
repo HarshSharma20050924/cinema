@@ -189,8 +189,8 @@ function cleanMediaTitle(rawTitle) {
   // Stop at Series / Movie keywords if used as delimiter
   str = str.replace(/\b(?:series|complete\s*series|all\s*episodes)\b/gi, ' ');
 
-  // Clean trailing delimiters, dashes, pipes, bullet points
-  str = str.replace(/[\s|·–—\-_:]+$/g, '').trim();
+  // Clean trailing delimiters, dashes, pipes, bullet points, stray brackets
+  str = str.replace(/[\s|·–—\-_:\]\[{}]+$/g, '').trim();
 
   // Clean double spaces
   str = str.replace(/\s{2,}/g, ' ').trim();
@@ -207,6 +207,44 @@ function cleanMediaTitle(rawTitle) {
   }
 
   return str.trim();
+}
+
+// Smart Relevance Ranking for Search Results
+function rankSearchResults(results, query) {
+  if (!query || !Array.isArray(results) || results.length <= 1) return results;
+  const cleanQ = query.toLowerCase().trim();
+  const qWords = cleanQ.split(/\s+/).filter(Boolean);
+
+  const getScore = (item) => {
+    const rawTitle = (item.title || '').toLowerCase();
+    const cleanT = cleanMediaTitle(rawTitle).toLowerCase();
+
+    // 1. Exact match (e.g. "Rear Window")
+    if (cleanT === cleanQ || rawTitle === cleanQ) return 1000;
+
+    // 2. Starts with query (e.g. "Rear Window (1954)")
+    if (cleanT.startsWith(cleanQ) || rawTitle.startsWith(cleanQ)) return 850;
+
+    // 3. Contains exact query phrase (e.g. "[Hindi] Rear Window")
+    if (cleanT.includes(cleanQ) || rawTitle.includes(cleanQ)) return 700;
+
+    // 4. All query words present in title (e.g. both "rear" and "window")
+    const allWords = qWords.every(w => cleanT.includes(w) || rawTitle.includes(w));
+    if (allWords) {
+      // Shorter title closer to query length gets higher priority
+      const lengthPenalty = Math.abs(cleanT.length - cleanQ.length);
+      return 500 - Math.min(lengthPenalty, 200);
+    }
+
+    // 5. Some query words present
+    let matchedWords = 0;
+    qWords.forEach(w => {
+      if (cleanT.includes(w) || rawTitle.includes(w)) matchedWords++;
+    });
+    return matchedWords * 50;
+  };
+
+  return [...results].sort((a, b) => getScore(b) - getScore(a));
 }
 
 function extractCleanResolution(str) {
@@ -582,61 +620,76 @@ const HELP_KEYBOARD = {
 };
 
 const PRIMARY_RENDER_BACKEND = "https://cinema-4h7t.onrender.com";
+let currentDb = null;
 
-// Forward directly to dedicated Cinema 24/7 Backend Engine (avoids Cloudflare edge self-subrequest recursion)
-async function callCinemaApi(requestUrl, endpoint, params = {}) {
-  let baseUrl = PRIMARY_RENDER_BACKEND;
-  // If requestUrl was explicitly a live external tunnel, we can use it, but avoid self pages.dev recursion
-  try {
-    const parsed = new URL(requestUrl);
-    if (!parsed.hostname.includes("pages.dev") && /^https?:\/\//i.test(requestUrl)) {
-      baseUrl = parsed.origin;
-    }
-  } catch (_) {}
-
-  const url = new URL(`/api${endpoint}`, baseUrl);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
-  });
-
-  try {
-    const res = await fetch(url.toString(), {
-      headers: { "User-Agent": "Cinema-Telegram-Bot/1.0" },
-      signal: AbortSignal.timeout(25000)
-    });
-    if (!res.ok) {
-      // Automatic failover to Render if another node was attempted and returned non-ok
-      if (baseUrl !== PRIMARY_RENDER_BACKEND) {
-        const fbUrl = new URL(`/api${endpoint}`, PRIMARY_RENDER_BACKEND);
-        Object.entries(params).forEach(([k, v]) => {
-          if (v !== undefined && v !== null) fbUrl.searchParams.set(k, String(v));
-        });
-        const fbRes = await fetch(fbUrl.toString(), {
-          headers: { "User-Agent": "Cinema-Telegram-Bot/1.0" },
-          signal: AbortSignal.timeout(25000)
-        });
-        if (fbRes.ok) return await fbRes.json();
+async function getCandidateBackends(db) {
+  const candidates = [];
+  if (db) {
+    try {
+      const urlRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_URL'").first();
+      if (urlRow?.value && /^https?:\/\//i.test(urlRow.value) && !urlRow.value.includes('pages.dev')) {
+        candidates.push(urlRow.value.replace(/\/+$/, ''));
       }
-      return null;
-    }
-    return await res.json();
-  } catch (err) {
-    if (baseUrl !== PRIMARY_RENDER_BACKEND) {
-      try {
-        const fbUrl = new URL(`/api${endpoint}`, PRIMARY_RENDER_BACKEND);
-        Object.entries(params).forEach(([k, v]) => {
-          if (v !== undefined && v !== null) fbUrl.searchParams.set(k, String(v));
-        });
-        const fbRes = await fetch(fbUrl.toString(), {
-          headers: { "User-Agent": "Cinema-Telegram-Bot/1.0" },
-          signal: AbortSignal.timeout(25000)
-        });
-        if (fbRes.ok) return await fbRes.json();
-      } catch (_) {}
-    }
-    console.error(`API Call [${endpoint}] error:`, err.message);
-    return null;
+      const poolRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_POOL'").first();
+      if (poolRow?.value) {
+        const pool = JSON.parse(poolRow.value);
+        if (Array.isArray(pool)) {
+          const now = Date.now();
+          for (const item of pool) {
+            const isFresh = !item.lastSeen || (now - item.lastSeen < 180000);
+            const u = typeof item === 'string' ? item : item?.url;
+            if (isFresh && u && /^https?:\/\//i.test(u) && !u.includes('pages.dev')) {
+              const clean = u.replace(/\/+$/, '');
+              if (!candidates.includes(clean)) candidates.push(clean);
+            }
+          }
+        }
+      }
+    } catch (_) {}
   }
+  if (!candidates.includes(PRIMARY_RENDER_BACKEND)) {
+    candidates.push(PRIMARY_RENDER_BACKEND);
+  }
+  return candidates;
+}
+
+// Forward to active Cinema Backend Nodes with automatic cluster failover
+async function callCinemaApi(requestUrl, endpoint, params = {}) {
+  const candidates = await getCandidateBackends(currentDb);
+  let lastError = null;
+
+  for (const base of candidates) {
+    try {
+      const url = new URL(`/api${endpoint}`, base);
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
+          url.searchParams.set(k, val);
+        }
+      });
+
+      const controller = new AbortController();
+      const isSlowEndpoint = endpoint.includes('/streams') || endpoint.includes('/search') || endpoint.includes('/meta');
+      const timeoutMs = isSlowEndpoint ? 35000 : 12000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const res = await fetch(url.toString(), {
+        headers: { "User-Agent": "Cinema-Telegram-Bot/1.0", "Accept": "application/json" },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        return data;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  console.error(`callCinemaApi [${endpoint}] all candidates failed:`, lastError ? lastError.message : 'Nodes exhausted');
+  return null;
 }
 
 // Main Telegram Webhook Entry Point
@@ -644,6 +697,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const token = env?.BOT_TOKEN || BOT_TOKEN;
   const db = env?.cinema_db;
+  currentDb = db;
 
   if (!token) {
     console.error("FATAL: Webhook received update but env.BOT_TOKEN is missing!");
@@ -967,7 +1021,8 @@ async function handleMessage(msg, token, db, requestUrl) {
     }
   }
 
-  const formatted = await formatSearchResults(results, query, 1, db);
+  const ranked = rankSearchResults(results, query);
+  const formatted = await formatSearchResults(ranked, query, 1, db);
   if (searchMsgId) {
     return tgCall(token, 'editMessageText', {
       chat_id: chatId,
@@ -1153,7 +1208,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     });
     const dataRes = await callCinemaApi(requestUrl, '/search', { provider: prov, q: query });
     const results = Array.isArray(dataRes) ? dataRes : [];
-    const formatted = await formatSearchResults(results, query, 1, db);
+    const ranked = rankSearchResults(results, query);
+    const formatted = await formatSearchResults(ranked, query, 1, db);
     return tgCall(token, 'editMessageText', {
       chat_id: chatId,
       message_id: messageId,
@@ -1339,11 +1395,11 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     });
     const waitMsgId = waitMsg?.result?.message_id;
 
-    // Start extraction in background
+    // Start extraction with robust timeout and fallback (try stream first, then download)
     const fetchPromise = (async () => {
-      let m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: true });
+      let m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: false });
       if (!m || m.length === 0) {
-        m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: false });
+        m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: true });
       }
       return m;
     })();
@@ -1363,8 +1419,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         text: `⚡ <b>Bypassing Cloud Gates & Verifying Mirrors...</b>\n` +
           `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `⏳ <code>[▰▰▰▰▰▰▰▰▱▱] Finalizing (85%)...</code>\n` +
-          `🚀 <i>Direct high-speed streaming links found. Generating players...</i>`,
+          `⏳ <code>[▰▰▰▰▰▰▰▰▱▱] Decrypting Cloud Mirrors (85%)...</code>\n` +
+          `🚀 <i>Direct stream links found. Finalizing player handoffs...</i>`,
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [[{ text: '⚡ Connecting to Stream Nodes...', callback_data: 'noop' }]]
@@ -1420,30 +1476,59 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     resMsg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     resMsg += `<i>Tap below to stream directly in VLC or download:</i>\n`;
 
-    const keyboard = [];
-    validMirrors.slice(0, 4).forEach((m, idx) => {
-      let rawServer = (m.server || `Mirror ${idx + 1}`).trim();
-      let isDownloadOnly = /download\s*only/i.test(rawServer) || /gdrive/i.test(rawServer);
-      let sName = rawServer.replace(/\s*\(download\s*only\)/i, '').replace(/^Server\s*/i, 'Svr ').trim().slice(0, 10);
-      const url = m.link || m.url;
-      const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(cleanTitle)}`;
+    // Deduplicate mirrors and pair VLC + Download symmetrically
+    const uniqueMirrors = [];
+    const seenDedupe = new Set();
+    const seenNames = new Set();
 
-      let dlUrl = url;
+    validMirrors.forEach((m) => {
+      const url = m.link || m.url;
+      if (!url || typeof url !== 'string' || !url.startsWith('http')) return;
+
+      // Deduplicate Pixeldrain / GDrive tokens so there are no duplicate buttons
+      let dedupeKey = url;
+      if (url.includes('pixeldrain.com') || url.includes('pixeldrain.dev')) {
+        const pdId = url.split('/file/')[1]?.split('?')[0] || url.split('/u/')[1]?.split('?')[0];
+        if (pdId) dedupeKey = `pixeldrain:${pdId}`;
+      } else if (url.includes('drive.google.com') || url.includes('googleusercontent')) {
+        const gdId = url.match(/[-\w]{25,}/)?.[0];
+        if (gdId) dedupeKey = `gdrive:${gdId}`;
+      }
+
+      if (seenDedupe.has(dedupeKey)) return;
+      seenDedupe.add(dedupeKey);
+
+      let rawServer = (m.server || 'Direct Mirror').trim();
+      let sName = rawServer.replace(/\s*\(download\s*only\)/i, '').replace(/^Server\s*/i, '').trim();
+      if (!sName || sName.toLowerCase() === 'mirror') sName = 'Cloud Mirror';
+      sName = sName.slice(0, 12);
+
+      if (seenNames.has(sName)) {
+        sName = `${sName} ${uniqueMirrors.length + 1}`;
+      }
+      seenNames.add(sName);
+
+      uniqueMirrors.push({
+        sName,
+        url,
+        server: m.server
+      });
+    });
+
+    const keyboard = [];
+    uniqueMirrors.slice(0, 4).forEach((m) => {
+      const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(m.url)}&title=${encodeURIComponent(cleanTitle)}`;
+      let dlUrl = m.url;
       if (dlUrl.includes('pixeldrain.dev/api/file/') || dlUrl.includes('pixeldrain.com/api/file/')) {
         const t = dlUrl.split('/file/')[1]?.split('?')[0];
         if (t) dlUrl = `https://pixeldrain.com/u/${t}`;
       }
 
-      const row = [];
-      if (isDownloadOnly) {
-        // Download only server (e.g. GDrive / instant downloads) - DO NOT make a VLC button!
-        row.push({ text: `⬇️ Download (${sName})`, url: dlUrl });
-      } else {
-        // Streamable cloud server (Pixeldrain, CF Storage, CF Worker, Gofile, FastDL)
-        row.push({ text: `🎬 VLC (${sName})`, url: vlcRedirectUrl });
-        row.push({ text: `⬇️ Download (${sName})`, url: dlUrl });
-      }
-      keyboard.push(row);
+      // Always pair VLC and Download together symmetrically in the same row!
+      keyboard.push([
+        { text: `🎬 VLC (${m.sName})`, url: vlcRedirectUrl },
+        { text: `⬇️ Download (${m.sName})`, url: dlUrl }
+      ]);
     });
 
     keyboard.push([
