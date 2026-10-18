@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cinema Scraper Studio & Extension Manager</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(18, 24, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(28, 36, 56, 0.9);
+      --primary: #e50914;
+      --primary-glow: rgba(229, 9, 20, 0.25);
+      --cyan: #06b6d4;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --purple: #8b5cf6;
+      --text: #ffffff;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .ambient-glow {
+      position: fixed;
+      top: -150px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 750px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(229, 9, 20, 0.15) 0%, rgba(6, 182, 212, 0.1) 40%, transparent 80%);
+      pointer-events: none;
+      filter: blur(100px);
+      z-index: 0;
+    }
+    .glass-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .badge-emerald { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3); }
+    .badge-amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-red { background: rgba(229, 9, 20, 0.15); color: #e50914; border: 1px solid rgba(229, 9, 20, 0.3); }
+    .badge-purple { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: #e50914;
+      color: #fff;
+      box-shadow: 0 4px 18px var(--primary-glow);
+    }
+    .btn-primary:hover {
+      background: #c80812;
+      transform: translateY(-1px);
+    }
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .btn-cyan {
+      background: #06b6d4;
+      color: #07090e;
+    }
+    .btn-cyan:hover {
+      background: #0891b2;
+      color: #fff;
+    }
+    .nav-tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .nav-tab.active {
+      background: rgba(229, 9, 20, 0.15);
+      color: #fff;
+      border-color: rgba(229, 9, 20, 0.35);
+      box-shadow: 0 2px 12px rgba(229, 9, 20, 0.2);
+    }
+    .input-field {
+      width: 100%;
+      background: rgba(11, 15, 25, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border 0.2s ease;
+    }
+    .input-field:focus {
+      border-color: #e50914;
+      box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.15);
+    }
+    .step-line {
+      position: absolute;
+      left: 17px;
+      top: 36px;
+      bottom: -10px;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .pulse-circle {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.5; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 0.5; transform: scale(0.9); }
+    }
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .modal-content {
+      max-width: 900px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Detect active backend URL (relative for local dev/Vite, or live Cloudflare domain)
+    function getApiBase() {
+      if (typeof window !== 'undefined') {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return '';
+        }
+      }
+      return '';
+    }
+
+    const CORE_EXTENSIONS = [
+      { id: 'hdhub4u', name: 'HDHub4u', icon: '🎬', type: 'global', popularQuery: 'Guntur Kaaram' },
+      { id: 'movieBoxWeb', name: 'MovieBox', icon: '📦', type: 'global', popularQuery: 'Loki' },
+      { id: 'drive', name: 'MoviesDrive', icon: '⚡', type: 'global', popularQuery: 'Avatar' },
+      { id: 'moviesmod', name: 'MoviesMod', icon: '🔥', type: 'global', popularQuery: 'Stree 2' },
+      { id: 'vega', name: 'VegaMovies', icon: '💎', type: 'global', popularQuery: 'Jawan' },
+      { id: '4khdhub', name: '4kHdHub', icon: '🌟', type: 'global', popularQuery: 'Fighter' },
+      { id: 'katmoviehd', name: 'KatmovieHD', icon: '🐱', type: 'global', popularQuery: 'Dark' },
+      { id: 'custom', name: 'Custom Website URL', icon: '🌐', type: 'custom', popularQuery: '' }
+    ];
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('crawler'); // 'crawler' | 'explorer' | 'custom' | 'diagnostics'
+      const [backendStatus, setBackendStatus] = useState({ online: true, url: window.location.origin, latency: 45 });
+      
+      // Crawler State
+      const [searchQuery, setSearchQuery] = useState('Guntur Kaaram');
+      const [targetUrl, setTargetUrl] = useState('');
+      const [selectedProvider, setSelectedProvider] = useState('hdhub4u');
+      const [contentType, setContentType] = useState('auto');
+      const [isCrawling, setIsCrawling] = useState(false);
+      const [crawlResult, setCrawlResult] = useState(null);
+      const [crawlError, setCrawlError] = useState(null);
+
+      // Extension Explorer State
+      const [extensionsList, setExtensionsList] = useState(CORE_EXTENSIONS);
+      const [explorerSelectedExt, setExplorerSelectedExt] = useState('hdhub4u');
+      const [explorerItems, setExplorerItems] = useState([]);
+      const [explorerLoading, setExplorerLoading] = useState(false);
+      const [selectedItemStructure, setSelectedItemStructure] = useState(null);
+
+      // Custom Website State
+      const [customUrl, setCustomUrl] = useState('');
+      const [customResult, setCustomResult] = useState(null);
+      const [customLoading, setCustomLoading] = useState(false);
+
+      // Diagnostics & Log Console
+      const [logEntries, setLogEntries] = useState([]);
+
+      // Video Player Modal
+      const [playerModal, setPlayerModal] = useState({ open: false, url: '', title: '', server: '' });
+
+      const addLog = (level, title, message) => {
+        const time = new Date().toLocaleTimeString();
+        setLogEntries(prev => [{ id: Math.random().toString(), time, level, title, message }, ...prev].slice(0, 50));
+      };
+
+      // Trigger Live Deep Crawl
+      const handleRunCrawl = async (customLink = null, forcedQuery = null) => {
+        setIsCrawling(true);
+        setCrawlError(null);
+        setCrawlResult(null);
+
+        const q = forcedQuery !== null ? forcedQuery : searchQuery;
+        const link = customLink !== null ? customLink : targetUrl;
+        
+        addLog('info', 'Crawl Started', `Query: "${q}" | URL: "${link}" | Provider: ${selectedProvider}`);
+
+        try {
+          const res = await fetch(`${getApiBase()}/api/scraper/crawl`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: q,
+              url: link,
+              provider: selectedProvider === 'custom' ? undefined : selectedProvider,
+              contentType: contentType !== 'auto' ? contentType : undefined
+            })
+          });
+
+          const data = await res.json();
+          if (!res.ok || data.success === false) {
+            throw new Error(data.error || data.message || 'Crawl failed');
+          }
+
+          setCrawlResult(data);
+          addLog('success', 'Crawl Complete', `Extracted ${data.finalMirrors?.length || 0} valid mirrors for ${data.metadata?.cleanTitle}`);
+        } catch (err) {
+          setCrawlError(err.message);
+          addLog('error', 'Crawl Error', err.message);
+        } finally {
+          setIsCrawling(false);
+        }
+      };
+
+      // Load items for Extension Explorer
+      const loadExplorerItems = async (provId) => {
+        setExplorerLoading(true);
+        setSelectedItemStructure(null);
+        try {
+          const res = await fetch(`${getApiBase()}/api/posts?provider=${provId}&page=1`);
+          const data = await res.json();
+          setExplorerItems(Array.isArray(data) ? data : (data.posts || []));
+          addLog('info', 'Explorer Loaded', `Fetched ${Array.isArray(data) ? data.length : 0} items for ${provId}`);
+        } catch (err) {
+          addLog('error', 'Explorer Error', `Failed to load catalog for ${provId}: ${err.message}`);
+        } finally {
+          setExplorerLoading(false);
+        }
+      };
+
+      useEffect(() => {
+        loadExplorerItems(explorerSelectedExt);
+      }, [explorerSelectedExt]);
+
+      // Inspect Item Structure
+      const inspectItem = async (item) => {
+        setSelectedItemStructure({ loading: true, title: item.title });
+        try {
+          const res = await fetch(`${getApiBase()}/api/scraper/crawl`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: item.link,
+              provider: explorerSelectedExt
+            })
+          });
+          const data = await res.json();
+          setSelectedItemStructure(data);
+        } catch (err) {
+          setSelectedItemStructure({ error: err.message });
+        }
+      };
+
+      // Custom Website Scrape
+      const handleCustomScrape = async () => {
+        if (!customUrl) return;
+        setCustomLoading(true);
+        setCustomResult(null);
+        try {
+          const res = await fetch(`${getApiBase()}/api/scraper/test-custom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: customUrl })
+          });
+          const data = await res.json();
+          setCustomResult(data);
+          addLog('success', 'Custom Scrape Finished', `Extracted ${data.extracted?.linksCount || 0} candidate links`);
+        } catch (err) {
+          addLog('error', 'Custom Scrape Failed', err.message);
+        } finally {
+          setCustomLoading(false);
+        }
+      };
+
+      return (
+        <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', padding: '16px 20px 40px' }}>
+          {/* Header */}
+          <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid var(--card-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg, #e50914, #990000)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: '0 4px 16px rgba(229,9,20,0.4)' }}>
+                ⚡
+              </div>
+              <div>
+                <h1 style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5 }}>CINEMA <span style={{ color: '#e50914' }}>SCRAPER STUDIO</span></h1>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Automated Extension Manager & Full-Stack Link Crawler</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="badge badge-emerald">
+                <span className="pulse-circle"></span>
+                <span>CLUSTER LIVE</span>
+              </div>
+              <a href="/vlc/" target="_blank" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: 12 }}>VLC Bridge</a>
+              <a href="/" target="_blank" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: 12 }}>Web App</a>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+            <button className={`nav-tab ${activeTab === 'crawler' ? 'active' : ''}`} onClick={() => setActiveTab('crawler')}>
+              <span>⚡</span> Deep Crawler & URL Tester
+            </button>
+            <button className={`nav-tab ${activeTab === 'explorer' ? 'active' : ''}`} onClick={() => setActiveTab('explorer')}>
+              <span>🌲</span> Extension Tree Explorer
+            </button>
+            <button className={`nav-tab ${activeTab === 'custom' ? 'active' : ''}`} onClick={() => setActiveTab('custom')}>
+              <span>🌐</span> Custom Website Studio
+            </button>
+            <button className={`nav-tab ${activeTab === 'diagnostics' ? 'active' : ''}`} onClick={() => setActiveTab('diagnostics')}>
+              <span>🩺</span> Diagnostics & Errors {logEntries.filter(l => l.level === 'error').length > 0 && <span className="badge badge-red">{logEntries.filter(l => l.level === 'error').length}</span>}
+            </button>
+          </div>
+
+          {/* TAB 1: DEEP CRAWLER */}
+          {activeTab === 'crawler' && (
+            <div>
+              {/* Crawler Controls Card */}
+              <div className="glass-card" style={{ padding: 22, marginBottom: 24 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>
+                    CHOOSE PROVIDER OR CUSTOM URL:
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {CORE_EXTENSIONS.map(ext => (
+                      <button
+                        key={ext.id}
+                        onClick={() => {
+                          setSelectedProvider(ext.id);
+                          if (ext.popularQuery && !searchQuery) setSearchQuery(ext.popularQuery);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '7px 14px',
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          background: selectedProvider === ext.id ? 'rgba(229, 9, 20, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                          color: selectedProvider === ext.id ? '#ffffff' : 'var(--text-muted)',
+                          border: selectedProvider === ext.id ? '1px solid #e50914' : '1px solid rgba(255, 255, 255, 0.08)'
+                        }}
+                      >
+                        <span>{ext.icon}</span>
+                        <span>{ext.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                      SEARCH QUERY / MOVIE OR SERIES NAME:
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="e.g. Game of Thrones, Guntur Kaaram, Loki, Jawan..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleRunCrawl()}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                      DIRECT POST OR PROTECTOR URL (OPTIONAL):
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field mono"
+                      placeholder="https://... (hubcloud, greenmotors, vcloud, etc.)"
+                      value={targetUrl}
+                      onChange={e => setTargetUrl(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleRunCrawl()}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Type:</span>
+                    {['auto', 'movie', 'series'].map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setContentType(t)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          background: contentType === t ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.04)',
+                          color: contentType === t ? '#06b6d4' : 'var(--text-dim)',
+                          border: contentType === t ? '1px solid #06b6d4' : '1px solid transparent',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    className="btn btn-primary"
+                    disabled={isCrawling}
+                    onClick={() => handleRunCrawl()}
+                    style={{ minWidth: 160 }}
+                  >
+                    {isCrawling ? (
+                      <>
+                        <span className="pulse-circle"></span>
+                        <span>CRAWLING PAGE...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🚀</span>
+                        <span>START DEEP CRAWL</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Alert */}
+              {crawlError && (
+                <div style={{ background: 'rgba(229, 9, 20, 0.1)', border: '1px solid rgba(229, 9, 20, 0.4)', padding: 16, borderRadius: 12, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 22 }}>⚠️</span>
+                  <div>
+                    <h4 style={{ color: '#e50914', fontSize: 14, fontWeight: 700 }}>Crawl Issue Detected</h4>
+                    <p style={{ color: '#cbd5e1', fontSize: 13 }}>{crawlError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Live Crawler Waterfall / Stepper */}
+              {crawlResult && crawlResult.crawlSteps && (
+                <div className="glass-card" style={{ padding: 22, marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>🌊</span>
+                    <span>LIVE CRAWL WATERFALL & STEP-BY-STEP TRACE</span>
+                    <span className="badge badge-emerald">{crawlResult.crawlSteps.length} Steps Executed</span>
+                  </h3>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {crawlResult.crawlSteps.map((st, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 50, background: st.status === 200 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(229, 9, 20, 0.2)', border: `1px solid ${st.status === 200 ? '#10b981' : '#e50914'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: st.status === 200 ? '#10b981' : '#e50914', flexShrink: 0 }}>
+                          {st.step}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontWeight: 700, fontSize: 13 }}>{st.name}</span>
+                              <span className={`badge ${st.status === 200 ? 'badge-emerald' : 'badge-red'}`}>HTTP {st.status}</span>
+                            </div>
+                            {st.timeMs > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)' }} className="mono">{st.timeMs}ms</span>}
+                          </div>
+                          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{st.details}</p>
+                          {st.url && (
+                            <div className="mono" style={{ fontSize: 11, color: '#38bdf8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              🔗 {st.url}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Resolved Content & Direct Mirrors */}
+              {crawlResult && crawlResult.finalMirrors && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+                  {/* Left: Metadata Card */}
+                  <div className="glass-card" style={{ padding: 20 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 14 }}>RESOLVED METADATA</h3>
+                    <div style={{ display: 'flex', gap: 16 }}>
+                      {crawlResult.metadata?.poster && (
+                        <img
+                          src={crawlResult.metadata.poster}
+                          alt="Poster"
+                          style={{ width: 90, height: 130, objectFit: 'cover', borderRadius: 8, boxShadow: '0 4px 14px rgba(0,0,0,0.5)', flexShrink: 0 }}
+                        />
+                      )}
+                      <div>
+                        <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>{crawlResult.metadata?.cleanTitle || 'Title'}</h2>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                          <span className="badge badge-purple">{crawlResult.metadata?.type?.toUpperCase()}</span>
+                          {crawlResult.metadata?.year && <span className="badge badge-cyan">{crawlResult.metadata.year}</span>}
+                          {crawlResult.metadata?.imdbId && <span className="badge badge-amber">{crawlResult.metadata.imdbId}</span>}
+                        </div>
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {crawlResult.metadata?.synopsis || 'No synopsis available.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Direct Stream / Download Mirrors */}
+                  <div className="glass-card" style={{ padding: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                      <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)' }}>
+                        EXTRACTED DIRECT MIRRORS ({crawlResult.finalMirrors.length})
+                      </h3>
+                      <span className="badge badge-emerald">Ready to Play</span>
+                    </div>
+
+                    {crawlResult.finalMirrors.length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>No direct stream mirrors found for this specific link.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {crawlResult.finalMirrors.map((m, mIdx) => (
+                          <div
+                            key={mIdx}
+                            style={{
+                              padding: '12px 14px',
+                              borderRadius: 10,
+                              background: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 10
+                            }}
+                          >
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontWeight: 700, fontSize: 13 }}>{m.server}</span>
+                                {m.alive ? (
+                                  <span className="badge badge-emerald">HTTP {m.statusCode}</span>
+                                ) : (
+                                  <span className="badge badge-amber">Stream Ready</span>
+                                )}
+                                {m.fileSize && <span className="badge badge-cyan">{m.fileSize}</span>}
+                              </div>
+                              <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {m.link}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                              {!m.isDownloadOnly && (
+                                <button
+                                  className="btn btn-primary"
+                                  style={{ padding: '6px 12px', fontSize: 11 }}
+                                  onClick={() => setPlayerModal({ open: true, url: m.link, title: crawlResult.metadata?.cleanTitle, server: m.server })}
+                                >
+                                  ▶ Play
+                                </button>
+                              )}
+                              <a
+                                href={`vlc://${m.link}`}
+                                className="btn btn-ghost"
+                                style={{ padding: '6px 10px', fontSize: 11 }}
+                                title="Open in VLC"
+                              >
+                                📱 VLC
+                              </a>
+                              <a
+                                href={m.link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn btn-ghost"
+                                style={{ padding: '6px 10px', fontSize: 11 }}
+                                title="Download File"
+                              >
+                                ⬇️
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: EXTENSION TREE EXPLORER */}
+          {activeTab === 'explorer' && (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+                {/* Left: Extension Selector & Catalog */}
+                <div className="glass-card" style={{ padding: 20 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>
+                    SELECT EXTENSION:
+                  </label>
+                  <select
+                    className="input-field"
+                    value={explorerSelectedExt}
+                    onChange={e => setExplorerSelectedExt(e.target.value)}
+                    style={{ marginBottom: 16 }}
+                  >
+                    {CORE_EXTENSIONS.filter(e => e.id !== 'custom').map(e => (
+                      <option key={e.id} value={e.id}>{e.icon} {e.name}</option>
+                    ))}
+                  </select>
+
+                  <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 12 }}>
+                    LATEST CATALOG ITEMS ({explorerItems.length})
+                  </h4>
+
+                  {explorerLoading ? (
+                    <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <span className="pulse-circle" style={{ margin: '0 auto 10px' }}></span>
+                      <p style={{ fontSize: 13 }}>Fetching extension posts...</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 540, overflowY: 'auto' }}>
+                      {explorerItems.map((it, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => inspectItem(it)}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 8,
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                        >
+                          {it.image && <img src={it.image} alt="" style={{ width: 36, height: 48, objectFit: 'cover', borderRadius: 4 }} />}
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <p style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</p>
+                            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Tap to inspect structure tree</span>
+                          </div>
+                          <span>➡️</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Structural Tree Inspector */}
+                <div className="glass-card" style={{ padding: 20 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>
+                    🌲 HIERARCHICAL STRUCTURE TREE
+                  </h3>
+
+                  {!selectedItemStructure ? (
+                    <div style={{ padding: 50, textAlign: 'center', color: 'var(--text-dim)' }}>
+                      <p style={{ fontSize: 32, marginBottom: 12 }}>🔍</p>
+                      <p style={{ fontSize: 14, fontWeight: 600 }}>Select any movie or series from the left list to view its complete quality, episode, and mirror hierarchy.</p>
+                    </div>
+                  ) : selectedItemStructure.loading ? (
+                    <div style={{ padding: 50, textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <span className="pulse-circle" style={{ margin: '0 auto 12px' }}></span>
+                      <p style={{ fontSize: 14 }}>Deep crawling item structure...</p>
+                    </div>
+                  ) : selectedItemStructure.error ? (
+                    <div style={{ padding: 20, background: 'rgba(229,9,20,0.1)', borderRadius: 10, color: '#e50914' }}>
+                      {selectedItemStructure.error}
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: '1px solid var(--card-border)' }}>
+                        <h2 style={{ fontSize: 16, fontWeight: 800 }}>{selectedItemStructure.metadata?.cleanTitle}</h2>
+                        <span className="badge badge-purple">{selectedItemStructure.metadata?.type?.toUpperCase()}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        {selectedItemStructure.structure?.map((grp, gIdx) => (
+                          <div key={gIdx} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 14 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontWeight: 700, fontSize: 13 }}>{grp.title}</span>
+                                <span className="badge badge-cyan">{grp.quality}</span>
+                                {grp.size && <span className="badge badge-amber">{grp.size}</span>}
+                              </div>
+                              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{grp.episodeCount} Links</span>
+                            </div>
+
+                            {/* Episodes / Direct Links inside this group */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 12, borderLeft: '2px solid rgba(255,255,255,0.1)' }}>
+                              {grp.episodes?.map((ep, epIdx) => (
+                                <div key={epIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, padding: '4px 0' }}>
+                                  <span style={{ color: 'var(--text-muted)' }}>• {ep.title}</span>
+                                  <button
+                                    className="btn btn-ghost"
+                                    style={{ padding: '3px 8px', fontSize: 10 }}
+                                    onClick={() => handleRunCrawl(ep.link)}
+                                  >
+                                    Crawl Link ⚡
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: CUSTOM WEBSITE WORKBENCH */}
+          {activeTab === 'custom' && (
+            <div className="glass-card" style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
+              <h3 style={{ fontSize: 17, fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>🌐</span> NEW WEBSITE SCRAPER WORKBENCH
+              </h3>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+                Enter any new streaming website URL to automatically crawl, analyze page layout, and extract video sources and download buttons.
+              </p>
+
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  WEBSITE / POST URL:
+                </label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <input
+                    type="text"
+                    className="input-field mono"
+                    placeholder="https://example-streaming-site.com/movie/xyz"
+                    value={customUrl}
+                    onChange={e => setCustomUrl(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    disabled={customLoading}
+                    onClick={handleCustomScrape}
+                    style={{ flexShrink: 0 }}
+                  >
+                    {customLoading ? 'Analyzing...' : 'Auto-Scrape'}
+                  </button>
+                </div>
+              </div>
+
+              {customResult && customResult.extracted && (
+                <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 18 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, color: '#06b6d4', marginBottom: 12 }}>SCRAPED STRUCTURE ANALYSIS</h4>
+                  <p style={{ fontSize: 13, marginBottom: 6 }}><b>Title:</b> {customResult.extracted.title}</p>
+                  <p style={{ fontSize: 13, marginBottom: 12 }}><b>Detected Links:</b> {customResult.extracted.linksCount}</p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
+                    {customResult.extracted.links?.map((l, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 12 }}>
+                        <span>{l.text}</span>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <span className="mono" style={{ color: '#38bdf8', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.href}</span>
+                          <button
+                            className="btn btn-ghost"
+                            style={{ padding: '2px 6px', fontSize: 10 }}
+                            onClick={() => {
+                              setTargetUrl(l.href);
+                              setActiveTab('crawler');
+                              handleRunCrawl(l.href);
+                            }}
+                          >
+                            Crawl 🚀
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: DIAGNOSTICS & ERROR CONSOLE */}
+          {activeTab === 'diagnostics' && (
+            <div className="glass-card" style={{ padding: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>🩺</span> REAL-TIME DIAGNOSTICS & SYSTEM EVENT LOG
+                </h3>
+                <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => setLogEntries([])}>
+                  Clear Log
+                </button>
+              </div>
+
+              {logEntries.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>No diagnostic events recorded yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 500, overflowY: 'auto' }} className="mono">
+                  {logEntries.map(l => (
+                    <div
+                      key={l.id}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        background: l.level === 'error' ? 'rgba(229, 9, 20, 0.1)' : l.level === 'success' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                        border: `1px solid ${l.level === 'error' ? 'rgba(229, 9, 20, 0.3)' : 'rgba(255, 255, 255, 0.06)'}`,
+                        fontSize: 12
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ color: 'var(--text-dim)' }}>[{l.time}]</span>
+                        <span className={`badge ${l.level === 'error' ? 'badge-red' : l.level === 'success' ? 'badge-emerald' : 'badge-cyan'}`}>
+                          {l.level.toUpperCase()}
+                        </span>
+                        <span style={{ fontWeight: 600 }}>{l.title}</span>
+                      </div>
+                      <p style={{ color: 'var(--text-muted)', paddingLeft: 10 }}>{l.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VIDEO PLAYER MODAL */}
+          {playerModal.open && (
+            <div className="modal-backdrop" onClick={() => setPlayerModal({ open: false, url: '', title: '', server: '' })}>
+              <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div>
+                    <h3 style={{ fontSize: 16, fontWeight: 700 }}>{playerModal.title}</h3>
+                    <p style={{ fontSize: 12, color: 'var(--text-dim)' }}>Playing from: {playerModal.server}</p>
+                  </div>
+                  <button
+                    onClick={() => setPlayerModal({ open: false, url: '', title: '', server: '' })}
+                    className="btn btn-ghost"
+                    style={{ padding: '6px 12px' }}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: 10, overflow: 'hidden' }}>
+                  <video
+                    src={playerModal.url}
+                    controls
+                    autoPlay
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+                  <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)', maxWidth: 450, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {playerModal.url}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <a href={`vlc://${playerModal.url}`} className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}>Open in VLC</a>
+                    <a href={playerModal.url} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ fontSize: 12, padding: '6px 12px' }}>Download</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

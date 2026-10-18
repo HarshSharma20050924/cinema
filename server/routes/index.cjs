@@ -55,7 +55,12 @@ const { relayFetch } = require("../controllers/fetchController.cjs");
 router.get("/fetch", relayFetch);
 router.post("/fetch", relayFetch);
 router.get("/relay", relayFetch);
-router.post("/relay", relayFetch);
+// Scraper Studio & Extension Manager Workbench API
+const { handleDeepCrawl, getExtensionCatalog, testCustomWebsite } = require("../controllers/scraperController.cjs");
+router.post("/scraper/crawl", handleDeepCrawl);
+router.get("/scraper/crawl", handleDeepCrawl);
+router.get("/scraper/extensions", getExtensionCatalog);
+router.post("/scraper/test-custom", testCustomWebsite);
 
 module.exports = router;
 
