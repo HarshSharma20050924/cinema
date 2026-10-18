@@ -50,4 +50,12 @@ const { playInVlc } = require("../controllers/vlcController.cjs");
 router.post("/play-vlc", playInVlc);
 router.get("/play-vlc", playInVlc);
 
+// Residential IP Fetch Relay (Used by Render Primary Server to route scrapes via Phone's Wi-Fi)
+const { relayFetch } = require("../controllers/fetchController.cjs");
+router.get("/fetch", relayFetch);
+router.post("/fetch", relayFetch);
+router.get("/relay", relayFetch);
+router.post("/relay", relayFetch);
+
 module.exports = router;
+

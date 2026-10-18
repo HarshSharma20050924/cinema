@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { smartAxios } = require('./smartFetcher.cjs');
 const cheerio = require('cheerio');
 const domainResolver = require('./domainResolver.cjs');
 const { ZENDA_RAW, DEFAULT_HEADERS } = require('../config/constants.cjs');
@@ -36,14 +37,14 @@ class ZendaEngine {
 
   getProviderContext(providerValue) {
     return {
-      axios,
+      axios: smartAxios,
       cheerio,
       commonHeaders: { ...DEFAULT_HEADERS },
       Aes: {},
       Crypto: CryptoPolyfill,
       openWebView: async (url, options) => {
         try {
-          const res = await axios.get(url, {
+          const res = await smartAxios.get(url, {
             headers: options?.headers || DEFAULT_HEADERS,
             timeout: options?.timeoutMs || 15000,
           });
