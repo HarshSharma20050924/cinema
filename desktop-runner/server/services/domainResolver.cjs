@@ -43,13 +43,38 @@ class DomainResolver {
 
     // Aliases
     if (key === 'moviebox' || key === 'movieboxapp') {
-      return this.urls['movieboxweb']?.url?.replace(/\/+$/, '') || '';
+      const mb = this.urls['movieboxweb']?.url?.replace(/\/+$/, '');
+      if (mb) return mb;
     }
     if (key === 'hdhub' || key === 'hdhub4u') {
-      return this.urls['hdhub']?.url?.replace(/\/+$/, '') || this.urls['hdhub4u']?.url?.replace(/\/+$/, '') || 'https://hdhub4u.com.se';
+      const hd = this.urls['hdhub']?.url?.replace(/\/+$/, '') || this.urls['hdhub4u']?.url?.replace(/\/+$/, '');
+      if (hd) return hd;
     }
 
-    return '';
+    const FALLBACK_DOMAINS = {
+      vega: 'https://new1.vegamovies.lease',
+      vegamovies: 'https://new1.vegamovies.lease',
+      drive: 'https://new3.moviesdrive.beer',
+      moviesdrive: 'https://new3.moviesdrive.beer',
+      moviesmod: 'https://moviesmod.us.org',
+      mod: 'https://moviesmod.us.org',
+      hdhub: 'https://new8.hdhub4u.cl',
+      hdhub4u: 'https://new8.hdhub4u.cl',
+      moviebox: 'https://officialmoviebox.com',
+      movieboxweb: 'https://officialmoviebox.com',
+      '4khdhub': 'https://4khdhub.one',
+      kat: 'https://new.katmoviehd.top',
+      katmoviehd: 'https://new.katmoviehd.top',
+      multi: 'https://m1.multimovies.courses',
+      multimovies: 'https://m1.multimovies.courses',
+      topmovies: 'https://moviesleech.club',
+      uhdmovies: 'https://uhdmovies.us.org',
+      uhd: 'https://uhdmovies.us.org',
+      extramovies: 'https://extramovies.ist',
+      extra: 'https://extramovies.ist',
+    };
+
+    return FALLBACK_DOMAINS[key] || '';
   }
 }
 

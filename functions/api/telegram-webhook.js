@@ -138,7 +138,24 @@ function extractActualSeason(str) {
 // Clean raw scraped media titles by stripping garbage tags, codecs, audio info, and repetitive season ranges
 function cleanMediaTitle(rawTitle) {
   if (!rawTitle) return '';
-  let str = String(rawTitle);
+  const rawStr = String(rawTitle);
+
+  // Extract Season badge to restore after cleaning (e.g. S1, Season 2, S1-S8)
+  let seasonBadge = '';
+  const rangeMatch = rawStr.match(/\b(?:season\s*(\d{1,2})\s*[-+–—]\s*(\d{1,2})|s(\d{1,2})\s*[-+–—]\s*s?(\d{1,2}))\b/i);
+  if (rangeMatch) {
+    const from = rangeMatch[1] || rangeMatch[3];
+    const to = rangeMatch[2] || rangeMatch[4];
+    seasonBadge = `(S${from}-S${to})`;
+  } else {
+    const singleMatch = rawStr.match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
+    if (singleMatch) {
+      const sNum = parseInt(singleMatch[1] || singleMatch[2], 10);
+      if (sNum > 0) seasonBadge = `(Season ${sNum})`;
+    }
+  }
+
+  let str = rawStr;
 
   // Strip leading emojis and symbols
   str = str.replace(/^[\s🎬📺📥⚡📦⬇️▶️]+/gu, '').trim();
@@ -177,6 +194,11 @@ function cleanMediaTitle(rawTitle) {
 
   // Clean double spaces
   str = str.replace(/\s{2,}/g, ' ').trim();
+
+  // Restore season badge if not already present in cleaned string
+  if (seasonBadge && !new RegExp(`\\b(season|s0*\\d)\\b`, 'i').test(str)) {
+    str = `${str} ${seasonBadge}`;
+  }
 
   // If title was stripped down too much, fallback to original sans leading emojis
   if (str.length < 2) {
@@ -1406,14 +1428,20 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       const url = m.link || m.url;
       const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(cleanTitle)}`;
 
+      let dlUrl = url;
+      if (dlUrl.includes('pixeldrain.dev/api/file/') || dlUrl.includes('pixeldrain.com/api/file/')) {
+        const t = dlUrl.split('/file/')[1]?.split('?')[0];
+        if (t) dlUrl = `https://pixeldrain.com/u/${t}`;
+      }
+
       const row = [];
       if (isDownloadOnly) {
         // Download only server (e.g. GDrive / instant downloads) - DO NOT make a VLC button!
-        row.push({ text: `⬇️ Download (${sName})`, url: url });
+        row.push({ text: `⬇️ Download (${sName})`, url: dlUrl });
       } else {
         // Streamable cloud server (Pixeldrain, CF Storage, CF Worker, Gofile, FastDL)
         row.push({ text: `🎬 VLC (${sName})`, url: vlcRedirectUrl });
-        row.push({ text: `⬇️ Download (${sName})`, url: url });
+        row.push({ text: `⬇️ Download (${sName})`, url: dlUrl });
       }
       keyboard.push(row);
     });
@@ -1579,8 +1607,8 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       } else {
         const targetLink = dLinks[0]?.link || actualLink;
         const cleanBase = cleanMediaTitle(meta?.title || item.title);
-        const resLabel = extractCleanResolution(group.title || group.quality) || `Quality ${startIndex + i + 1}`;
-        const qTitle = `${cleanBase} [${resLabel}]`;
+        const resLabel = extractCleanResolution(group.title || group.quality);
+        const qTitle = resLabel ? `${cleanBase} [${resLabel}]` : cleanBase;
         const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
         const label = formatQualityButtonLabel(group.title || group.quality, `Quality ${startIndex + i + 1}`);
         rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });

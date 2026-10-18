@@ -35,7 +35,25 @@ class ZendaEngine {
     this.kvStorage = new Map();
   }
 
+  normalizeProvider(provider) {
+    if (!provider) return '';
+    const p = String(provider).trim();
+    const map = {
+      moviesmod: 'mod',
+      modworld: 'mod',
+      moviebox: 'movieBoxWeb',
+      hdhub: 'hdhub4u',
+      katmoviehd: 'katmovies',
+      kat: 'katmovies',
+      uhdmovies: 'uhd',
+      topmovies: 'topmovies',
+      extramovies: 'extraMovies',
+    };
+    return map[p.toLowerCase()] || p;
+  }
+
   getProviderContext(providerValue) {
+    const pVal = this.normalizeProvider(providerValue);
     return {
       axios: smartAxios,
       cheerio,
@@ -65,12 +83,12 @@ class ZendaEngine {
           };
         }
       },
-      getBaseUrl: (pVal) => {
-        const val = domainResolver.getBaseUrl(pVal || providerValue);
-        const p = Promise.resolve(val);
-        p.toString = () => val;
-        p.valueOf = () => val;
-        return p;
+      getBaseUrl: (p) => {
+        const val = domainResolver.getBaseUrl(p || pVal);
+        const prom = Promise.resolve(val);
+        prom.toString = () => val;
+        prom.valueOf = () => val;
+        return prom;
       },
       kvStore: {
         get: async (key) => this.kvStorage.get(key),
@@ -83,7 +101,8 @@ class ZendaEngine {
   }
 
   async loadModule(provider, moduleName) {
-    const cacheKey = `${provider}:${moduleName}`;
+    const targetProvider = this.normalizeProvider(provider);
+    const cacheKey = `${targetProvider}:${moduleName}`;
     if (this.moduleCache.has(cacheKey)) {
       return this.moduleCache.get(cacheKey);
     }
@@ -91,8 +110,8 @@ class ZendaEngine {
     // 1. Check local provider modules first (e.g. tpb, gramcinema, etc.)
     const fs = require('fs');
     const path = require('path');
-    const localPathCjs = path.resolve(__dirname, `../providers/${provider}/${moduleName}.cjs`);
-    const localPathJs = path.resolve(__dirname, `../providers/${provider}/${moduleName}.js`);
+    const localPathCjs = path.resolve(__dirname, `../providers/${targetProvider}/${moduleName}.cjs`);
+    const localPathJs = path.resolve(__dirname, `../providers/${targetProvider}/${moduleName}.js`);
     if (fs.existsSync(localPathCjs)) {
       const localMod = require(localPathCjs);
       this.moduleCache.set(cacheKey, localMod);
@@ -104,7 +123,7 @@ class ZendaEngine {
       return localMod;
     }
 
-    const url = `${ZENDA_RAW}/dist/${provider}/${moduleName}.js`;
+    const url = `${ZENDA_RAW}/dist/${targetProvider}/${moduleName}.js`;
     const response = await axios.get(url, { timeout: 12000 });
     const code = response.data;
 

@@ -98,14 +98,41 @@ async function extractHubCloudMirrors(link) {
     // 2. Resolve intermediate HubDrive / Greenmotors landing pages
     if (targetLink.includes('hubdrive') || targetLink.includes('greenmotors')) {
       try {
+        if (targetLink.includes('hubdrive.pics')) {
+          targetLink = targetLink.replace('hubdrive.pics', 'hubdrive.me');
+        }
         const landingRes = await axios.get(targetLink, { headers, timeout: 8000, maxRedirects: 5 });
         const lHtml = typeof landingRes.data === 'string' ? landingRes.data : '';
-        const refreshMatch = lHtml.match(/<meta[^>]*http-equiv=["']refresh["'][^>]*content=["'][^"']*url=([^"']+)["']/i);
+
+        // Check greenmotors token encryption s('o', '<enc>')
+        if (lHtml.includes("s('o',") || lHtml.includes('s("o",')) {
+          try {
+            const encMatch = lHtml.match(/s\(\s*['"]o['"]\s*,\s*['"]([^'"]+)['"]/);
+            if (encMatch && encMatch[1]) {
+              const rot13 = str => str.replace(/[a-zA-Z]/g, c => {
+                const code = c.charCodeAt(0);
+                return String.fromCharCode(((code - (code <= 90 ? 65 : 97) + 13) % 26) + (code <= 90 ? 65 : 97));
+              });
+              let d = Buffer.from(encMatch[1], 'base64').toString('utf-8');
+              d = Buffer.from(d, 'base64').toString('utf-8');
+              d = rot13(d);
+              d = Buffer.from(d, 'base64').toString('utf-8');
+              const parsed = JSON.parse(d);
+              if (parsed?.o) {
+                const nextUrl = Buffer.from(parsed.o, 'base64').toString('utf-8');
+                if (nextUrl && nextUrl.startsWith('http')) targetLink = nextUrl;
+              }
+            }
+          } catch (_) {}
+        }
+
+        const refreshMatch = lHtml.match(/<meta[^>]*http-equiv=["']refresh["'][^>]*content=["'][^"']*url=([^"']+)["']/i) ||
+                             lHtml.match(/location\.replace\(['"]([^'"]+)['"]\)/i);
         if (refreshMatch && refreshMatch[1]) {
           targetLink = refreshMatch[1];
         } else {
           const $l = cheerio.load(lHtml);
-          const nextHref = $l(".btn-success1, .btn-primary, a[href*='hubcloud'], a[href*='drive/']").attr('href');
+          const nextHref = $l(".btn-success1, .btn-primary, a[href*='hubcloud'], a[href*='drive/'], a[href*='hubcdn']").attr('href');
           if (nextHref && nextHref.startsWith('http')) {
             targetLink = nextHref;
           }
@@ -159,10 +186,71 @@ async function extractHubCloudMirrors(link) {
     const directR2 = $('a[href*="r2.dev"]').attr('href');
     if (directR2) addMirror('HubCDN', directR2);
 
-    // Extract vcloudLink script url
-    let vcloudLink = '';
+    // If this is an archive/intermediate page (like hblinks.lol) linking to hubcloud or direct files
+    if (targetLink.includes('hblinks') || targetLink.includes('archive') || targetLink.includes('links.') || targetLink.includes('greenmotors')) {
+      const candidateLinks = [];
+      $("a[href*='hubcloud'], a[href*='hubcdn.wiki/file/'], a[href*='hubdrive']").each((_, el) => {
+        const h = $(el).attr('href');
+        if (
+          h &&
+          h.startsWith('http') &&
+          h !== targetLink &&
+          !candidateLinks.includes(h) &&
+          !h.includes('/admin') &&
+          !h.includes('/tg/') &&
+          !h.includes('.foo')
+        ) {
+          candidateLinks.push(h);
+        }
+      });
+
+      for (const cLink of candidateLinks) {
+        const fixedLink = cLink.replace('hubdrive.pics', 'hubdrive.me');
+        try {
+          const subMirrors = await extractHubCloudMirrors(fixedLink);
+          if (subMirrors && subMirrors.length > 0) {
+            subMirrors.forEach(m => addMirror(m.server, m.link));
+            if (mirrors.length > 0) break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Extract reurl from hubcdn.wiki / inventoryidea (Googleusercontent links)
     const reurlMatch = html.match(/var\s+reurl\s*=\s*["'`](https?:\/\/[^"'`]+)["'`]/i);
     if (reurlMatch && reurlMatch[1]) {
+      let rawReurl = reurlMatch[1];
+      if (rawReurl.includes('?r=') || rawReurl.includes('&r=')) {
+        try {
+          const u = new URL(rawReurl);
+          const rParam = u.searchParams.get('r');
+          if (rParam) {
+            const decoded = Buffer.from(rParam, 'base64').toString('utf-8');
+            if (decoded && decoded.startsWith('http')) rawReurl = decoded;
+          }
+        } catch (_) {}
+      }
+      if (rawReurl.includes('?link=') || rawReurl.includes('&link=')) {
+        try {
+          const u = new URL(rawReurl);
+          const target = u.searchParams.get('link');
+          if (target && target.startsWith('http')) {
+            if (target.includes('googleusercontent') || target.includes('googleapis')) {
+              addMirror('GDrive (download only)', target);
+            } else {
+              addMirror('HubCDN', target);
+            }
+          }
+        } catch (_) {}
+      }
+      if (rawReurl.startsWith('http') && (rawReurl.includes('googleusercontent') || rawReurl.includes('googleapis'))) {
+        addMirror('GDrive (download only)', rawReurl);
+      }
+    }
+
+    // Extract vcloudLink script url
+    let vcloudLink = '';
+    if (reurlMatch && reurlMatch[1] && (reurlMatch[1].includes('hubcloud') || reurlMatch[1].includes('drive/'))) {
       vcloudLink = reurlMatch[1];
     }
 
@@ -184,7 +272,7 @@ async function extractHubCloudMirrors(link) {
     }
 
     if (!vcloudLink) {
-      vcloudLink = $('.fa-file-download').parent().attr('href') || $("a[href*='hubcloud.php']").attr('href') || '';
+      vcloudLink = $("a[href*='hubcloud.php']").attr('href') || $('.fa-file-download').parent().attr('href') || '';
     }
 
     // 4. Fetch and parse vcloudLink buttons
@@ -215,6 +303,7 @@ async function extractHubCloudMirrors(link) {
           const token = pxUrl.split('/').pop()?.split('?')[0];
           if (token && token.length > 3) {
             addMirror('Pixeldrain', `https://pixeldrain.dev/api/file/${token}?download`);
+            addMirror('Pixeldrain (download only)', `https://pixeldrain.com/u/${token}`);
           }
         } else if (href.includes('cloudflarestorage') || href.includes('r2.cloudflarestorage')) {
           addMirror('CF Storage', href);
@@ -227,8 +316,12 @@ async function extractHubCloudMirrors(link) {
           (href.includes('.mkv') && href.startsWith('http'))
         ) {
           addMirror('CF Worker', href);
-        } else if (href.includes('storage.googleapis.com') || href.includes('googleusercontent')) {
-          addMirror('GDrive (download only)', href);
+        } else if (href.includes('storage.googleapis.com') || href.includes('googleusercontent') || href.includes('hubcdn.club/dl/')) {
+          let gLink = href;
+          if (href.includes('?link=')) {
+            try { gLink = new URL(href).searchParams.get('link') || href; } catch (_) {}
+          }
+          addMirror('GDrive (download only)', gLink);
         } else if (href.includes('fuckingfast.net') || href.includes('fastdl') || href.includes('fsl.')) {
           addMirror('FastDL', href);
         } else if (href.includes('hubcdn') && !href.includes('/?id=')) {
@@ -240,13 +333,13 @@ async function extractHubCloudMirrors(link) {
           } else {
             addMirror('Gofile', href);
           }
-        } else if (href.includes('hubcloud') || href.includes('/?id=')) {
+        } else if ((href.includes('hubcloud') || href.includes('/?id=')) && !href.includes('/admin') && !href.includes('/tg/') && !href.includes('telegram')) {
           // GDrive redirector link: follow redirect
+          let directGoogle = href;
           try {
-            let directGoogle = href;
             const res1 = await axios.get(href, {
               headers,
-              timeout: 6000,
+              timeout: 2500,
               maxRedirects: 0,
               validateStatus: (s) => s >= 200 && s < 400,
             });
@@ -254,10 +347,10 @@ async function extractHubCloudMirrors(link) {
               directGoogle = res1.headers.location;
               if (directGoogle.includes('?link=')) directGoogle = directGoogle.split('?link=')[1];
             }
-            if (directGoogle && directGoogle.startsWith('http') && !directGoogle.includes('/drive/')) {
-              addMirror('GDrive (download only)', directGoogle);
-            }
           } catch (_) {}
+          if (directGoogle && directGoogle.startsWith('http') && !directGoogle.includes('/drive/')) {
+            addMirror('GDrive (download only)', directGoogle);
+          }
         }
       }
     }

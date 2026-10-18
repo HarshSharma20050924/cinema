@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { smartAxios } = require('./smartFetcher.cjs');
 const cheerio = require('cheerio');
 const domainResolver = require('./domainResolver.cjs');
 const { ZENDA_RAW, DEFAULT_HEADERS } = require('../config/constants.cjs');
@@ -34,16 +35,34 @@ class ZendaEngine {
     this.kvStorage = new Map();
   }
 
+  normalizeProvider(provider) {
+    if (!provider) return '';
+    const p = String(provider).trim();
+    const map = {
+      moviesmod: 'mod',
+      modworld: 'mod',
+      moviebox: 'movieBoxWeb',
+      hdhub: 'hdhub4u',
+      katmoviehd: 'katmovies',
+      kat: 'katmovies',
+      uhdmovies: 'uhd',
+      topmovies: 'topmovies',
+      extramovies: 'extraMovies',
+    };
+    return map[p.toLowerCase()] || p;
+  }
+
   getProviderContext(providerValue) {
+    const pVal = this.normalizeProvider(providerValue);
     return {
-      axios,
+      axios: smartAxios,
       cheerio,
       commonHeaders: { ...DEFAULT_HEADERS },
       Aes: {},
       Crypto: CryptoPolyfill,
       openWebView: async (url, options) => {
         try {
-          const res = await axios.get(url, {
+          const res = await smartAxios.get(url, {
             headers: options?.headers || DEFAULT_HEADERS,
             timeout: options?.timeoutMs || 15000,
           });
@@ -64,12 +83,12 @@ class ZendaEngine {
           };
         }
       },
-      getBaseUrl: (pVal) => {
-        const val = domainResolver.getBaseUrl(pVal || providerValue);
-        const p = Promise.resolve(val);
-        p.toString = () => val;
-        p.valueOf = () => val;
-        return p;
+      getBaseUrl: (p) => {
+        const val = domainResolver.getBaseUrl(p || pVal);
+        const prom = Promise.resolve(val);
+        prom.toString = () => val;
+        prom.valueOf = () => val;
+        return prom;
       },
       kvStore: {
         get: async (key) => this.kvStorage.get(key),
@@ -82,26 +101,29 @@ class ZendaEngine {
   }
 
   async loadModule(provider, moduleName) {
-    const cacheKey = `${provider}:${moduleName}`;
+    const targetProvider = this.normalizeProvider(provider);
+    const cacheKey = `${targetProvider}:${moduleName}`;
     if (this.moduleCache.has(cacheKey)) {
       return this.moduleCache.get(cacheKey);
     }
 
-    // Check local custom providers first (e.g. tpb, gramcinema, etc.)
+    // 1. Check local provider modules first (e.g. tpb, gramcinema, etc.)
     const fs = require('fs');
     const path = require('path');
-    const localPath = path.join(__dirname, '..', 'providers', provider, `${moduleName}.cjs`);
-    if (fs.existsSync(localPath)) {
-      try {
-        const localMod = require(localPath);
-        this.moduleCache.set(cacheKey, localMod);
-        return localMod;
-      } catch (err) {
-        console.error(`[ZendaEngine] Error loading local module ${provider}/${moduleName}:`, err.message);
-      }
+    const localPathCjs = path.resolve(__dirname, `../providers/${targetProvider}/${moduleName}.cjs`);
+    const localPathJs = path.resolve(__dirname, `../providers/${targetProvider}/${moduleName}.js`);
+    if (fs.existsSync(localPathCjs)) {
+      const localMod = require(localPathCjs);
+      this.moduleCache.set(cacheKey, localMod);
+      return localMod;
+    }
+    if (fs.existsSync(localPathJs)) {
+      const localMod = require(localPathJs);
+      this.moduleCache.set(cacheKey, localMod);
+      return localMod;
     }
 
-    const url = `${ZENDA_RAW}/dist/${provider}/${moduleName}.js`;
+    const url = `${ZENDA_RAW}/dist/${targetProvider}/${moduleName}.js`;
     const response = await axios.get(url, { timeout: 12000 });
     const code = response.data;
 
