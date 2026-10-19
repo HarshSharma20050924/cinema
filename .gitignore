@@ -58,6 +58,10 @@ server.log
 .env
 .env.*
 *.token
+*.session
+*.session-journal
+telegram_session*
+server/config/*.json
 .gramcinema_token
 telegram-bot/bot_settings.json
 telegram-bot/.env

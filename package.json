@@ -28,9 +28,11 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "hls.js": "^1.7.3",
+    "input": "^1.0.1",
     "nodejs-mobile-react-native": "^18.20.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "telegram": "^2.26.22",
     "webtorrent": "^3.0.21"
   },
   "devDependencies": {
