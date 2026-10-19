@@ -1,7 +1,66 @@
+const dns = require('dns');
+const https = require('https');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const zendaEngine = require('../services/zendaEngine.cjs');
 const { DEFAULT_HEADERS } = require('../config/constants.cjs');
+
+// DNS-over-HTTPS / Custom DNS Agent to bypass Indian ISP RPZ DNS poisoning (202.56.230.30)
+const resolver = new dns.promises.Resolver();
+try {
+  resolver.setServers(['1.1.1.1', '8.8.8.8']);
+} catch (_) {}
+
+const dnsCache = new Map();
+
+function customLookup(hostname, options, callback) {
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    if (options && options.all) {
+      return callback(null, [{ address: hostname, family: 4 }]);
+    }
+    return callback(null, hostname, 4);
+  }
+
+  if (dnsCache.has(hostname)) {
+    const cachedIp = dnsCache.get(hostname);
+    if (options && options.all) {
+      return callback(null, [{ address: cachedIp, family: 4 }]);
+    }
+    return callback(null, cachedIp, 4);
+  }
+
+  resolver.resolve4(hostname).then(addresses => {
+    if (addresses && addresses.length > 0) {
+      const ip = addresses[0];
+      dnsCache.set(hostname, ip);
+      if (options && options.all) {
+        return callback(null, [{ address: ip, family: 4 }]);
+      }
+      return callback(null, ip, 4);
+    }
+    dns.lookup(hostname, options, callback);
+  }).catch(() => {
+    if (hostname.includes('hubdrive.pics')) {
+      const fallbackIp = '104.21.23.14';
+      if (options && options.all) {
+        return callback(null, [{ address: fallbackIp, family: 4 }]);
+      }
+      return callback(null, fallbackIp, 4);
+    }
+    dns.lookup(hostname, options, callback);
+  });
+}
+
+const httpsAgent = new https.Agent({
+  lookup: customLookup,
+  keepAlive: true,
+  rejectUnauthorized: false
+});
 
 /**
  * Resolves raw Gofile URLs to direct high-speed stream links via Gofile API (same as Vega App)
@@ -85,6 +144,7 @@ async function extractHubCloudMirrors(link) {
           const origin = new URL(targetLink).origin;
           const apiRes = await axios.get(`https://api.dandndn.one/api/v1/file/${fileId}`, {
             headers: { ...headers, Authorization: `Bearer ${token}`, Origin: origin },
+            httpsAgent,
             timeout: 8000,
           });
           const hubId = apiRes.data?.upload_links?.hubdrive_res;
@@ -95,13 +155,10 @@ async function extractHubCloudMirrors(link) {
       } catch (_) {}
     }
 
-    // 2. Resolve intermediate HubDrive / Greenmotors landing pages
-    if (targetLink.includes('hubdrive') || targetLink.includes('greenmotors')) {
+    // 2. Resolve intermediate HubDrive / Greenmotors / HubCDN landing pages
+    if (targetLink.includes('hubdrive') || targetLink.includes('greenmotors') || targetLink.includes('hubcdn')) {
       try {
-        if (targetLink.includes('hubdrive.pics')) {
-          targetLink = targetLink.replace('hubdrive.pics', 'hubdrive.me');
-        }
-        const landingRes = await axios.get(targetLink, { headers, timeout: 8000, maxRedirects: 5 });
+        const landingRes = await axios.get(targetLink, { headers, httpsAgent, timeout: 8000, maxRedirects: 5 });
         const lHtml = typeof landingRes.data === 'string' ? landingRes.data : '';
 
         // Check greenmotors token encryption s('o', '<enc>')
@@ -132,8 +189,14 @@ async function extractHubCloudMirrors(link) {
           targetLink = refreshMatch[1];
         } else {
           const $l = cheerio.load(lHtml);
-          const nextHref = $l(".btn-success1, .btn-primary, a[href*='hubcloud'], a[href*='drive/'], a[href*='hubcdn']").attr('href');
-          if (nextHref && nextHref.startsWith('http')) {
+          let nextHref = '';
+          $l("a[href*='hubcloud'], a.btn-success1, a[href*='drive/'], a[href*='hubcdn']").each((_, el) => {
+            const h = $l(el).attr('href');
+            if (h && h.startsWith('http') && !nextHref && !h.includes('/admin') && !h.includes('/tg/') && !h.includes('telegram')) {
+              nextHref = h;
+            }
+          });
+          if (nextHref) {
             targetLink = nextHref;
           }
         }
@@ -178,13 +241,13 @@ async function extractHubCloudMirrors(link) {
     }
 
     // 3. Fetch the drive page (e.g. hubcloud.ist/drive/...)
-    const res = await axios.get(targetLink, { headers, timeout: 10000, maxRedirects: 5 });
+    const res = await axios.get(targetLink, { headers, httpsAgent, timeout: 10000, maxRedirects: 5 });
     const html = typeof res.data === 'string' ? res.data : '';
     const $ = cheerio.load(html);
 
     // Check direct R2
     const directR2 = $('a[href*="r2.dev"]').attr('href');
-    if (directR2) addMirror('HubCDN', directR2);
+    if (directR2) addMirror('CF Storage', directR2);
 
     // If this is an archive/intermediate page (like hblinks.lol) linking to hubcloud or direct files
     if (targetLink.includes('hblinks') || targetLink.includes('archive') || targetLink.includes('links.') || targetLink.includes('greenmotors')) {
@@ -205,7 +268,7 @@ async function extractHubCloudMirrors(link) {
       });
 
       for (const cLink of candidateLinks) {
-        const fixedLink = cLink.replace('hubdrive.pics', 'hubdrive.me');
+        const fixedLink = cLink;
         try {
           const subMirrors = await extractHubCloudMirrors(fixedLink);
           if (subMirrors && subMirrors.length > 0) {
@@ -216,7 +279,7 @@ async function extractHubCloudMirrors(link) {
       }
     }
 
-    // Extract reurl from hubcdn.wiki / inventoryidea (Googleusercontent links)
+    // Extract reurl from hubcdn.wiki / inventoryidea (Googleusercontent links / R2 links)
     const reurlMatch = html.match(/var\s+reurl\s*=\s*["'`](https?:\/\/[^"'`]+)["'`]/i);
     if (reurlMatch && reurlMatch[1]) {
       let rawReurl = reurlMatch[1];
@@ -237,14 +300,20 @@ async function extractHubCloudMirrors(link) {
           if (target && target.startsWith('http')) {
             if (target.includes('googleusercontent') || target.includes('googleapis')) {
               addMirror('GDrive (download only)', target);
+            } else if (target.includes('r2.dev') || target.includes('cloudflarestorage')) {
+              addMirror('CF Storage', target);
             } else {
               addMirror('HubCDN', target);
             }
           }
         } catch (_) {}
       }
-      if (rawReurl.startsWith('http') && (rawReurl.includes('googleusercontent') || rawReurl.includes('googleapis'))) {
-        addMirror('GDrive (download only)', rawReurl);
+      if (rawReurl.startsWith('http')) {
+        if (rawReurl.includes('googleusercontent') || rawReurl.includes('googleapis')) {
+          addMirror('GDrive (download only)', rawReurl);
+        } else if (rawReurl.includes('r2.dev') || rawReurl.includes('cloudflarestorage')) {
+          addMirror('CF Storage', rawReurl);
+        }
       }
     }
 
@@ -284,6 +353,7 @@ async function extractHubCloudMirrors(link) {
 
       const vRes = await axios.get(vcloudLink, {
         headers: { ...headers, Referer: targetLink },
+        httpsAgent,
         timeout: 10000,
       });
       const vHtml = typeof vRes.data === 'string' ? vRes.data : '';
@@ -305,8 +375,18 @@ async function extractHubCloudMirrors(link) {
             addMirror('Pixeldrain', `https://pixeldrain.dev/api/file/${token}?download`);
             addMirror('Pixeldrain (download only)', `https://pixeldrain.com/u/${token}`);
           }
-        } else if (href.includes('cloudflarestorage') || href.includes('r2.cloudflarestorage')) {
+        } else if (href.includes('cloudflarestorage') || href.includes('r2.cloudflarestorage') || href.includes('r2.dev')) {
           addMirror('CF Storage', href);
+        } else if (href.includes('hbplay.pages.dev') && href.includes('?u=')) {
+          try {
+            const uParam = new URL(href).searchParams.get('u');
+            if (uParam) {
+              const decoded = Buffer.from(uParam, 'base64').toString('utf-8');
+              if (decoded && decoded.startsWith('http')) {
+                addMirror('CF Storage', decoded);
+              }
+            }
+          } catch (_) {}
         } else if (href.includes('.dev') && !href.includes('/?id=')) {
           addMirror('CF Worker', href);
         } else if (
@@ -339,7 +419,8 @@ async function extractHubCloudMirrors(link) {
           try {
             const res1 = await axios.get(href, {
               headers,
-              timeout: 2500,
+              httpsAgent,
+              timeout: 3500,
               maxRedirects: 0,
               validateStatus: (s) => s >= 200 && s < 400,
             });
