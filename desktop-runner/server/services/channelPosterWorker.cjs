@@ -7,10 +7,11 @@ const zendaEngine = require('./zendaEngine.cjs');
 /**
  * ⚡ Continuous Channel Auto-Poster & Bulk Archive Crawler Worker
  * -------------------------------------------------------------
- * 1. Crawls all enabled extensions and websites in bulk with NO limit.
- * 2. Pushes every movie, series, and episode directly into the Telegram channel.
- * 3. Handles automatic 429 backoff and fallback to text message if poster image fails.
- * 4. Advances archive page cursors so the entire catalog is backfilled without duplicates.
+ * 1. Crawls all enabled extensions across changing pages (Page 1, 2, 3, 4, 5...).
+ * 2. Pushes every movie, series, and episode directly into the Telegram channel with no limits.
+ * 3. Immediately saves archive cursors so pagination persists across restarts.
+ * 4. Fast-forwards past already-posted pages and continuously mines deep catalog pages.
+ * 5. Periodically checks Page 1 so newly published releases are posted immediately.
  */
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '8887103348:AAFYcYbWEm8adSF4fpLUcUliJKTmqGxvEe4';
@@ -54,7 +55,7 @@ function recordHistory(key) {
         const trimmed = arr.length > 25000 ? arr.slice(-25000) : arr;
         fs.writeFileSync(HISTORY_FILE, JSON.stringify(trimmed), 'utf8');
       } catch (_) {}
-    }, 2000);
+    }, 1500);
   }
 }
 
@@ -66,7 +67,9 @@ function getCursors() {
 }
 
 function saveCursors(cursors) {
-  try { fs.writeFileSync(CURSOR_FILE, JSON.stringify(cursors, null, 2), 'utf8'); } catch (_) {}
+  try {
+    fs.writeFileSync(CURSOR_FILE, JSON.stringify(cursors, null, 2), 'utf8');
+  } catch (_) {}
 }
 
 // Dynamic Provider Pool (Synced from Cloudflare D1 /api/bot-providers)
@@ -86,7 +89,9 @@ async function getLiveBotProviders() {
       return dynamicBotProviders;
     }
   } catch (_) {}
-  return dynamicBotProviders.length > 0 ? dynamicBotProviders : ['drive', 'hdhub4u', '4khdhub', 'movieBoxWeb', 'vega', 'moviesmod', 'topmovies', 'katmoviehd'];
+  return dynamicBotProviders.length > 0
+    ? dynamicBotProviders
+    : ['drive', 'hdhub4u', '4khdhub', 'movieBoxWeb', 'vega', 'moviesmod', 'topmovies', 'katmoviehd'];
 }
 
 function escapeHtml(str) {
@@ -186,8 +191,49 @@ async function postCardToChannel(item, providerKey) {
 }
 
 let isJobRunning = false;
+let sweepCounter = 0;
 
-// Crawl all enabled providers and push EVERYTHING in bulk with no limit
+// Process a single page for a provider and post unposted content
+async function processProviderPage(provKey, pageNumber, mod, ctx, cursors) {
+  let posts = [];
+  try {
+    posts = await mod.getPosts({
+      page: pageNumber,
+      filter: '',
+      providerValue: provKey,
+      providerContext: ctx,
+      signal: new AbortController().signal
+    });
+  } catch (err) {
+    console.warn(`[AutoPoster Bulk] Error fetching ${provKey} page ${pageNumber}:`, err.message);
+    return { count: 0, posted: 0, hasMore: false, error: true };
+  }
+
+  if (!Array.isArray(posts) || posts.length === 0) {
+    return { count: 0, posted: 0, hasMore: false, error: false };
+  }
+
+  let provPosted = 0;
+  for (const post of posts) {
+    if (!post.title || !post.link) continue;
+    const key = `${provKey}:${post.link}`;
+
+    if (historySet.has(key)) continue;
+
+    const res = await postCardToChannel(post, provKey);
+    if (res?.ok) {
+      recordHistory(key);
+      provPosted++;
+      console.log(`📢 [AutoPoster Bulk] Posted "${post.title}" [${provKey} | Page ${pageNumber}]`);
+      // Telegram channel rate-limit spacing (~1.2s between posts)
+      await sleep(1200);
+    }
+  }
+
+  return { count: posts.length, posted: provPosted, hasMore: true, error: false };
+}
+
+// Crawl all enabled providers across changing pages in bulk with no limit
 async function processBulkBatch() {
   if (isJobRunning) return;
   isJobRunning = true;
@@ -201,64 +247,68 @@ async function processBulkBatch() {
 
     const cursors = getCursors();
     loadHistory();
+    sweepCounter++;
 
-    console.log(`📢 [AutoPoster Bulk] Starting bulk crawl across ${enabled.length} enabled extensions: ${enabled.join(', ')}`);
+    console.log(`📢 [AutoPoster Bulk] Sweep #${sweepCounter}: Crawling across ${enabled.length} enabled extensions: ${enabled.join(', ')}`);
 
     for (const provKey of enabled) {
-      const currentPage = cursors[provKey] || 1;
-      let posts = [];
+      let mod = null;
+      let ctx = null;
 
       try {
-        const mod = await zendaEngine.loadModule(provKey, 'posts');
-        if (!mod || typeof mod.getPosts !== 'function') {
-          continue;
-        }
-
-        const ctx = zendaEngine.getProviderContext(provKey);
-        posts = await mod.getPosts({
-          page: currentPage,
-          filter: '',
-          providerValue: provKey,
-          providerContext: ctx,
-          signal: new AbortController().signal
-        });
-      } catch (err) {
-        console.warn(`[AutoPoster Bulk] Error fetching ${provKey} page ${currentPage}:`, err.message);
-      }
-
-      if (!Array.isArray(posts) || posts.length === 0) {
-        // If page has no posts and was beyond page 1, reset back to page 1 for new releases
-        if (currentPage > 1) {
-          cursors[provKey] = 1;
-          saveCursors(cursors);
-        }
+        mod = await zendaEngine.loadModule(provKey, 'posts');
+        if (!mod || typeof mod.getPosts !== 'function') continue;
+        ctx = zendaEngine.getProviderContext(provKey);
+      } catch (modErr) {
+        console.warn(`[AutoPoster Bulk] Cannot load module for ${provKey}:`, modErr.message);
         continue;
       }
 
-      console.log(`📢 [AutoPoster Bulk] Found ${posts.length} posts on ${provKey} [Page ${currentPage}]. Posting unposted items...`);
-
-      let provPosted = 0;
-      for (const post of posts) {
-        if (!post.title || !post.link) continue;
-        const key = `${provKey}:${post.link}`;
-
-        if (historySet.has(key)) continue;
-
-        const res = await postCardToChannel(post, provKey);
-        if (res?.ok) {
-          recordHistory(key);
-          provPosted++;
-          console.log(`📢 [AutoPoster Bulk] Posted "${post.title}" [${provKey} | Page ${currentPage}]`);
-          // Telegram channel rate-limit spacing (~1.2s between posts)
-          await sleep(1200);
-        }
+      // Check Page 1 every 6 sweeps for brand new uploads
+      if (sweepCounter % 6 === 0) {
+        console.log(`🆕 [AutoPoster Bulk] Checking ${provKey} Page 1 for brand new releases...`);
+        await processProviderPage(provKey, 1, mod, ctx, cursors);
       }
 
-      // Advance to next archive page so older movies & shows continue getting pushed
-      cursors[provKey] = currentPage + 1;
-      saveCursors(cursors);
+      // Deep Archive Progression: Crawl through changing pages (Page 1 -> 2 -> 3 -> 4...)
+      // Crawl up to 3 consecutive pages per sweep, or fast-forward if a page was already fully posted
+      let pagesProcessedThisSweep = 0;
+      let maxPagesPerProvider = 3;
 
-      console.log(`✅ [AutoPoster Bulk] Finished ${provKey} [Page ${currentPage}]: ${provPosted} new items posted. Advanced to Page ${currentPage + 1}.`);
+      while (pagesProcessedThisSweep < maxPagesPerProvider) {
+        let currentPage = cursors[provKey] || 1;
+
+        console.log(`🔍 [AutoPoster Bulk] Crawling ${provKey} [Page ${currentPage}]...`);
+        const result = await processProviderPage(provKey, currentPage, mod, ctx, cursors);
+
+        if (!result.hasMore && !result.error) {
+          // Reached the end of archive, reset back to page 1 for next round
+          console.log(`🏁 [AutoPoster Bulk] Reached end of archive on ${provKey} at Page ${currentPage}. Resetting cursor to Page 1.`);
+          cursors[provKey] = 1;
+          saveCursors(cursors);
+          break;
+        }
+
+        if (result.error) {
+          // Network or provider error, advance to next page after saving cursor
+          cursors[provKey] = currentPage + 1;
+          saveCursors(cursors);
+          break;
+        }
+
+        // Advance to next page immediately and save cursor to disk
+        cursors[provKey] = currentPage + 1;
+        saveCursors(cursors);
+        pagesProcessedThisSweep++;
+
+        console.log(`✅ [AutoPoster Bulk] ${provKey} Page ${currentPage} done (${result.posted} new posts). Moving to Page ${currentPage + 1}.`);
+
+        // If this page had 0 unposted items (already 100% posted in past), don't count against limit
+        // so it fast-forwards through already-posted pages to find new pages
+        if (result.posted === 0 && result.count > 0 && maxPagesPerProvider < 10) {
+          maxPagesPerProvider++;
+        }
+      }
     }
 
   } catch (err) {
@@ -274,14 +324,14 @@ function start247AutoPoster() {
   if (workerStarted) return;
   workerStarted = true;
 
-  console.log('🚀 [AutoPoster 24/7] Continuous Bulk Channel Poster Initialized!');
+  console.log('🚀 [AutoPoster 24/7] Continuous Multi-Page Bulk Channel Poster Initialized!');
   console.log(`📢 Target Channel: ${CHANNEL_ID}`);
-  console.log(`⚡ Mode: UNLIMITED BULK POSTING across ALL enabled extensions`);
+  console.log(`⚡ Mode: UNLIMITED MULTI-PAGE BULK POSTING across ALL enabled extensions`);
 
   // Start continuous loop
   (async () => {
     // Initial delay to allow network and providers to initialize
-    await sleep(4000);
+    await sleep(3000);
 
     while (true) {
       try {
@@ -289,8 +339,8 @@ function start247AutoPoster() {
       } catch (loopErr) {
         console.error('[AutoPoster Bulk Loop Error]:', loopErr.message);
       }
-      // Brief 5-second rest between full-pool sweeps
-      await sleep(5000);
+      // Brief 4-second breather between full-catalog sweeps
+      await sleep(4000);
     }
   })();
 }
