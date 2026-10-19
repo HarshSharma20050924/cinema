@@ -517,9 +517,9 @@ async function getStreams(req, res) {
       console.warn(`Zenda stream module error for ${provider}:`, modErr.message);
     }
 
-    // 2. Real Mirror Extraction for any HubCloud / HubDrive / Katmovies / Gamerxyt / Greenmotors links
+    // 2. Real Mirror Extraction for any HubCloud / HubDrive / Katmovies / Gamerxyt / Greenmotors / VegaDrive links
     const isHosterLink = (l) =>
-      Boolean(l && typeof l === 'string' && /(hubcdn|hubcloud|hubdrive|greenmotors|gamerxyt|vcloud|kmhd|kmphotos|katdrive|gdflix|4khdhub)/i.test(l));
+      Boolean(l && typeof l === 'string' && /(hubcdn|hubcloud|hubdrive|greenmotors|gamerxyt|vcloud|kmhd|kmphotos|katdrive|gdflix|4khdhub|vegadrive|hblinks|inventoryidea|fastdl|fuckingfast|pixeld|gofile|r2\.dev|cloudflarestorage|rohitkiskk)/i.test(l));
 
     if (streams.length === 0 || isHosterLink(link)) {
       const realMirrors = await extractHubCloudMirrors(link);
