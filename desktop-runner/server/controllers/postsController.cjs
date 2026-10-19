@@ -95,13 +95,16 @@ async function searchPosts(req, res) {
     const provInfo = allProviders.find((p) => p.value === provider);
     const provDisplayName = provInfo ? provInfo.name : provider;
 
-    const result = Array.isArray(posts)
+    let result = Array.isArray(posts)
       ? posts.map((item) => ({
           ...item,
           provider: item.provider || provider,
           providerName: item.providerName || provDisplayName,
         }))
       : [];
+    
+    result = rankSearchResults(result, q);
+
     if (result.length > 0) {
       serverCache.set(cacheKey, result, 10 * 60 * 1000);
     }
@@ -110,6 +113,55 @@ async function searchPosts(req, res) {
     console.error(`Search error for provider ${provider}:`, err.message);
     res.json([]);
   }
+}
+
+// Smart Relevance Ranking for Search Results
+function rankSearchResults(results, query) {
+  if (!query || !Array.isArray(results) || results.length <= 1) return results;
+  const cleanQ = query.toLowerCase().trim();
+  const qWords = cleanQ.split(/\s+/).filter(Boolean);
+
+  const cleanTitle = (raw) => {
+    return String(raw || '')
+      .replace(/^[\s🎬📺📥⚡📦⬇️▶️]+/gu, '')
+      .replace(/^(?:download|watch(?:\s+online)?|stream)\s+/i, '')
+      .replace(/\[\s*18\+\s*\]|\(\s*18\+\s*\)/gi, '')
+      .replace(/\{[^}]*\}/g, ' ')
+      .replace(/\[\s*(?:dual\s*audio|hindi|eng|org|bluray|hevc|x264|x265|720p|1080p|480p|2160p|4k)[^\]]*\]/gi, ' ')
+      .split(/\b(?:480p|720p|1080p|2160p|4k)\b/i)[0]
+      .trim()
+      .toLowerCase();
+  };
+
+  const getScore = (item) => {
+    const rawTitle = (item.title || '').toLowerCase();
+    const cleanT = cleanTitle(rawTitle);
+
+    // 1. Exact match (e.g. "Rear Window")
+    if (cleanT === cleanQ || rawTitle === cleanQ) return 1000;
+
+    // 2. Starts with query (e.g. "Rear Window (1954)")
+    if (cleanT.startsWith(cleanQ) || rawTitle.startsWith(cleanQ)) return 850;
+
+    // 3. Contains exact query phrase (e.g. "[Hindi] Rear Window")
+    if (cleanT.includes(cleanQ) || rawTitle.includes(cleanQ)) return 700;
+
+    // 4. All query words present in title (e.g. both "rear" and "window")
+    const allWords = qWords.every(w => cleanT.includes(w) || rawTitle.includes(w));
+    if (allWords) {
+      const lengthPenalty = Math.abs(cleanT.length - cleanQ.length);
+      return 500 - Math.min(lengthPenalty, 200);
+    }
+
+    // 5. Some query words present
+    let matchedWords = 0;
+    qWords.forEach(w => {
+      if (cleanT.includes(w) || rawTitle.includes(w)) matchedWords++;
+    });
+    return matchedWords * 50;
+  };
+
+  return [...results].sort((a, b) => getScore(b) - getScore(a));
 }
 
 async function globalSearch(req, res) {
@@ -141,7 +193,7 @@ async function globalSearch(req, res) {
 
       const context = zendaEngine.getProviderContext(providerKey);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6500);
+      const timeoutId = setTimeout(() => controller.abort(), 14000);
 
       const posts = await Promise.race([
         mod.getSearchPosts({
@@ -151,7 +203,7 @@ async function globalSearch(req, res) {
           providerContext: context,
           signal: controller.signal,
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 6500)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 14000)),
       ]);
       clearTimeout(timeoutId);
 
@@ -168,7 +220,7 @@ async function globalSearch(req, res) {
   });
 
   const results = await Promise.allSettled(searchPromises);
-  const combined = [];
+  let combined = [];
   const seenItems = new Set();
 
   for (const r of results) {
@@ -184,6 +236,8 @@ async function globalSearch(req, res) {
       }
     }
   }
+
+  combined = rankSearchResults(combined, q);
 
   if (combined.length > 0) {
     serverCache.set(cacheKey, combined, 10 * 60 * 1000);

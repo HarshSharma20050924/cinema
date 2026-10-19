@@ -77,31 +77,6 @@ function hashString(str) {
   return Math.abs(hash).toString(16);
 }
 
-// Check for direct downloadable mirrors vs hotlink-protected stream links
-function isRealDownloadLink(url) {
-  if (!url || typeof url !== 'string') return false;
-  const l = url.toLowerCase();
-  if (l.includes('hakunaymatata.com') || l.includes('officialmoviebox.com') || l.includes('bcdnxw.')) {
-    return false;
-  }
-  if (l.includes('.m3u8') || l.includes('.mpd') || l.includes('/hls/') || l.includes('/dash/')) {
-    return false;
-  }
-  return (
-    l.includes('drive.google.com') ||
-    l.includes('pixeldrain.com') ||
-    l.includes('r2.cloudflarestorage.com') ||
-    l.includes('fastdl') ||
-    l.includes('download') ||
-    l.includes('hubdrive') ||
-    l.includes('gdflix') ||
-    l.includes('filebee') ||
-    l.includes('droplink') ||
-    l.endsWith('.mp4') ||
-    l.endsWith('.mkv') ||
-    l.endsWith('.zip')
-  );
-}
 
 function extractActualSeason(str) {
   if (!str) return null;
@@ -1397,9 +1372,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     // Start extraction with robust timeout and fallback (try stream first, then download)
     const fetchPromise = (async () => {
-      let m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: false });
+      const mediaType = item.type || (/episode|season|\bs\d+/i.test(item.title) ? 'series' : 'movie');
+      let targetLink = item.link;
+      if (typeof targetLink === 'object' && targetLink !== null) {
+        targetLink = JSON.stringify(targetLink);
+      }
+      let m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: false });
       if (!m || m.length === 0) {
-        m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: item.link, download: true });
+        m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: true });
       }
       return m;
     })();

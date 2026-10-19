@@ -1,0 +1,15 @@
+[Unit]
+Description=Cinema Vega Watcher Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /home/harsh/cinema/scripts/vega-watcher.cjs
+Restart=always
+RestartSec=30
+Environment=DISPLAY=:1
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target
