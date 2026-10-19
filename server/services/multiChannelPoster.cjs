@@ -119,14 +119,38 @@ async function tgCall(token, method, data) {
   }
 }
 
+function hashString(str) {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16);
+}
+
 async function postToDedicatedChannel(item, provKey, channelId) {
   const bot = getBotForExtension(provKey);
   const title = escapeHtml(item.title || 'Untitled Release');
   const targetChatId = channelId.startsWith('-100') ? channelId : `-100${channelId}`;
 
-  // Safe base64 payload for start parameter
-  const rawPayload = `${provKey}___${item.link || ''}`;
-  const startParam = Buffer.from(rawPayload).toString('base64url');
+  // Clean title for deep link parameter (max 24 chars to stay well within Telegram 64 char limit)
+  const cleanTitleParam = (item.title || '')
+    .replace(/\b(?:480p|720p|1080p|2160p|4k|bluray|web-dl|webrip|hdrip|hevc|x264|x265|dd5\.1|dual audio|hindi|clean)\b/gi, '')
+    .replace(/[^a-zA-Z0-9 ]/g, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .slice(0, 24);
+
+  const storeId = hashString(`${provKey}:${item.link || ''}`);
+  const directStartParam = `p_${storeId}_${provKey}_${cleanTitleParam}`;
+
+  // Sync to D1 bot_links in background for instant opening
+  axios.post(`${WEB_URL}/api/store-link`, {
+    id: storeId,
+    provider: provKey,
+    link: item.link || '',
+    title: item.title || '',
+  }, { timeout: 4000 }).catch(() => {});
 
   const text = `🎬 <b>${title}</b>\n\n` +
     `📦 <b>Source:</b> <code>${provKey.toUpperCase()}</code>\n` +
@@ -136,7 +160,7 @@ async function postToDedicatedChannel(item, provKey, channelId) {
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '🎬 Stream & Download', url: `https://t.me/${bot.username}?start=p_${startParam}` },
+        { text: '🎬 Stream & Download', url: `https://t.me/${bot.username}?start=${directStartParam}` },
         { text: '🌐 Watch on Web', url: `${WEB_URL}` },
       ],
     ],

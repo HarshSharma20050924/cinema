@@ -12,8 +12,8 @@ node_modules
 dist
 dist-ssr
 # Server runtime data
-server/data/*.json
-desktop-runner/server/data/*.json
+server/data/
+desktop-runner/server/data/
 
 # Built binaries - don't push large files
 

@@ -671,7 +671,8 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
 // Main Telegram Webhook Entry Point
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const token = env?.BOT_TOKEN || BOT_TOKEN;
+  const urlObj = new URL(request.url);
+  const token = urlObj.searchParams.get('token') || env?.BOT_TOKEN || BOT_TOKEN;
   const db = env?.cinema_db;
   currentDb = db;
 
@@ -718,8 +719,9 @@ export async function onRequestPost(context) {
 }
 
 export async function onRequestGet(context) {
-  const { env } = context || {};
-  const tok = env?.BOT_TOKEN || BOT_TOKEN;
+  const { request, env } = context || {};
+  const urlObj = request ? new URL(request.url) : null;
+  const tok = urlObj?.searchParams?.get('token') || env?.BOT_TOKEN || BOT_TOKEN;
   const db = env?.cinema_db ? 'CONNECTED' : 'MISSING';
   const status = tok ? `OK (Prefix: ${tok.slice(0, 8)}...)` : 'MISSING';
   return new Response(`Cinema Telegram Webhook is Live (Cloudflare Edge 24/7)\nBOT_TOKEN: ${status}\nDATABASE: ${db}\n`, {
@@ -743,9 +745,35 @@ async function handleMessage(msg, token, db, requestUrl) {
     const param = parts[1];
 
     if (param) {
-      // Direct channel post click: p_<storeId>_<provKey>_<title>
+      // Direct channel post click: p_<storeId>_<provKey>_<title> or base64url payload
       if (param.startsWith('p_')) {
         const payload = param.slice(2);
+
+        // 1. Try decoding base64url payload (legacy or direct URL payload: provKey___link)
+        let b64Prov = null;
+        let b64Link = null;
+        try {
+          let b64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+          while (b64.length % 4) b64 += '=';
+          const decoded = atob(b64);
+          if (decoded && decoded.includes('___')) {
+            const splitIdx = decoded.indexOf('___');
+            b64Prov = decoded.slice(0, splitIdx);
+            b64Link = decoded.slice(splitIdx + 3);
+          }
+        } catch (_) {}
+
+        if (b64Prov && b64Link) {
+          await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_photo' });
+          const loadingMsgRes = await tgCall(token, 'sendMessage', {
+            chat_id: chatId,
+            text: `⏳ Loading media details from <b>${escapeHtml(b64Prov)}</b>...`,
+            parse_mode: 'HTML'
+          });
+          const loadingMsgId = loadingMsgRes?.result?.message_id;
+          return showItemDetails(chatId, { provider: b64Prov, link: b64Link, title: '' }, token, db, requestUrl, null, 1, null, loadingMsgId);
+        }
+
         const firstUnderscore = payload.indexOf('_');
         const secondUnderscore = payload.indexOf('_', firstUnderscore + 1);
 
@@ -774,11 +802,7 @@ async function handleMessage(msg, token, db, requestUrl) {
 
         const item = await getStoredLink(db, storeId);
         if (item) {
-          if (loadingMsgId) {
-            tgCall(token, 'deleteMessage', { chat_id: chatId, message_id: loadingMsgId }).catch(() => {});
-          }
-          // DIRECTLY SHOW MEDIA FROM THIS EXACT EXTENSION WITH POSTER
-          return showItemDetails(chatId, item, token, db, requestUrl, null);
+          return showItemDetails(chatId, item, token, db, requestUrl, null, 1, storeId, loadingMsgId);
         }
 
         // Fallback: search exclusively on the extension that was clicked
@@ -794,10 +818,7 @@ async function handleMessage(msg, token, db, requestUrl) {
           const dataRes = await callCinemaApi(requestUrl, '/search', { provider: provKey, q: rawTitle });
           const results = Array.isArray(dataRes) ? dataRes : [];
           if (results.length > 0) {
-            if (loadingMsgId) {
-              tgCall(token, 'deleteMessage', { chat_id: chatId, message_id: loadingMsgId }).catch(() => {});
-            }
-            return showItemDetails(chatId, results[0], token, db, requestUrl, null);
+            return showItemDetails(chatId, results[0], token, db, requestUrl, null, 1, null, loadingMsgId);
           }
           const formatted = await formatSearchResults(results, rawTitle, 1, db);
           if (loadingMsgId) {
