@@ -20,7 +20,7 @@ const WEB_URL = process.env.WEB_URL || 'https://cinema-dwh.pages.dev';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) { }
 }
 
 const HISTORY_FILE = path.join(DATA_DIR, 'posted_history.json');
@@ -38,7 +38,7 @@ function loadHistory() {
         historySet = new Set(arr);
         return historySet;
       }
-    } catch (_) {}
+    } catch (_) { }
   }
   historySet = new Set();
   return historySet;
@@ -54,14 +54,14 @@ function recordHistory(key) {
         const arr = Array.from(historySet);
         const trimmed = arr.length > 25000 ? arr.slice(-25000) : arr;
         fs.writeFileSync(HISTORY_FILE, JSON.stringify(trimmed), 'utf8');
-      } catch (_) {}
+      } catch (_) { }
     }, 1500);
   }
 }
 
 function getCursors() {
   if (fs.existsSync(CURSOR_FILE)) {
-    try { return JSON.parse(fs.readFileSync(CURSOR_FILE, 'utf8')); } catch (_) {}
+    try { return JSON.parse(fs.readFileSync(CURSOR_FILE, 'utf8')); } catch (_) { }
   }
   return {};
 }
@@ -69,7 +69,7 @@ function getCursors() {
 function saveCursors(cursors) {
   try {
     fs.writeFileSync(CURSOR_FILE, JSON.stringify(cursors, null, 2), 'utf8');
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // Dynamic Provider Pool (Synced from Cloudflare D1 /api/bot-providers)
@@ -88,7 +88,7 @@ async function getLiveBotProviders() {
       lastProviderSync = now;
       return dynamicBotProviders;
     }
-  } catch (_) {}
+  } catch (_) { }
   return dynamicBotProviders.length > 0
     ? dynamicBotProviders
     : ['drive', 'hdhub4u', '4khdhub', 'movieBoxWeb', 'vega', 'moviesmod', 'topmovies', 'katmoviehd'];
@@ -100,6 +100,37 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+function cleanMediaTitle(raw) {
+  if (!raw) return '';
+  let str = String(raw).replace(/^[\s🎬📺📥⚡📦⬇️▶️]+/gu, '').trim();
+  str = str.replace(/^(?:download|watch(?:\s+online)?|stream)\s+/i, '').trim();
+  str = str.replace(/\[\s*18\+\s*\]|\(\s*18\+\s*\)|\[Adult\]/gi, '').trim();
+  str = str.replace(/\{[^}]*\}/g, ' ');
+  str = str.replace(/\[\s*(?:dual\s*audio|hindi|eng|org|bluray|hevc|x264|x265|720p|1080p|480p|2160p|4k)[^\]]*\]/gi, ' ');
+  str = str.replace(/\((?:season\s*\d+\s*[-+–—]\s*\d+|seasons?\s*\d+[^)]*)\)/gi, ' ');
+  str = str.split(/\b(?:480p|720p|1080p|2160p|4k)\s*[|•·–—-]/i)[0];
+  str = str.split(/\b(?:dual\s*audio|multi\s*audio|hindi\s*dubbed|org\s*2\.0|org\s*5\.1|multi\s*sub)\b/i)[0];
+  str = str.replace(/\b(?:480p|720p|1080p|2160p|4k|bluray|web-dl|webrip|hdrip)\b.*$/i, '');
+  str = str.replace(/\b(?:complete|hindi|english|telugu|tamil|malayalam|kannada)\b.*$/i, '');
+  str = str.replace(/[\s|·–—\-_:]+$/g, '').trim();
+  str = str.replace(/\s{2,}/g, ' ').trim();
+  return str.toLowerCase();
+}
+
+function extractSeason(str) {
+  if (!str) return '';
+  const m = str.match(/\b(?:season\s*(\d{1,2})|s(\d{1,2}))\b/i);
+  return m ? `_s${m[1] || m[2]}` : '';
+}
+
+function getProviderContentKey(provKey, item) {
+  const p = String(provKey || '').toLowerCase().trim();
+  const rawTitle = item.title || '';
+  const clean = cleanMediaTitle(rawTitle);
+  const s = extractSeason(rawTitle);
+  return `${p}:${clean}${s}`.replace(/[^a-z0-9_:]/g, '');
 }
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -117,7 +148,7 @@ async function tgCall(method, payload) {
       try {
         const retryRes = await axios.post(url, payload, { timeout: 15000 });
         return retryRes.data;
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // If sendPhoto failed (e.g. hotlink blocked, broken image URL, size exceeded), fallback to sendMessage
@@ -216,13 +247,19 @@ async function processProviderPage(provKey, pageNumber, mod, ctx, cursors) {
   let provPosted = 0;
   for (const post of posts) {
     if (!post.title || !post.link) continue;
-    const key = `${provKey}:${post.link}`;
+    const linkKey = `${provKey}:${post.link}`;
+    const contentKey = getProviderContentKey(provKey, post);
 
-    if (historySet.has(key)) continue;
+    // Rule: Same content from DIFFERENT extensions is ALLOWED.
+    // But from the SAME extension, duplicate link OR duplicate normalized title is REJECTED.
+    if (historySet.has(linkKey) || (contentKey && historySet.has(contentKey))) {
+      continue;
+    }
 
     const res = await postCardToChannel(post, provKey);
     if (res?.ok) {
-      recordHistory(key);
+      recordHistory(linkKey);
+      if (contentKey) recordHistory(contentKey);
       provPosted++;
       console.log(`📢 [AutoPoster Bulk] Posted "${post.title}" [${provKey} | Page ${pageNumber}]`);
       // Telegram channel rate-limit spacing (~1.2s between posts)
@@ -270,19 +307,16 @@ async function processBulkBatch() {
         await processProviderPage(provKey, 1, mod, ctx, cursors);
       }
 
-      // Deep Archive Progression: Crawl through changing pages (Page 1 -> 2 -> 3 -> 4...)
-      // Crawl up to 3 consecutive pages per sweep, or fast-forward if a page was already fully posted
-      let pagesProcessedThisSweep = 0;
-      let maxPagesPerProvider = 3;
-
-      while (pagesProcessedThisSweep < maxPagesPerProvider) {
+      // Deep Archive Progression: Crawl through changing pages without hardcoded page limits
+      // Traverses all pages until provider has no more posts or ends
+      while (true) {
         let currentPage = cursors[provKey] || 1;
 
         console.log(`🔍 [AutoPoster Bulk] Crawling ${provKey} [Page ${currentPage}]...`);
         const result = await processProviderPage(provKey, currentPage, mod, ctx, cursors);
 
         if (!result.hasMore && !result.error) {
-          // Reached the end of archive, reset back to page 1 for next round
+          // Reached the true end of all available pages on this extension
           console.log(`🏁 [AutoPoster Bulk] Reached end of archive on ${provKey} at Page ${currentPage}. Resetting cursor to Page 1.`);
           cursors[provKey] = 1;
           saveCursors(cursors);
@@ -290,7 +324,7 @@ async function processBulkBatch() {
         }
 
         if (result.error) {
-          // Network or provider error, advance to next page after saving cursor
+          // Network glitch or end, advance to next page after saving cursor
           cursors[provKey] = currentPage + 1;
           saveCursors(cursors);
           break;
@@ -299,15 +333,8 @@ async function processBulkBatch() {
         // Advance to next page immediately and save cursor to disk
         cursors[provKey] = currentPage + 1;
         saveCursors(cursors);
-        pagesProcessedThisSweep++;
 
         console.log(`✅ [AutoPoster Bulk] ${provKey} Page ${currentPage} done (${result.posted} new posts). Moving to Page ${currentPage + 1}.`);
-
-        // If this page had 0 unposted items (already 100% posted in past), don't count against limit
-        // so it fast-forwards through already-posted pages to find new pages
-        if (result.posted === 0 && result.count > 0 && maxPagesPerProvider < 10) {
-          maxPagesPerProvider++;
-        }
       }
     }
 
@@ -344,6 +371,9 @@ function start247AutoPoster() {
     }
   })();
 }
+
+// Auto-start worker daemon safely (idempotent guard inside prevents duplicates)
+start247AutoPoster();
 
 module.exports = {
   start247AutoPoster,

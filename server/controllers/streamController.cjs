@@ -518,10 +518,25 @@ async function getStreams(req, res) {
     }
 
     // 2. Real Mirror Extraction for any HubCloud / HubDrive / Katmovies / Gamerxyt / Greenmotors / VegaDrive links
-    const isHosterLink = (l) =>
-      Boolean(l && typeof l === 'string' && /(hubcdn|hubcloud|hubdrive|greenmotors|gamerxyt|vcloud|kmhd|kmphotos|katdrive|gdflix|4khdhub|vegadrive|hblinks|inventoryidea|fastdl|fuckingfast|pixeld|gofile|r2\.dev|cloudflarestorage|rohitkiskk)/i.test(l));
+    const isDirectStream = (url) => {
+      if (!url || typeof url !== 'string') return false;
+      return Boolean(
+        url.includes('cloudflarestorage.com') ||
+        url.includes('.r2.dev') ||
+        url.includes('googleusercontent.com') ||
+        url.includes('/api/file/') ||
+        url.includes('gofile.io/download/') ||
+        url.includes('fuckingfast.net/dl/') ||
+        /\.(mp4|mkv|webm)(\?|$)/i.test(url)
+      );
+    };
 
-    if (streams.length === 0 || isHosterLink(link)) {
+    const isIntermediateHoster = (url) => {
+      if (!url || typeof url !== 'string' || isDirectStream(url)) return false;
+      return /(hubcloud|hubdrive|greenmotors|gamerxyt|vcloud|kmhd|kmphotos|katdrive|gdflix|4khdhub|vegadrive|hblinks|inventoryidea|fastdl|nexdrive|mdrive|moviesdrive)/i.test(url);
+    };
+
+    if (streams.length === 0 || isIntermediateHoster(link)) {
       const realMirrors = await extractHubCloudMirrors(link);
       if (realMirrors.length > 0) {
         for (const mirror of realMirrors) {
@@ -532,10 +547,10 @@ async function getStreams(req, res) {
       }
     }
 
-    // Expand any streams that are themselves intermediate hoster links
+    // Expand any streams that are themselves intermediate hoster links (NOT direct video files!)
     const expandedStreams = [];
     for (const s of streams) {
-      if (isHosterLink(s.link)) {
+      if (isIntermediateHoster(s.link)) {
         const subMirrors = await extractHubCloudMirrors(s.link);
         if (subMirrors.length > 0) {
           for (const sm of subMirrors) {
@@ -551,6 +566,7 @@ async function getStreams(req, res) {
       }
     }
     streams = expandedStreams;
+
 
     // 3. Resolve any raw Gofile mirrors to direct links
     for (let i = 0; i < streams.length; i++) {

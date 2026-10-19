@@ -15,6 +15,7 @@ const STATE_FILE = path.join(process.env.HOME || '/home/harsh', '.config/cinema/
 const LOG_FILE = path.join(__dirname, '../logs/vega-updates.log');
 
 const REPOS_TO_WATCH = [
+  { owner: 'vega-org', repo: 'vega-app', branch: 'main' },
   { owner: 'Zenda-Cross', repo: 'vega-providers', branch: 'main' },
   { owner: 'Zenda-Cross', repo: 'vega-providers', branch: 'with-bundler' }
 ];

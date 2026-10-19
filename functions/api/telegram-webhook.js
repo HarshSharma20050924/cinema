@@ -601,10 +601,6 @@ async function getCandidateBackends(db) {
   const candidates = [];
   if (db) {
     try {
-      const urlRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_URL'").first();
-      if (urlRow?.value && /^https?:\/\//i.test(urlRow.value) && !urlRow.value.includes('pages.dev')) {
-        candidates.push(urlRow.value.replace(/\/+$/, ''));
-      }
       const poolRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_POOL'").first();
       if (poolRow?.value) {
         const pool = JSON.parse(poolRow.value);
@@ -619,6 +615,11 @@ async function getCandidateBackends(db) {
             }
           }
         }
+      }
+      const urlRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_URL'").first();
+      if (urlRow?.value && /^https?:\/\//i.test(urlRow.value) && !urlRow.value.includes('pages.dev')) {
+        const clean = urlRow.value.replace(/\/+$/, '');
+        if (!candidates.includes(clean)) candidates.push(clean);
       }
     } catch (_) {}
   }
@@ -645,7 +646,7 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
 
       const controller = new AbortController();
       const isSlowEndpoint = endpoint.includes('/streams') || endpoint.includes('/search') || endpoint.includes('/meta');
-      const timeoutMs = isSlowEndpoint ? 35000 : 12000;
+      const timeoutMs = isSlowEndpoint ? 16000 : 7000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(url.toString(), {
@@ -687,12 +688,20 @@ export async function onRequestPost(context) {
 
     // 1. Handle Messages
     if (update.message) {
-      await handleMessage(update.message, token, db, request.url);
+      if (context && typeof context.waitUntil === 'function') {
+        context.waitUntil(handleMessage(update.message, token, db, request.url));
+      } else {
+        await handleMessage(update.message, token, db, request.url);
+      }
     }
 
     // 2. Handle Callback Queries (Button clicks)
     if (update.callback_query) {
-      await handleCallbackQuery(update.callback_query, token, db, request.url);
+      if (context && typeof context.waitUntil === 'function') {
+        context.waitUntil(handleCallbackQuery(update.callback_query, token, db, request.url));
+      } else {
+        await handleCallbackQuery(update.callback_query, token, db, request.url);
+      }
     }
 
     return new Response(JSON.stringify({ ok: true }), {
@@ -1016,6 +1025,9 @@ async function handleMessage(msg, token, db, requestUrl) {
   }
 }
 
+// In-memory debounce set to block duplicate webhook retries
+const processedCallbacks = new Map();
+
 // Callback Query Handler (Inline Buttons)
 async function handleCallbackQuery(cq, token, db, requestUrl) {
   const cqId = cq.id;
@@ -1025,8 +1037,28 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
   const userId = cq.from?.id;
   const isAdmin = ADMIN_IDS.includes(userId);
 
+  // 1. Instantly acknowledge button to stop user client spinner
+  tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId }).catch(() => {});
+
   if (data === 'noop') {
-    return tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
+    return;
+  }
+
+  // 2. Webhook retry debouncing: ignore duplicate retries within 45s
+  const dedupeKey = `${userId}:${data}:${messageId || ''}`;
+  const now = Date.now();
+  if (processedCallbacks.has(dedupeKey) && (now - processedCallbacks.get(dedupeKey) < 45000)) {
+    console.log(`[Webhook] Ignored duplicate callback: ${dedupeKey}`);
+    return;
+  }
+  processedCallbacks.set(dedupeKey, now);
+
+  // Prune map periodically
+  if (processedCallbacks.size > 2000) {
+    const cutoff = now - 90000;
+    for (const [k, v] of processedCallbacks.entries()) {
+      if (v < cutoff) processedCallbacks.delete(k);
+    }
   }
 
   if (data === 'vlc_guide') {

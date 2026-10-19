@@ -6,6 +6,7 @@ class DomainResolver {
     this.urls = {};
     this.lastFetched = 0;
     this.CACHE_DURATION = 1000 * 60 * 30; // 30 mins
+    this.syncUrls().catch(() => {});
   }
 
   async syncUrls() {
@@ -15,14 +16,13 @@ class DomainResolver {
         return this.urls;
       }
 
-      console.log('🔄 Fetching updated domain mirrors from Zenda urls.json...');
       const res = await axios.get(`${ZENDA_RAW}/urls.json`, { timeout: 8000 });
       if (res.data && typeof res.data === 'object') {
         this.urls = res.data;
         this.lastFetched = now;
       }
     } catch (err) {
-      console.warn('⚠️ Failed to sync urls.json, using fallback domains:', err.message);
+      // Use latest fallback domains
     }
     return this.urls;
   }
@@ -43,12 +43,20 @@ class DomainResolver {
 
     // Aliases
     if (key === 'moviebox' || key === 'movieboxapp') {
-      const mb = this.urls['movieboxweb']?.url?.replace(/\/+$/, '');
+      const mb = this.urls['movieboxWeb']?.url?.replace(/\/+$/, '') || this.urls['movieboxweb']?.url?.replace(/\/+$/, '');
       if (mb) return mb;
     }
     if (key === 'hdhub' || key === 'hdhub4u') {
       const hd = this.urls['hdhub']?.url?.replace(/\/+$/, '') || this.urls['hdhub4u']?.url?.replace(/\/+$/, '');
       if (hd) return hd;
+    }
+    if (key === 'moviesmod' || key === 'mod') {
+      const mm = this.urls['Moviesmod']?.url?.replace(/\/+$/, '') || this.urls['moviesmod']?.url?.replace(/\/+$/, '');
+      if (mm) return mm;
+    }
+    if (key === 'kat' || key === 'katmovies' || key === 'katmoviehd') {
+      const km = this.urls['kat']?.url?.replace(/\/+$/, '');
+      if (km) return km;
     }
 
     const FALLBACK_DOMAINS = {
@@ -56,14 +64,15 @@ class DomainResolver {
       vegamovies: 'https://new1.vegamovies.lease',
       drive: 'https://new3.moviesdrive.beer',
       moviesdrive: 'https://new3.moviesdrive.beer',
-      moviesmod: 'https://moviesmod.us.org',
-      mod: 'https://moviesmod.us.org',
+      moviesmod: 'https://moviesmod.uk.com',
+      mod: 'https://moviesmod.uk.com',
       hdhub: 'https://new8.hdhub4u.cl',
       hdhub4u: 'https://new8.hdhub4u.cl',
       moviebox: 'https://officialmoviebox.com',
       movieboxweb: 'https://officialmoviebox.com',
       '4khdhub': 'https://4khdhub.one',
       kat: 'https://new.katmoviehd.top',
+      katmovies: 'https://new.katmoviehd.top',
       katmoviehd: 'https://new.katmoviehd.top',
       multi: 'https://m1.multimovies.courses',
       multimovies: 'https://m1.multimovies.courses',

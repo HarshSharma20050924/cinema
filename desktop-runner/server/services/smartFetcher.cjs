@@ -1,12 +1,14 @@
 const axios = require('axios');
+const dns = require('dns');
+const https = require('https');
 
 /**
- * 🚀 Cinema Smart Resilient Fetcher for Primary Server (Render)
- * -----------------------------------------------------------
- * 1. Executes heavy parsing and compute 100% on Render.
- * 2. Uses residential phone tunnels (Airtel Wi-Fi) purely as an egress IP pipe.
- * 3. Never crashes or blocks if a phone sleeps or changes tunnel URL.
- * 4. Automatic Round-Robin across all 4 phones with 3s failover.
+ * 🚀 Cinema Smart Resilient Fetcher for Primary Server (Render & Desktop)
+ * ---------------------------------------------------------------------
+ * 1. Handles both axios(url, config) and axios(config) calling signatures.
+ * 2. Automatic Relative URL tracking & resolution.
+ * 3. Custom DNS (1.1.1.1, 8.8.8.8) to bypass Indian ISP RPZ DNS poisoning.
+ * 4. Residential phone pool failover when Cloudflare Turnstile blocks datacenter IPs.
  */
 
 let activePhonePool = [];
@@ -15,6 +17,56 @@ let roundRobinIndex = 0;
 const deadPhones = new Map(); // phoneUrl -> deadUntilTimestamp
 
 const CLUSTER_STATUS_URL = process.env.CLUSTER_STATUS_URL || 'https://cinema-dwh.pages.dev/api/tunnel-status';
+
+// Custom DNS Resolver for ISP bypass
+const resolver = new dns.promises.Resolver();
+try {
+  resolver.setServers(['1.1.1.1', '8.8.8.8', '1.0.0.1']);
+} catch (_) {}
+
+const dnsCache = new Map();
+
+function customLookup(hostname, options, callback) {
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    if (options && options.all) {
+      return callback(null, [{ address: hostname, family: 4 }]);
+    }
+    return callback(null, hostname, 4);
+  }
+
+  if (dnsCache.has(hostname)) {
+    const cachedIp = dnsCache.get(hostname);
+    if (options && options.all) {
+      return callback(null, [{ address: cachedIp, family: 4 }]);
+    }
+    return callback(null, cachedIp, 4);
+  }
+
+  resolver.resolve4(hostname).then(addresses => {
+    if (addresses && addresses.length > 0) {
+      const ip = addresses[0];
+      dnsCache.set(hostname, ip);
+      if (options && options.all) {
+        return callback(null, [{ address: ip, family: 4 }]);
+      }
+      return callback(null, ip, 4);
+    }
+    dns.lookup(hostname, options, callback);
+  }).catch(() => {
+    dns.lookup(hostname, options, callback);
+  });
+}
+
+const secureAgent = new https.Agent({
+  lookup: customLookup,
+  keepAlive: true,
+  rejectUnauthorized: false
+});
 
 // Domains known to enforce Cloudflare Turnstile or aggressively block datacenter IPs
 const RESIDENTIAL_PREFERRED_DOMAINS = [
@@ -56,7 +108,6 @@ async function syncPhonePool() {
     if (valid.length > 0) {
       activePhonePool = valid;
       lastPoolSync = now;
-      console.log(`📡 [SmartFetcher] Synced ${valid.length} live residential phone node(s) for Render`);
     }
   } catch (err) {
     // Keep using existing pool on temporary network hiccup
@@ -64,7 +115,7 @@ async function syncPhonePool() {
   return activePhonePool;
 }
 
-// Public APIs that never block datacenter IPs and should never be routed through phone relays
+// Public APIs that never block datacenter IPs
 const DIRECT_ONLY_DOMAINS = [
   'theintrodb.org',
   'strem.io',
@@ -73,7 +124,13 @@ const DIRECT_ONLY_DOMAINS = [
   'tmdb.org',
   'imdb.com',
   'raw.githubusercontent.com',
-  'githubusercontent.com'
+  'githubusercontent.com',
+  'gofile.io',
+  'pixeldrain.com',
+  'fuckingfast.net',
+  'cloudflarestorage.com',
+  'workers.dev',
+  'googleusercontent.com'
 ];
 
 function isDirectOnly(url) {
@@ -91,7 +148,7 @@ function getNextHealthyPhone() {
   });
 
   if (healthy.length === 0) {
-    return null; // Don't clear deadPhones and loop endlessly on dead nodes!
+    return null;
   }
 
   roundRobinIndex = (roundRobinIndex + 1) % healthy.length;
@@ -105,22 +162,47 @@ function markPhoneFailed(url) {
   }
 }
 
+let lastBaseUrl = '';
+
 /**
  * Smart Resilient Request Function
- * Tries direct or residential relay with seamless multi-phone failover
  */
-async function smartRequest(config) {
-  const targetUrl = typeof config === 'string' ? config : (config.url || '');
-  const method = (config.method || 'GET').toLowerCase();
-  const headers = config.headers || {};
-  const timeout = config.timeout || 15000;
+async function smartRequest(rawConfig) {
+  let cfg = typeof rawConfig === 'string' ? { url: rawConfig } : { ...rawConfig };
+  let targetUrl = cfg.url || '';
 
-  // Public APIs should always be fetched direct
-  if (isDirectOnly(targetUrl)) {
+  // Track & Resolve relative URLs automatically
+  if (targetUrl.startsWith('/') && lastBaseUrl) {
+    targetUrl = `${lastBaseUrl}${targetUrl}`;
+    cfg.url = targetUrl;
+  } else if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+    try {
+      lastBaseUrl = new URL(targetUrl).origin;
+    } catch (_) {}
+  }
+
+  const method = (cfg.method || 'GET').toLowerCase();
+  const headers = cfg.headers || {};
+  const timeout = cfg.timeout || 15000;
+
+  // Add custom secure DNS agent to avoid ISP poisoning
+  if (targetUrl.startsWith('https://')) {
+    cfg.httpsAgent = secureAgent;
+  }
+
+  // Direct fetch helper
+  const tryDirect = async (directTimeout = 6000) => {
     return axios({
-      ...config,
-      timeout: Math.min(timeout, 5000)
+      ...cfg,
+      url: targetUrl,
+      timeout: directTimeout,
+      validateStatus: (status) => status < 500
     });
+  };
+
+  // Direct-only domains (APIs, Google CDN, Cloudflare Storage, Pixeldrain, Gofile)
+  if (isDirectOnly(targetUrl)) {
+    return tryDirect(Math.min(timeout, 12000));
   }
 
   await syncPhonePool();
@@ -128,27 +210,17 @@ async function smartRequest(config) {
   const needsResidential = isResidentialPreferred(targetUrl);
   const hasPhones = activePhonePool.length > 0;
 
-  // Direct fetch helper
-  const tryDirect = async () => {
-    return axios({
-      ...config,
-      timeout: Math.min(timeout, 6000),
-      validateStatus: (status) => status < 500
-    });
-  };
-
-  // If the target doesn't require residential IP and we want to try direct first:
+  // Try direct first if not residential preferred or no phone pool available
   if (!needsResidential || !hasPhones) {
     try {
-      const directRes = await tryDirect();
+      const directRes = await tryDirect(6000);
       const isCloudflareBlocked = directRes.status === 403 || directRes.status === 503 ||
         (typeof directRes.data === 'string' && (directRes.data.includes('Just a moment...') || directRes.data.includes('Cloudflare Ray ID')));
 
-      // Return immediately for successful responses or standard 404/400 (not a Cloudflare block!)
       if (!isCloudflareBlocked) {
         return directRes;
       }
-      console.log(`🛡️ [SmartFetcher] Direct request to ${targetUrl} hit Cloudflare check (${directRes.status}). Routing through residential phone...`);
+      console.log(`🛡️ [SmartFetcher] Cloudflare WAF on direct ${targetUrl} (${directRes.status}). Routing via phone pool...`);
     } catch (e) {
       if (!hasPhones) throw e;
     }
@@ -172,9 +244,9 @@ async function smartRequest(config) {
             url: targetUrl,
             method,
             headers,
-            data: config.data
+            data: cfg.data
           },
-          timeout: 3000,
+          timeout: 4000,
           validateStatus: (status) => status < 500
         });
 
@@ -193,7 +265,8 @@ async function smartRequest(config) {
 
   // Final fallback: execute direct
   return axios({
-    ...config,
+    ...cfg,
+    url: targetUrl,
     timeout,
   });
 }
@@ -201,7 +274,15 @@ async function smartRequest(config) {
 // Create smart Axios instance drop-in
 const smartAxios = new Proxy(axios, {
   apply(target, thisArg, argArray) {
-    return smartRequest(argArray[0]);
+    const arg0 = argArray[0];
+    const arg1 = argArray[1] || {};
+    let cfg = {};
+    if (typeof arg0 === 'string') {
+      cfg = { ...arg1, url: arg0, method: arg1.method || 'get' };
+    } else if (arg0 && typeof arg0 === 'object') {
+      cfg = { ...arg0 };
+    }
+    return smartRequest(cfg);
   },
   get(target, propKey) {
     if (propKey === 'get') {
@@ -209,6 +290,12 @@ const smartAxios = new Proxy(axios, {
     }
     if (propKey === 'post') {
       return (url, data, config = {}) => smartRequest({ ...config, method: 'post', url, data });
+    }
+    if (propKey === 'head') {
+      return (url, config = {}) => smartRequest({ ...config, method: 'head', url });
+    }
+    if (propKey === 'delete') {
+      return (url, config = {}) => smartRequest({ ...config, method: 'delete', url });
     }
     return target[propKey];
   }
