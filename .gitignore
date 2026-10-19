@@ -11,9 +11,12 @@ scratch/
 node_modules
 dist
 dist-ssr
-*.local
+# Server runtime data
+server/data/*.json
+desktop-runner/server/data/*.json
 
 # Built binaries - don't push large files
+
 release/
 *.AppImage
 *.deb

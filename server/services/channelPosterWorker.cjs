@@ -1,17 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const { smartAxios } = require('./smartFetcher.cjs');
 const domainResolver = require('./domainResolver.cjs');
 const zendaEngine = require('./zendaEngine.cjs');
 
 /**
- * ⚡ 24/7 Rapid Channel Auto-Poster & Archive Backfill Worker
- * ----------------------------------------------------------
- * 1. Keeps Render active 24/7 (no sleep/inactivity).
- * 2. Crawls both latest releases (Page 1) and historical archives (Page 2, 3, 4...).
- * 3. Formats rich media cards with posters, synopsis, quality badges, and direct bot buttons.
- * 4. Respects Telegram rate limits with a safe 35-second cadence.
+ * ⚡ Continuous Channel Auto-Poster & Bulk Archive Crawler Worker
+ * -------------------------------------------------------------
+ * 1. Crawls all enabled extensions and websites in bulk with NO limit.
+ * 2. Pushes every movie, series, and episode directly into the Telegram channel.
+ * 3. Handles automatic 429 backoff and fallback to text message if poster image fails.
+ * 4. Advances archive page cursors so the entire catalog is backfilled without duplicates.
  */
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '8887103348:AAFYcYbWEm8adSF4fpLUcUliJKTmqGxvEe4';
@@ -25,6 +24,50 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const HISTORY_FILE = path.join(DATA_DIR, 'posted_history.json');
 const CURSOR_FILE = path.join(DATA_DIR, 'archive_cursors.json');
+
+// In-memory set for O(1) deduplication
+let historySet = null;
+
+function loadHistory() {
+  if (historySet) return historySet;
+  if (fs.existsSync(HISTORY_FILE)) {
+    try {
+      const arr = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+      if (Array.isArray(arr)) {
+        historySet = new Set(arr);
+        return historySet;
+      }
+    } catch (_) {}
+  }
+  historySet = new Set();
+  return historySet;
+}
+
+let saveHistoryTimeout = null;
+function recordHistory(key) {
+  loadHistory().add(key);
+  if (!saveHistoryTimeout) {
+    saveHistoryTimeout = setTimeout(() => {
+      saveHistoryTimeout = null;
+      try {
+        const arr = Array.from(historySet);
+        const trimmed = arr.length > 25000 ? arr.slice(-25000) : arr;
+        fs.writeFileSync(HISTORY_FILE, JSON.stringify(trimmed), 'utf8');
+      } catch (_) {}
+    }, 2000);
+  }
+}
+
+function getCursors() {
+  if (fs.existsSync(CURSOR_FILE)) {
+    try { return JSON.parse(fs.readFileSync(CURSOR_FILE, 'utf8')); } catch (_) {}
+  }
+  return {};
+}
+
+function saveCursors(cursors) {
+  try { fs.writeFileSync(CURSOR_FILE, JSON.stringify(cursors, null, 2), 'utf8'); } catch (_) {}
+}
 
 // Dynamic Provider Pool (Synced from Cloudflare D1 /api/bot-providers)
 let dynamicBotProviders = [];
@@ -43,32 +86,7 @@ async function getLiveBotProviders() {
       return dynamicBotProviders;
     }
   } catch (_) {}
-  return dynamicBotProviders.length > 0 ? dynamicBotProviders : ['vega', 'hdhub4u', '4khdhub', 'movieBoxWeb', 'drive', 'autoEmbed'];
-}
-
-function getHistory() {
-  if (fs.existsSync(HISTORY_FILE)) {
-    try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch (_) {}
-  }
-  return [];
-}
-
-function saveHistory(history) {
-  try {
-    if (history.length > 5000) history = history.slice(-5000);
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
-  } catch (_) {}
-}
-
-function getCursors() {
-  if (fs.existsSync(CURSOR_FILE)) {
-    try { return JSON.parse(fs.readFileSync(CURSOR_FILE, 'utf8')); } catch (_) {}
-  }
-  return {};
-}
-
-function saveCursors(cursors) {
-  try { fs.writeFileSync(CURSOR_FILE, JSON.stringify(cursors, null, 2), 'utf8'); } catch (_) {}
+  return dynamicBotProviders.length > 0 ? dynamicBotProviders : ['drive', 'hdhub4u', '4khdhub', 'movieBoxWeb', 'vega', 'moviesmod', 'topmovies', 'katmoviehd'];
 }
 
 function escapeHtml(str) {
@@ -79,13 +97,40 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 async function tgCall(method, payload) {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
   try {
     const res = await axios.post(url, payload, { timeout: 15000 });
     return res.data;
   } catch (err) {
-    console.error(`[Poster TG Error ${method}]:`, err.response?.data?.description || err.message);
+    const retryAfter = err.response?.data?.parameters?.retry_after;
+    if (retryAfter) {
+      console.warn(`⏳ [AutoPoster] Telegram 429 Rate Limit. Sleeping ${retryAfter + 1}s...`);
+      await sleep((retryAfter + 1) * 1000);
+      try {
+        const retryRes = await axios.post(url, payload, { timeout: 15000 });
+        return retryRes.data;
+      } catch (_) {}
+    }
+
+    // If sendPhoto failed (e.g. hotlink blocked, broken image URL, size exceeded), fallback to sendMessage
+    if (method === 'sendPhoto') {
+      try {
+        const fallbackRes = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          chat_id: payload.chat_id,
+          text: payload.caption || payload.text,
+          parse_mode: 'HTML',
+          reply_markup: payload.reply_markup
+        }, { timeout: 15000 });
+        return fallbackRes.data;
+      } catch (fbErr) {
+        console.error(`[AutoPoster Fallback Error]:`, fbErr.response?.data?.description || fbErr.message);
+      }
+    }
+
+    console.error(`[AutoPoster TG Error ${method}]:`, err.response?.data?.description || err.message);
     return null;
   }
 }
@@ -104,7 +149,6 @@ async function postCardToChannel(item, providerKey) {
     .slice(0, 30);
 
   const botUsername = 'cinemaisherebtw_bot';
-  // Deep link directly to this provider's item
   const botDeepLink = `https://t.me/${botUsername}?start=p_arch_${providerKey}_${encodeURIComponent(titleParam)}`;
 
   let text = `🎬 <b>${escapeHtml(item.title)}</b>\n\n`;
@@ -141,11 +185,10 @@ async function postCardToChannel(item, providerKey) {
   });
 }
 
-let currentProviderIndex = 0;
 let isJobRunning = false;
 
-// Crawl single page and post 1-2 new/old releases
-async function processNextBatch() {
+// Crawl all enabled providers and push EVERYTHING in bulk with no limit
+async function processBulkBatch() {
   if (isJobRunning) return;
   isJobRunning = true;
 
@@ -156,77 +199,104 @@ async function processNextBatch() {
       return;
     }
 
-    currentProviderIndex = currentProviderIndex % enabled.length;
-    const provKey = enabled[currentProviderIndex];
-    currentProviderIndex = (currentProviderIndex + 1) % enabled.length;
-
     const cursors = getCursors();
-    const history = getHistory();
+    loadHistory();
 
-    const currentPage = cursors[provKey] || 1;
+    console.log(`📢 [AutoPoster Bulk] Starting bulk crawl across ${enabled.length} enabled extensions: ${enabled.join(', ')}`);
 
-    // Fetch posts using zendaEngine & smartAxios
-    let posts = [];
-    try {
-      const manifest = await domainResolver.getResolvedManifest();
-      const provInfo = manifest.find(p => p.value === provKey);
-      if (provInfo && provInfo.postsScript) {
-        posts = await zendaEngine.getPosts(provKey, provInfo.postsScript, { page: currentPage, filter: '' });
+    for (const provKey of enabled) {
+      const currentPage = cursors[provKey] || 1;
+      let posts = [];
+
+      try {
+        const mod = await zendaEngine.loadModule(provKey, 'posts');
+        if (!mod || typeof mod.getPosts !== 'function') {
+          continue;
+        }
+
+        const ctx = zendaEngine.getProviderContext(provKey);
+        posts = await mod.getPosts({
+          page: currentPage,
+          filter: '',
+          providerValue: provKey,
+          providerContext: ctx,
+          signal: new AbortController().signal
+        });
+      } catch (err) {
+        console.warn(`[AutoPoster Bulk] Error fetching ${provKey} page ${currentPage}:`, err.message);
       }
-    } catch (e) {
-      // If error on this provider, continue next cycle
-    }
 
-    if (!Array.isArray(posts) || posts.length === 0) {
-      // If page had no posts, loop back to page 1
-      cursors[provKey] = 1;
+      if (!Array.isArray(posts) || posts.length === 0) {
+        // If page has no posts and was beyond page 1, reset back to page 1 for new releases
+        if (currentPage > 1) {
+          cursors[provKey] = 1;
+          saveCursors(cursors);
+        }
+        continue;
+      }
+
+      console.log(`📢 [AutoPoster Bulk] Found ${posts.length} posts on ${provKey} [Page ${currentPage}]. Posting unposted items...`);
+
+      let provPosted = 0;
+      for (const post of posts) {
+        if (!post.title || !post.link) continue;
+        const key = `${provKey}:${post.link}`;
+
+        if (historySet.has(key)) continue;
+
+        const res = await postCardToChannel(post, provKey);
+        if (res?.ok) {
+          recordHistory(key);
+          provPosted++;
+          console.log(`📢 [AutoPoster Bulk] Posted "${post.title}" [${provKey} | Page ${currentPage}]`);
+          // Telegram channel rate-limit spacing (~1.2s between posts)
+          await sleep(1200);
+        }
+      }
+
+      // Advance to next archive page so older movies & shows continue getting pushed
+      cursors[provKey] = currentPage + 1;
       saveCursors(cursors);
-      isJobRunning = false;
-      return;
+
+      console.log(`✅ [AutoPoster Bulk] Finished ${provKey} [Page ${currentPage}]: ${provPosted} new items posted. Advanced to Page ${currentPage + 1}.`);
     }
-
-    let postedCount = 0;
-    for (const post of posts) {
-      if (!post.title || !post.link) continue;
-      const key = `${provKey}:${post.link}`;
-
-      if (history.includes(key)) continue;
-
-      const res = await postCardToChannel(post, provKey);
-      if (res?.ok) {
-        history.push(key);
-        saveHistory(history);
-        postedCount++;
-        console.log(`📢 [AutoPoster 24/7] Posted "${post.title}" [${provKey} | Page ${currentPage}]`);
-        // Telegram rate-limit safety gap between messages
-        await new Promise(r => setTimeout(r, 1200));
-        if (postedCount >= 2) break; // Post up to 2 per 35-sec tick
-      }
-    }
-
-    // Advance archive page cursor so older movies/shows are crawled on next cycle
-    cursors[provKey] = currentPage + 1;
-    saveCursors(cursors);
 
   } catch (err) {
-    console.warn('[AutoPoster 24/7] Loop notice:', err.message);
+    console.warn('[AutoPoster Bulk] Loop notice:', err.message);
   } finally {
     isJobRunning = false;
   }
 }
 
+let workerStarted = false;
+
 function start247AutoPoster() {
-  console.log('🚀 [AutoPoster 24/7] Continuous Channel Archive & New Release Poster Started!');
+  if (workerStarted) return;
+  workerStarted = true;
+
+  console.log('🚀 [AutoPoster 24/7] Continuous Bulk Channel Poster Initialized!');
   console.log(`📢 Target Channel: ${CHANNEL_ID}`);
-  console.log(`⏱️ Cadence: Active every 35 seconds (24/7 Render Keep-Alive active)`);
+  console.log(`⚡ Mode: UNLIMITED BULK POSTING across ALL enabled extensions`);
 
-  // Initial post after 5 seconds
-  setTimeout(processNextBatch, 5000);
+  // Start continuous loop
+  (async () => {
+    // Initial delay to allow network and providers to initialize
+    await sleep(4000);
 
-  // Rapid recurring tick every 35 seconds
-  setInterval(processNextBatch, 35000);
+    while (true) {
+      try {
+        await processBulkBatch();
+      } catch (loopErr) {
+        console.error('[AutoPoster Bulk Loop Error]:', loopErr.message);
+      }
+      // Brief 5-second rest between full-pool sweeps
+      await sleep(5000);
+    }
+  })();
 }
 
 module.exports = {
-  start247AutoPoster
+  start247AutoPoster,
+  processBulkBatch,
+  postCardToChannel
 };

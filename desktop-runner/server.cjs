@@ -766,4 +766,15 @@ app.get('/api/image-proxy', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🎬 Zenda-Cross Real Cinema Engine running on http://0.0.0.0:${PORT}`);
+
+  // Start 24/7 Bulk Channel Auto-Poster when Node Runner is on
+  if (process.env.ENABLE_AUTO_POSTER !== 'false') {
+    try {
+      const { start247AutoPoster } = require('./server/services/channelPosterWorker.cjs');
+      start247AutoPoster();
+    } catch (err) {
+      console.warn('AutoPoster startup notice:', err.message);
+    }
+  }
 });
+
