@@ -79,8 +79,47 @@ class DomainResolver {
       topmovies: 'https://moviesleech.club',
       uhdmovies: 'https://uhdmovies.us.org',
       uhd: 'https://uhdmovies.us.org',
+      cinemaluxe: 'https://cinemaluxe.one',
       extramovies: 'https://extramovies.ist',
       extra: 'https://extramovies.ist',
+      bollyflix: 'https://bollyflix.vip',
+      moviesflix: 'https://moviesflix.is',
+      world4ufree: 'https://world4ufree.vet',
+      world4u: 'https://world4ufree.vet',
+      skymovieshd: 'https://skymovieshd.ink',
+      luxmovies: 'https://luxmovies.link',
+      eonmovies: 'https://eonmovies.ink',
+      cinevood: 'https://1cinevood.lol',
+      '1cinevood': 'https://1cinevood.lol',
+      movies4u: 'https://movies4u.vip',
+      filmyfly: 'https://filmyfly.mov',
+      moviezwap: 'https://moviezwap.org',
+      zeefliz: 'https://zeefliz.ink',
+
+      // Hollywood & OTT Series
+      showbox: 'https://officialmoviebox.com',
+      gokuhd: 'https://goku.sx',
+      goku: 'https://goku.sx',
+      protonmovies: 'https://protonmovies.lat',
+      ridomovies: 'https://ridomovies.tv',
+      flixhq: 'https://flixhq.to',
+
+      // Anime & Asian Drama
+      hianime: 'https://hianime.to',
+      kisskh: 'https://kisskh.co',
+      gogoanime: 'https://anitaku.so',
+      animerulz: 'https://animerulz.cc',
+      animesalt: 'https://animesalt.cc',
+      animeworld: 'https://animeworld.ac',
+      anikoto: 'https://anikoto.com',
+      dramacool: 'https://dramacool.ch',
+      kickassanime: 'https://kickassanime.mx',
+
+      // Torrents
+      thepiratebay: 'https://thepiratebay.org',
+      tpb: 'https://thepiratebay.org',
+      yts: 'https://yts.mx',
+      '1337x': 'https://1337x.to',
     };
 
     return FALLBACK_DOMAINS[key] || '';
