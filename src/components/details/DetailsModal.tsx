@@ -498,7 +498,11 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       }
 
       if (chosen) {
-        onPlayStream(chosen, displayTitle, list && list.length > 0 ? list : undefined, details?.backdrop, details?.poster, details?.runtime);
+        if (defaultPlayer && defaultPlayer !== "web" && onPlayExternal) {
+          onPlayExternal(chosen, defaultPlayer, displayTitle);
+        } else {
+          onPlayStream(chosen, displayTitle, list && list.length > 0 ? list : undefined, details?.backdrop, details?.poster, details?.runtime);
+        }
       }
     } catch (err) {
       console.warn("Play release resolution error:", err);

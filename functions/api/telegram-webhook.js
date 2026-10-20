@@ -591,7 +591,22 @@ function formatEpisodeButtonLabel(rawTitle, epCount, rawQuality = '', groupIndex
   else if (/punjabi/i.test(combined)) lang = 'Punjabi';
   else if (/tamil/i.test(combined)) lang = 'Tamil';
   else if (/telugu/i.test(combined)) lang = 'Telugu';
-  else if (/english/i.test(combined)) lang = 'Eng';
+  else if (/kannada/i.test(combined)) lang = 'Kannada';
+  else if (/malayalam/i.test(combined)) lang = 'Malayalam';
+  else if (/bengali/i.test(combined)) lang = 'Bengali';
+  else if (/marathi/i.test(combined)) lang = 'Marathi';
+  else if (/original\s*audio|original|orig/i.test(combined)) lang = 'Original';
+  else if (/english|\beng\b/i.test(combined)) lang = 'English';
+  else if (/spanish|español/i.test(combined)) lang = 'Spanish';
+  else if (/french|français/i.test(combined)) lang = 'French';
+  else if (/german|deutsch/i.test(combined)) lang = 'German';
+  else if (/japanese|nihongo/i.test(combined)) lang = 'Japanese';
+  else if (/korean/i.test(combined)) lang = 'Korean';
+  else if (/russian/i.test(combined)) lang = 'Russian';
+  else if (/portuguese/i.test(combined)) lang = 'Portuguese';
+  else if (/arabic/i.test(combined)) lang = 'Arabic';
+  else if (/turkish/i.test(combined)) lang = 'Turkish';
+  else if (dubStr) lang = dubStr.replace(/\s*dub/i, '').trim();
 
   let size = '';
   const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
@@ -602,9 +617,26 @@ function formatEpisodeButtonLabel(rawTitle, epCount, rawQuality = '', groupIndex
   if (lang) parts.push(lang);
   if (res) parts.push(res);
 
-  let main = parts.join(' • ') || (season || (epCount > 0 ? `Season ${groupIndex + 1}` : `Quality ${groupIndex + 1}`));
+  let main = '';
+  if (parts.length > 1) {
+    main = parts.join(' • ');
+  } else if (parts.length === 1 && lang) {
+    main = season ? `${season} • ${lang}` : lang;
+  } else if (res) {
+    main = season ? `${season} • ${res}` : res;
+  } else {
+    // If only season was found or neither, DO NOT JUST RETURN S1!
+    const cleanRaw = str
+      .replace(/season\s*\d+/gi, '')
+      .replace(/s\d+/gi, '')
+      .replace(/[-:·|–—\[\]()]/g, ' ')
+      .trim();
+    const fallbackDesc = cleanRaw || (rawQuality ? rawQuality : `Option ${groupIndex + 1}`);
+    main = season ? `${season} • ${fallbackDesc}` : fallbackDesc;
+  }
+
   if (size) main += ` [${size}]`;
-  if (epCount > 0 && !main.includes(season)) main += ` (${epCount} Eps)`;
+  if (epCount > 0 && !main.includes('Eps') && !main.includes(season)) main += ` (${epCount} Eps)`;
 
   if (main.length > 26) main = main.slice(0, 25) + '…';
   return main;
@@ -1736,9 +1768,21 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     const info = sqData.link || {};
     const seasonNum = info.seasonNum || 1;
-    const seasonGroups = info.groups || [];
+    let seasonGroups = [...(info.groups || [])];
     const seriesTitle = info.seriesTitle || sqData.title;
     const cleanSeries = sanitizeCleanTitle(seriesTitle);
+
+    // Prioritize Indian dubs (Hindi, Dual, Tamil, Telugu), then Original/English, then other dubs
+    seasonGroups.sort((a, b) => {
+      const getScore = (g) => {
+        const t = `${g.title || ''} ${g.dub || ''} ${g.language || ''}`.toLowerCase();
+        if (t.includes('hindi') || t.includes('dual')) return 1;
+        if (t.includes('tamil') || t.includes('telugu') || t.includes('punjabi') || t.includes('malayalam')) return 2;
+        if (t.includes('original') || t.includes('orig') || t.includes('english') || t.includes('eng')) return 3;
+        return 10;
+      };
+      return getScore(a) - getScore(b);
+    });
 
     let text = `🎬 <b>${escapeHtml(cleanSeries)} • Season ${seasonNum}</b>\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━━\n`;

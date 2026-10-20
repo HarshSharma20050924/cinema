@@ -436,9 +436,13 @@ export default function App() {
   const [loadingStreams, setLoadingStreams] = useState(false);
 
   // Video Playback & Download Manager State
-  const [playbackUrl, setPlaybackUrl] = useState<string | null>(
-    initialNavState?.playbackUrl || null
-  );
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("play");
+      if (p) return p;
+    }
+    return initialNavState?.playbackUrl || null;
+  });
   const [playerModalState, setPlayerModalState] = useState<{
     url: string;
     title: string;
@@ -446,7 +450,19 @@ export default function App() {
     poster?: string;
     servers?: StreamItem[];
     runtime?: string | number;
-  } | null>(null);
+  } | null>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("play");
+      const t = new URLSearchParams(window.location.search).get("title") || "Cinema Stream";
+      if (p) {
+        return {
+          url: p,
+          title: t,
+        };
+      }
+    }
+    return null;
+  });
   const [downloadManagerOpen, setDownloadManagerOpen] = useState(false);
 
   // Cast / Person Details State & URL Hash Synchronization (e.g. #!/person/3223)

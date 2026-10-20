@@ -7,7 +7,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   cinemaName: "Cinema",
   providerSource: "Cinema",
   installedExtensions: ["hdhub4u", "vega", "4khdhub", "mod", "movieBoxWeb", "1cinevood", "autoEmbed", "katmovies", "world4u"],
-  defaultPlayer: "vlc",
+  defaultPlayer: "web",
   customPlayerScheme: "vlc://",
   isConfigured: false,
 };
@@ -169,7 +169,7 @@ export function useSettings() {
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
-          defaultPlayer: parsed.defaultPlayer === "web" ? "vlc" : (parsed.defaultPlayer || "vlc"),
+          defaultPlayer: parsed.defaultPlayer || "web",
           installedExtensions,
           cinemaName: "Cinema",
           isConfigured: true,

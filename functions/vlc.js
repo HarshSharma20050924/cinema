@@ -203,6 +203,7 @@ export async function onRequest(context) {
     function showToast() {
       copyToast.style.display = 'block';
       setTimeout(() => { copyToast.style.display = 'none'; }, 2000);
+    }
   </script>
 </body>
 </html>`;
