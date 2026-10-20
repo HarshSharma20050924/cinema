@@ -48,6 +48,17 @@ def generate_all_vega_logos():
         {"id": "cinemaluxe", "label": "CINEMALUXE"},
         {"id": "zeefliz", "label": "ZEEFLIZ"},
         {"id": "movies4u", "label": "MOVIES4U"},
+        {"id": "netflixMirror", "label": "NETFLIX"},
+        {"id": "disneyMirror", "label": "DISNEY+"},
+        {"id": "primeMirror", "label": "PRIME VIDEO"},
+        {"id": "castle", "label": "CASTLE"},
+        {"id": "mxplayer", "label": "MX PLAYER"},
+        {"id": "animesalt", "label": "ANIMESALT"},
+        # Category Bots
+        {"id": "bot_desi", "label": "CINEMAWOOD"},
+        {"id": "bot_series", "label": "OTT SERIES"},
+        {"id": "bot_4k", "label": "CINEMA 4K"},
+        {"id": "bot_anime", "label": "ANIME"}
     ]
 
     base_img = Image.open(base_logo_path).convert("RGBA")

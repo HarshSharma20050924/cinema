@@ -136,44 +136,57 @@ async function syncToCluster(url) {
   }
 }
 
-// 3. Automated Cloudflare Quick Tunnel Spawner
-function startTunnel(port) {
-  return new Promise((resolve) => {
-    if (currentPublicUrl) return resolve(currentPublicUrl);
+// 3. Automated Cloudflare Quick Tunnel Spawner with Auto-Reconnect Watchdog
+let activeCfProc = null;
 
-    console.log(`🚀 [Tunnel] Launching Cloudflare quick tunnel for port ${port}...`);
-    try {
-      const cf = spawn('cloudflared', ['tunnel', '--url', `http://127.0.0.1:${port}`], {
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
+function maintainTunnel(port) {
+  if (process.env.PUBLIC_URL) {
+    currentPublicUrl = process.env.PUBLIC_URL;
+    console.log(`📡 [Tunnel Configured] Using static PUBLIC_URL: ${currentPublicUrl}`);
+    syncToCluster(currentPublicUrl);
+    if (!heartbeatTimer) heartbeatTimer = setInterval(() => syncToCluster(currentPublicUrl), 25000);
+    return;
+  }
 
-      let resolved = false;
-      const onData = (chunk) => {
-        const text = chunk.toString();
-        const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
-        if (match && !resolved) {
-          resolved = true;
-          currentPublicUrl = match[0];
-          console.log(`\n🎉 [Tunnel Ready] Residential Node Live: ${currentPublicUrl}\n`);
-          resolve(currentPublicUrl);
-        }
-      };
+  console.log(`🚀 [Tunnel] Launching Cloudflare quick tunnel for port ${port}...`);
+  try {
+    const cf = spawn('cloudflared', ['tunnel', '--url', `http://127.0.0.1:${port}`], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    activeCfProc = cf;
 
-      cf.stdout.on('data', onData);
-      cf.stderr.on('data', onData);
+    const onData = (chunk) => {
+      const text = chunk.toString();
+      const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+      if (match && match[0] !== currentPublicUrl) {
+        currentPublicUrl = match[0];
+        console.log(`\n🎉 [Tunnel Ready] Residential Node Live: ${currentPublicUrl}\n`);
+        syncToCluster(currentPublicUrl);
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        heartbeatTimer = setInterval(() => syncToCluster(currentPublicUrl), 25000);
+      }
+    };
 
-      cf.on('error', (err) => {
-        console.warn(`[Tunnel Error] cloudflared not available: ${err.message}`);
-        if (!resolved) resolve(null);
-      });
+    cf.stdout.on('data', onData);
+    cf.stderr.on('data', onData);
 
-      setTimeout(() => {
-        if (!resolved) resolve(null);
-      }, 15000);
-    } catch (e) {
-      resolve(null);
-    }
-  });
+    cf.on('error', (err) => {
+      console.warn(`[Tunnel Error] cloudflared not available or error: ${err.message}`);
+    });
+
+    cf.on('close', (code) => {
+      console.warn(`⚠️ [Tunnel Closed] cloudflared disconnected (code ${code}). Re-establishing tunnel in 3s...`);
+      currentPublicUrl = '';
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+      setTimeout(() => maintainTunnel(port), 3000);
+    });
+  } catch (e) {
+    console.warn('[Tunnel Spawn Exception]:', e.message);
+    setTimeout(() => maintainTunnel(port), 5000);
+  }
 }
 
 // 4. Main Bootstrap
@@ -184,9 +197,5 @@ server.listen(PORT, async () => {
   console.log(`🔌 Local Port: ${PORT} (RAM: ~12MB, CPU: ~0.1%)`);
   console.log(`=======================================================`);
 
-  const tunnelUrl = await startTunnel(PORT);
-  if (tunnelUrl) {
-    await syncToCluster(tunnelUrl);
-    heartbeatTimer = setInterval(() => syncToCluster(tunnelUrl), 25000);
-  }
+  maintainTunnel(PORT);
 });

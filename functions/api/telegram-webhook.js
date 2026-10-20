@@ -1570,10 +1570,18 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     let loaderMsgId = null;
     if (data.startsWith('eps:')) {
+      const epTitle = cleanMediaTitle(groupDataObj?.seriesTitle || groupData.title || 'Series');
       const loadRes = await tgCall(token, 'sendMessage', {
         chat_id: chatId,
-        text: `📺 <b>Loading Episode List...</b>\n<i>Fetching episodes, please wait a moment...</i>`,
-        parse_mode: 'HTML'
+        text: `📺 <b>Loading Episode List...</b>\n` +
+          `🎬 <b>${escapeHtml(epTitle)}</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `<code>[■■■■■□□□□□] 50%</code>\n\n` +
+          `🛰️ <i>Extracting season episodes from catalog...</i>`,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [[{ text: '📺 Fetching Episodes • 50%', callback_data: 'noop' }]]
+        }
       });
       loaderMsgId = loadRes?.result?.message_id;
     }
@@ -1755,17 +1763,18 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
 
     const cleanTitle = cleanMediaTitle(item.title);
-    const initialLoader = `⚡ <b>Getting your stream ready...</b>\n` +
+    const initialLoader = `⚡ <b>Resolving Stream Links...</b>\n` +
       `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `⏳ <i>Finding the fastest playback links...</i>`;
+      `<code>[■■■□□□□□□□] 30%</code>\n\n` +
+      `🛰️ <i>Contacting resolver nodes & mirrors...</i>`;
 
     const waitMsg = await tgCall(token, 'sendMessage', {
       chat_id: chatId,
       text: initialLoader,
       parse_mode: 'HTML',
       reply_markup: {
-        inline_keyboard: [[{ text: '⏳ Preparing Links... Please Wait', callback_data: 'noop' }]]
+        inline_keyboard: [[{ text: '⚡ Resolving Sources • 30%', callback_data: 'noop' }]]
       }
     });
     const waitMsgId = waitMsg?.result?.message_id;
@@ -1809,30 +1818,53 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       return m;
     })();
 
-    // Dynamic animated stage 2 if extraction takes > 1.4s
-    const timerPromise = new Promise(resolve => setTimeout(resolve, 1400));
-    const raceRes = await Promise.race([
-      fetchPromise.then(res => ({ done: true, res })),
-      timerPromise.then(() => ({ done: false }))
-    ]);
+    // Progressive real visual progress bar updates while resolving
+    let progressTimer1 = null;
+    let progressTimer2 = null;
 
-    if (!raceRes.done && waitMsgId) {
-      await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
-      await tgCall(token, 'editMessageText', {
-        chat_id: chatId,
-        message_id: waitMsgId,
-        text: `⚡ <b>Almost ready...</b>\n` +
-          `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
-          `━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `🚀 <i>Verifying high-speed stream links for instant playback...</i>`,
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [[{ text: '✨ Almost Ready...', callback_data: 'noop' }]]
-        }
-      });
+    if (waitMsgId) {
+      progressTimer1 = setTimeout(async () => {
+        try {
+          await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
+          await tgCall(token, 'editMessageText', {
+            chat_id: chatId,
+            message_id: waitMsgId,
+            text: `⚡ <b>Extracting Stream Links...</b>\n` +
+              `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `<code>[■■■■■■□□□□] 65%</code>\n\n` +
+              `🔍 <i>Bypassing cloud mirrors & shortlinks...</i>`,
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [[{ text: '🚀 Fetching Mirrors • 65%', callback_data: 'noop' }]]
+            }
+          });
+        } catch (_) {}
+      }, 1100);
+
+      progressTimer2 = setTimeout(async () => {
+        try {
+          await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
+          await tgCall(token, 'editMessageText', {
+            chat_id: chatId,
+            message_id: waitMsgId,
+            text: `⚡ <b>Finalizing Stream...</b>\n` +
+              `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `<code>[■■■■■■■■■□] 90%</code>\n\n` +
+              `✨ <i>Verifying high-speed 1080p/720p stream links...</i>`,
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [[{ text: '✨ Verifying Streams • 90%', callback_data: 'noop' }]]
+            }
+          });
+        } catch (_) {}
+      }, 2300);
     }
 
-    const mirrors = raceRes.done ? raceRes.res : await fetchPromise;
+    const mirrors = await fetchPromise;
+    if (progressTimer1) clearTimeout(progressTimer1);
+    if (progressTimer2) clearTimeout(progressTimer2);
 
     const uniqueMap = new Map();
     (mirrors || []).forEach(s => {
@@ -1882,6 +1914,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     let resMsg = `🎬 <b>${escapeHtml(cleanTitle)}</b>\n`;
     resMsg += `🌐 <b>Source:</b> <b>${escapeHtml(item.provider ? item.provider.toUpperCase() : 'CINEMA')}</b>\n`;
     resMsg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    resMsg += `<code>[■■■■■■■■■■] 100% Ready</code>\n\n`;
     resMsg += `<i>Choose your preferred option below to play in VLC or download:</i>\n`;
 
     // Deduplicate mirrors and pair VLC + Download symmetrically
