@@ -97,17 +97,25 @@ export async function onRequest(context) {
     }
 
     const candidates = [];
-    if (backendUrl && /^https?:\/\//i.test(backendUrl)) {
-      candidates.push(backendUrl.replace(/\/+$/, ''));
-    }
     if (Array.isArray(pool)) {
-      for (const item of pool) {
+      const sorted = [...pool].sort((a, b) => {
+        if (a?.deviceId === 'server_local_dev') return -1;
+        if (b?.deviceId === 'server_local_dev') return 1;
+        if (a?.isPrimary && !b?.isPrimary) return -1;
+        if (!a?.isPrimary && b?.isPrimary) return 1;
+        return (b?.lastSeen || 0) - (a?.lastSeen || 0);
+      });
+      for (const item of sorted) {
         const u = typeof item === 'string' ? item : item?.url;
         if (u && /^https?:\/\//i.test(u)) {
           const clean = u.replace(/\/+$/, '');
           if (!candidates.includes(clean)) candidates.push(clean);
         }
       }
+    }
+    if (backendUrl && /^https?:\/\//i.test(backendUrl)) {
+      const clean = backendUrl.replace(/\/+$/, '');
+      if (!candidates.includes(clean)) candidates.push(clean);
     }
     return candidates;
   }
@@ -121,10 +129,11 @@ export async function onRequest(context) {
       try {
         const tunnelDownloadUrl = `${backendUrl}/api/download?url=${encodeURIComponent(targetUrl)}&filename=${encodeURIComponent(safeFilename)}&referer=${encodeURIComponent(refererHeader)}&origin=${encodeURIComponent(originHeader)}`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 18000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
+        const reqMethod = request.method === 'HEAD' ? 'HEAD' : 'GET';
         const tunnelResp = await fetch(tunnelDownloadUrl, {
-          method: 'GET',
+          method: reqMethod,
           headers: forwardHeaders,
           signal: controller.signal,
         });
@@ -144,7 +153,7 @@ export async function onRequest(context) {
           }
           responseHeaders.set('Content-Disposition', `attachment; filename="${safeFilename}"`);
           responseHeaders.set('Access-Control-Allow-Origin', '*');
-          return new Response(tunnelResp.body, {
+          return new Response(request.method === 'HEAD' ? null : tunnelResp.body, {
             status: tunnelResp.status,
             headers: responseHeaders,
           });
@@ -161,8 +170,9 @@ export async function onRequest(context) {
   }
 
   try {
+    const reqMethod = request.method === 'HEAD' ? 'HEAD' : 'GET';
     const upstream = await fetch(targetUrl, {
-      method: 'GET',
+      method: reqMethod,
       headers: forwardHeaders,
     });
 
@@ -188,7 +198,7 @@ export async function onRequest(context) {
     responseHeaders.set('Content-Disposition', `attachment; filename="${safeFilename}"`);
     responseHeaders.set('Access-Control-Allow-Origin', '*');
 
-    return new Response(upstream.body, {
+    return new Response(request.method === 'HEAD' ? null : upstream.body, {
       status: upstream.status,
       headers: responseHeaders,
     });

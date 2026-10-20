@@ -6,8 +6,9 @@ let currentPublicUrl = process.env.PUBLIC_URL || '';
 async function syncToCluster(url) {
   if (!url) return;
   const cleanUrl = url.replace(/\/+$/, '');
-  const deviceId = process.env.DEVICE_ID || 'server_247_cloud';
-  const deviceName = process.env.DEVICE_NAME || '24/7 Cloud Engine (WARP Edge)';
+  const isCloudHost = Boolean(process.env.RENDER_EXTERNAL_URL || process.env.SPACE_HOST);
+  const deviceId = process.env.DEVICE_ID || (isCloudHost ? 'server_247_cloud' : 'server_local_dev');
+  const deviceName = process.env.DEVICE_NAME || (isCloudHost ? '24/7 Cloud Engine (WARP Edge)' : 'Antigravity Local Engine');
 
   try {
     const resp = await fetch('https://cinema-dwh.pages.dev/api/tunnel-sync', {
@@ -18,10 +19,11 @@ async function syncToCluster(url) {
         secret: 'cinema_secret_2026',
         deviceId,
         deviceName,
+        isPrimary: !isCloudHost,
       }),
     });
     const data = await resp.json().catch(() => ({}));
-    console.log(`[24/7 Server] Cloudflare cluster synced: ${cleanUrl}`, data?.ok ? '✅' : '');
+    console.log(`[24/7 Server] Cloudflare cluster synced: ${cleanUrl} (${deviceId})`, data?.success ? '✅' : '');
   } catch (e) {
     console.warn('[24/7 Server] Cluster sync notice:', e.message);
   }

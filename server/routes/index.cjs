@@ -5,6 +5,7 @@ const { getPosts, searchPosts, globalSearch } = require("../controllers/postsCon
 const { getMeta } = require("../controllers/metaController.cjs");
 const { getStreams } = require("../controllers/streamController.cjs");
 const { getRatings } = require("../controllers/ratingsController.cjs");
+const { getEpisodes } = require("../controllers/episodesController.cjs");
 const { proxyStream, downloadFile, getPlaylistM3u } = require("../controllers/proxyController.cjs");
 const { getPoster, proxyImage } = require("../controllers/posterController.cjs");
 const { getLetterboxdFilms } = require("../controllers/letterboxdController.cjs");
@@ -19,6 +20,7 @@ router.get("/search", searchPosts);
 router.get("/search/global", globalSearch);
 router.get("/global-search", globalSearch);
 router.get("/meta", getMeta);
+router.get("/episodes", getEpisodes);
 router.get("/ratings", getRatings);
 router.get("/letterboxd", getLetterboxdFilms);
 router.get("/letterboxd/films", getLetterboxdFilms);

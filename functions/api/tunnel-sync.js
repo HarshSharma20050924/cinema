@@ -74,6 +74,8 @@ export async function onRequestPost(context) {
       (deviceId || "").toLowerCase().includes("relay") ||
       (deviceId || "").startsWith("phone_jiophone");
 
+    const devKey = deviceId || (cleanUrl.includes("trycloudflare.com") ? cleanUrl : "server_cloud");
+
     // Handle Residential Proxy Relays separately from full API backends
     if (isRelay) {
       let relayPool = [];
@@ -101,18 +103,35 @@ export async function onRequestPost(context) {
       });
     }
 
+    const isLocalDev = deviceId === "server_local_dev";
+    const isPrimary = isLocalDev || (body?.isPrimary ?? (!cleanUrl.includes("trycloudflare.com")));
+
+    const entry = {
+      deviceId: devKey,
+      deviceName: deviceName || "Cloud Backend",
+      url: cleanUrl,
+      lastSeen: now,
+      isPrimary
+    };
+
+    const existingIdx = pool.findIndex(p => p.deviceId === devKey || p.url === cleanUrl);
     if (existingIdx >= 0) {
       pool[existingIdx] = entry;
     } else {
       pool.push(entry);
     }
 
-    // Sort by freshest lastSeen first
-    pool.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+    // Sort: server_local_dev first, then primary, then newest lastSeen
+    pool.sort((a, b) => {
+      if (a?.deviceId === 'server_local_dev' && b?.deviceId !== 'server_local_dev') return -1;
+      if (b?.deviceId === 'server_local_dev' && a?.deviceId !== 'server_local_dev') return 1;
+      if (a?.isPrimary && !b?.isPrimary) return -1;
+      if (!a?.isPrimary && b?.isPrimary) return 1;
+      return (b.lastSeen || 0) - (a.lastSeen || 0);
+    });
 
-    // The dedicated 24/7 backend is Render. Temporary trycloudflare tunnels must NEVER hijack BACKEND_URL!
-    const RENDER_PRIMARY = "https://cinema-4h7t.onrender.com";
-    const primaryUrl = cleanUrl.includes("trycloudflare.com") ? RENDER_PRIMARY : cleanUrl;
+    const primaryEntry = pool.find(p => p.deviceId === 'server_local_dev') || pool.find(p => p.isPrimary) || pool[0];
+    const primaryUrl = primaryEntry?.url || cleanUrl;
 
     // Persist to D1 database (100k daily writes free!)
     if (env?.cinema_db) {

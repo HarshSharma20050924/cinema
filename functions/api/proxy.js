@@ -78,7 +78,14 @@ export async function onRequest(context) {
           if (poolRow?.value) {
             const pool = JSON.parse(poolRow.value);
             if (Array.isArray(pool)) {
-              for (const p of pool) {
+              const sorted = [...pool].sort((a, b) => {
+                if (a?.deviceId === 'server_local_dev') return -1;
+                if (b?.deviceId === 'server_local_dev') return 1;
+                if (a?.isPrimary && !b?.isPrimary) return -1;
+                if (!a?.isPrimary && b?.isPrimary) return 1;
+                return (b?.lastSeen || 0) - (a?.lastSeen || 0);
+              });
+              for (const p of sorted) {
                 const u = typeof p === 'string' ? p : p?.url;
                 if (u && !candidates.includes(u)) candidates.push(u);
               }
@@ -104,19 +111,25 @@ export async function onRequest(context) {
               }
             }
           }
+          const backendUrl = await env.CINEMA_KV.get('BACKEND_URL').catch?.(() => null);
+          if (backendUrl && !candidates.includes(backendUrl)) candidates.push(backendUrl);
         } catch (_) {}
-        const backendUrl = await env.CINEMA_KV.get('BACKEND_URL').catch?.(() => null);
-        if (backendUrl && !candidates.includes(backendUrl)) candidates.push(backendUrl);
       }
 
+      let lastDebug = '';
       for (const nodeUrl of candidates) {
         try {
           const cleanNode = nodeUrl.replace(/\/+$/, '');
           const tunnelUrl = `${cleanNode}/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererHeader)}`;
+          const controller = new AbortController();
+          const timerId = setTimeout(() => controller.abort(), 6000);
           const tunnelResp = await fetch(tunnelUrl, {
             method: request.method,
             headers: forwardHeaders,
+            signal: controller.signal,
           });
+          clearTimeout(timerId);
+          lastDebug += `[${cleanNode}: ${tunnelResp.status}] `;
           if (tunnelResp.ok || tunnelResp.status === 206) {
             const respHeaders = new Headers();
             for (const key of ['Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges', 'Last-Modified', 'ETag']) {
@@ -126,18 +139,33 @@ export async function onRequest(context) {
             respHeaders.set('Access-Control-Allow-Origin', '*');
             respHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
             respHeaders.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
-            return new Response(tunnelResp.body, {
+            const respBody = request.method === 'HEAD' ? null : tunnelResp.body;
+            return new Response(respBody, {
               status: tunnelResp.status,
               headers: respHeaders,
             });
           }
-        } catch (_) {}
+        } catch (e) {
+          lastDebug += `[${nodeUrl}: err ${e.message}] `;
+        }
+      }
+      if (lastDebug) {
+        return new Response(JSON.stringify({ error: 'Tunnel candidates failed', candidates, debug: lastDebug }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
       }
     } catch (_) {}
     return null;
   }
 
-  // 1. Try direct fetch first with authentic headers (handles MovieBox CDN directly)
+  // MovieBox CDN blocks datacenter/Cloudflare IPs with 427, fetch via tunnel directly
+  if (isMovieBox) {
+    const tunnelResult = await fetchViaTunnel();
+    if (tunnelResult) return tunnelResult;
+  }
+
+  // 1. Try direct fetch first with authentic headers (handles non-blocked CDNs)
   try {
     const upstream = await fetch(targetUrl, {
       method: request.method,

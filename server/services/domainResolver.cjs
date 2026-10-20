@@ -103,6 +103,11 @@ class DomainResolver {
       protonmovies: 'https://protonmovies.lat',
       ridomovies: 'https://ridomovies.tv',
       flixhq: 'https://flixhq.to',
+      netflixmirror: 'https://net52.cc',
+      disneymirror: 'https://net52.cc',
+      primemirror: 'https://net52.cc',
+      castle: 'https://castletv.xyz',
+      mxplayer: 'https://www.mxplayer.in',
 
       // Anime & Asian Drama
       hianime: 'https://hianime.to',

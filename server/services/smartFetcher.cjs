@@ -98,6 +98,10 @@ async function syncPhonePool() {
     const valid = [];
 
     for (const item of pool) {
+      const devId = item?.deviceId || '';
+      if (devId.startsWith('server_') || devId === 'server_local_dev' || devId === 'server_247_cloud') {
+        continue;
+      }
       const u = typeof item === 'string' ? item : item?.url;
       if (u && /^https?:\/\//i.test(u) && !u.includes('pages.dev') && !u.includes('onrender.com')) {
         const clean = u.replace(/\/+$/, '');
@@ -172,8 +176,11 @@ async function smartRequest(rawConfig) {
   let targetUrl = cfg.url || '';
 
   // Track & Resolve relative URLs automatically
-  if (targetUrl.startsWith('/') && lastBaseUrl) {
-    targetUrl = `${lastBaseUrl}${targetUrl}`;
+  const providerBase = cfg.baseURL || lastBaseUrl || '';
+  if ((targetUrl.startsWith('/') || targetUrl.startsWith('?')) && providerBase) {
+    const baseClean = providerBase.replace(/\/+$/, '');
+    const pathClean = targetUrl.startsWith('/') ? targetUrl : `/${targetUrl}`;
+    targetUrl = `${baseClean}${pathClean}`;
     cfg.url = targetUrl;
   } else if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
     try {
@@ -182,7 +189,13 @@ async function smartRequest(rawConfig) {
   }
 
   const method = (cfg.method || 'GET').toLowerCase();
-  const headers = cfg.headers || {};
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    ...(cfg.headers || {})
+  };
+  cfg.headers = headers;
   const timeout = cfg.timeout || 15000;
 
   // Add custom secure DNS agent to avoid ISP poisoning

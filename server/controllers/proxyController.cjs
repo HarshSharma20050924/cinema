@@ -402,7 +402,7 @@ async function proxyStream(req, res) {
       timeout: 25000,
       validateStatus: (status) => status < 500,
     });
-
+    console.log('[ProxyStream]', { targetUrl: targetUrl.slice(0, 80), isHead, status: response.status, referer: headers['Referer'] });
     res.status(response.status);
 
     if (response.headers["content-type"]) res.set("Content-Type", response.headers["content-type"]);

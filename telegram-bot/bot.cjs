@@ -576,11 +576,11 @@ We strongly recommend installing <b>VLC Player</b> for ultra-smooth 4K/1080p pla
     if (idx >= 0) {
       cfg.enabledProviders.splice(idx, 1);
       saveConfig(cfg);
-      return sendMessage(chatId, `🔴 Disabled extension: <b>${escapeHtml(provName)}</b>`);
+      return sendMessage(chatId, `✖️ Disabled extension: <b>${escapeHtml(provName)}</b>`);
     } else {
       cfg.enabledProviders.push(provName);
       saveConfig(cfg);
-      return sendMessage(chatId, `🟢 Enabled extension: <b>${escapeHtml(provName)}</b>`);
+      return sendMessage(chatId, `✅ Enabled extension: <b>${escapeHtml(provName)}</b>`);
     }
   }
 

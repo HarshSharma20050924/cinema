@@ -165,13 +165,15 @@ async function postToDedicatedChannel(item, provKey, channelId) {
   const storeId = hashString(`${provKey}:${item.link || ''}`);
   const directStartParam = `p_${storeId}_${provKey}_${cleanTitleParam}`;
 
-  // Sync to D1 bot_links in background for instant opening
-  axios.post(`${WEB_URL}/api/store-link`, {
-    id: storeId,
-    provider: provKey,
-    link: item.link || '',
-    title: item.title || '',
-  }, { timeout: 4000 }).catch(() => {});
+  // Sync to D1 bot_links BEFORE posting for instant opening
+  try {
+    await axios.post(`${WEB_URL}/api/store-link`, {
+      id: storeId,
+      provider: provKey,
+      link: item.link || '',
+      title: item.title || '',
+    }, { timeout: 3500 });
+  } catch (_) {}
 
   const text = `🎬 <b>${displayTitle}</b>\n\n` +
     `📦 <b>Source:</b> <code>${provKey.toUpperCase()}</code>\n` +
@@ -213,6 +215,37 @@ async function postToDedicatedChannel(item, provKey, channelId) {
   });
 }
 
+// 18 Strictly Authentic, Non-Spoofed Providers with verified working scrapers & streams
+const ACTIVE_AUTHENTIC_PROVIDERS = [
+  // CinemaWood (Bollywood & Desi)
+  'hdhub4u',
+  'vega',
+  'drive',
+  'moviesmod',
+  'movies4u',
+  'castle',
+  'mxplayer',
+
+  // Cinema 4K
+  '4khdhub',
+  'uhd',
+
+  // Cinema Anime
+  'animeworld',
+  'animesalt',
+  'hiAnime',
+
+  // Cinema OTT / Series
+  'netflixMirror',
+  'disneyMirror',
+  'primeMirror',
+  'movieBoxWeb',
+  'multi',
+
+  // Cinema Torrents
+  'tpb'
+];
+
 let isScanning = false;
 
 async function checkLatestReleases() {
@@ -221,12 +254,11 @@ async function checkLatestReleases() {
 
   try {
     const network = getNetworkChannels();
-    const extensions = Object.keys(network);
 
-    console.log(`\n🔍 [Multi-Channel Poster] Scanning Page 1 across ${extensions.length} extensions...`);
+    console.log(`\n🔍 [Multi-Channel Poster] Scanning Page 1 across ${ACTIVE_AUTHENTIC_PROVIDERS.length} authentic extensions...`);
     loadHistory();
 
-    for (const extId of extensions) {
+    for (const extId of ACTIVE_AUTHENTIC_PROVIDERS) {
       const channel = network[extId];
       if (!channel?.channelId) continue;
 
@@ -300,7 +332,7 @@ module.exports = {
   postToDedicatedChannel,
 };
 
-// Always start daemon when launched via PM2 or node directly
-if (!process.env.DO_NOT_AUTOSTART) {
+// Only start daemon when executed directly (e.g. by PM2)
+if (require.main === module) {
   startMultiChannelPoster();
 }

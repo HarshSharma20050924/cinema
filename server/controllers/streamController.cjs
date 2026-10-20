@@ -155,6 +155,115 @@ async function extractHubCloudMirrors(link) {
       } catch (_) {}
     }
 
+    // 1.5 Resolve MoviesMod links.modpro.blog / thenaukriadda.in / driveseed.org landing pages
+    if (targetLink.includes('modpro') || targetLink.includes('thenaukriadda') || targetLink.includes('driveseed')) {
+      try {
+        let currentLpUrl = targetLink;
+        if (currentLpUrl.includes('modpro')) {
+          const mpRes = await axios.get(currentLpUrl, { headers, timeout: 8000, maxRedirects: 5 });
+          const $mp = cheerio.load(mpRes.data || '');
+          let foundSid = '';
+          $mp('a[href*="thenaukriadda"], a[href*="sid="]').each((_, el) => {
+            const h = $mp(el).attr('href');
+            if (h && !foundSid && h.includes('sid=')) foundSid = h;
+          });
+          if (foundSid) currentLpUrl = foundSid;
+        }
+
+        if (currentLpUrl.includes('thenaukriadda') && currentLpUrl.includes('sid=')) {
+          const sRes = await axios.get(currentLpUrl, { headers: { ...headers, Referer: targetLink }, timeout: 8000 });
+          const $s = cheerio.load(sRes.data || '');
+          const lpHttpVal = $s('input[name="_lp_http"]').val();
+          const hop1Action = $s('form').attr('action') || 'https://en.thenaukriadda.in/';
+          if (lpHttpVal) {
+            const hop1Res = await axios.post(hop1Action, new URLSearchParams({ _lp_http: lpHttpVal }).toString(), {
+              headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded', Referer: currentLpUrl },
+              timeout: 8000
+            });
+            const $h1 = cheerio.load(hop1Res.data || '');
+            const hop2Action = $h1('form').attr('action') || hop1Res.request?.res?.responseUrl;
+            const hop2Params = {};
+            $h1('form input[type="hidden"]').each((_, el) => {
+              const n = $h1(el).attr('name');
+              const v = $h1(el).attr('value');
+              if (n) hop2Params[n] = v;
+            });
+            if (hop2Action && Object.keys(hop2Params).length > 0) {
+              const hop2Res = await axios.post(hop2Action, new URLSearchParams(hop2Params).toString(), {
+                headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded', Referer: hop1Action },
+                timeout: 8000
+              });
+              const $h2 = cheerio.load(hop2Res.data || '');
+              let lpCookieName = null;
+              let lpCookieValue = null;
+              let lpGoUrl = null;
+              $h2('script').each((_, s) => {
+                const html = $h2(s).html() || '';
+                const scMatch = html.match(/sc\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']/);
+                if (scMatch) {
+                  lpCookieName = scMatch[1];
+                  lpCookieValue = scMatch[2].replace(/\\\//g, '/');
+                }
+                const goMatch = html.match(/setAttribute\(\s*['"]href['"]\s*,\s*['"]([^'"]+)['"]/);
+                if (goMatch) {
+                  lpGoUrl = goMatch[1].replace(/\\\//g, '/');
+                }
+              });
+              if (!lpGoUrl && lpCookieName) {
+                const origin = new URL(hop2Action).origin;
+                lpGoUrl = `${origin}/?lp_go=${lpCookieName}`;
+              }
+              if (lpGoUrl && lpCookieName) {
+                const destRes = await axios.get(lpGoUrl, {
+                  headers: { ...headers, Cookie: `${lpCookieName}=${lpCookieValue}`, Referer: hop2Action },
+                  timeout: 8000
+                });
+                const destHtml = typeof destRes.data === 'string' ? destRes.data : '';
+                const locMatch = destHtml.match(/window\.location\.replace\(["']([^"']+)["']\)/i) ||
+                                 destHtml.match(/location\.href\s*=\s*["']([^"']+)["']/i);
+                if (locMatch && locMatch[1]) {
+                  currentLpUrl = locMatch[1].replace(/\\\//g, '/');
+                }
+              }
+            }
+          }
+        }
+
+        if (currentLpUrl.includes('driveseed.org')) {
+          let dsRes = await axios.get(currentLpUrl, { headers: { ...headers, Referer: 'https://en.thenaukriadda.in/' }, timeout: 8000 });
+          let dsHtml = typeof dsRes.data === 'string' ? dsRes.data : '';
+          const dsRedirect = dsHtml.match(/location\.replace\(["']([^"']+)["']\)/i);
+          if (dsRedirect && dsRedirect[1]) {
+            const rel = dsRedirect[1];
+            const fullDs = rel.startsWith('http') ? rel : `https://driveseed.org${rel}`;
+            dsRes = await axios.get(fullDs, { headers: { ...headers, Referer: currentLpUrl }, timeout: 8000 });
+            dsHtml = typeof dsRes.data === 'string' ? dsRes.data : '';
+          }
+          const $ds = cheerio.load(dsHtml);
+          const r2Link = $ds('a[href*="r2.dev"]').attr('href');
+          if (r2Link) addMirror('CF Storage', r2Link);
+          $ds('a[href*="video-gen.xyz"]').each((_, el) => {
+            const h = $ds(el).attr('href');
+            if (h && h.startsWith('http')) {
+              const label = $ds(el).text().trim() || 'Fast Server';
+              addMirror(label.includes('V2') ? 'Fast Server 2' : 'Fast Server', h);
+            }
+          });
+          $ds('a[href*="pixeldrain"], a[href*="hubcloud"]').each((_, el) => {
+            const h = $ds(el).attr('href');
+            if (h && h.startsWith('http')) addMirror('Direct Link', h);
+          });
+          if (mirrors.length > 0) return mirrors;
+        }
+
+        if (currentLpUrl && currentLpUrl.startsWith('http') && currentLpUrl !== targetLink) {
+          targetLink = currentLpUrl;
+        }
+      } catch (lpErr) {
+        console.warn('LinkPilot / modpro resolver error:', lpErr.message);
+      }
+    }
+
     // 2. Resolve intermediate HubDrive / Greenmotors / HubCDN landing pages
     if (targetLink.includes('hubdrive') || targetLink.includes('greenmotors') || targetLink.includes('hubcdn')) {
       try {
@@ -490,6 +599,14 @@ async function getStreams(req, res) {
   const { provider = 'autoEmbed', link, type = 'movie', download = 'false' } = req.query;
   if (!link) return res.status(400).json({ error: 'Link required' });
 
+  let cleanLink = link;
+  try {
+    if (typeof cleanLink === 'string' && cleanLink.trim().startsWith('{')) {
+      const parsed = JSON.parse(cleanLink.trim());
+      cleanLink = parsed.hubcloud || parsed.vcloud || parsed.vegadrive || parsed.url || cleanLink;
+    }
+  } catch (_) {}
+
   const isDownload = download === 'true' || download === true;
 
   try {
@@ -502,7 +619,7 @@ async function getStreams(req, res) {
         const context = zendaEngine.getProviderContext(provider);
 
         const results = await mod.getStream({
-          link,
+          link: cleanLink,
           type,
           isDownload,
           providerContext: context,
@@ -536,8 +653,8 @@ async function getStreams(req, res) {
       return /(hubcloud|hubdrive|greenmotors|gamerxyt|vcloud|kmhd|kmphotos|katdrive|gdflix|4khdhub|vegadrive|hblinks|inventoryidea|fastdl|nexdrive|mdrive|moviesdrive)/i.test(url);
     };
 
-    if (streams.length === 0 || isIntermediateHoster(link)) {
-      const realMirrors = await extractHubCloudMirrors(link);
+    if (streams.length === 0 || isIntermediateHoster(cleanLink)) {
+      const realMirrors = await extractHubCloudMirrors(cleanLink);
       if (realMirrors.length > 0) {
         for (const mirror of realMirrors) {
           if (!streams.some((s) => s.link === mirror.link)) {
@@ -584,7 +701,7 @@ async function getStreams(req, res) {
     streams = streams
       .filter((s) => Boolean(s && s.link && typeof s.link === 'string'))
       .map((s) => {
-        let l = s.link.trim();
+        let l = s.link.trim().replace(/^"|"$/g, '').replace('/hls/"', '/hls/').replace(/\\"/g, '');
         if (l.startsWith('//')) {
           l = 'https:' + l;
         }

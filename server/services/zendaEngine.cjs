@@ -41,51 +41,29 @@ class ZendaEngine {
     const map = {
       // 4K UHD
       uhdmovies: 'uhd',
-      cinemaluxe: 'uhd',
+      '4k': '4khdhub',
 
-      // Bollywood & Desi (CinemaWood)
+      // CinemaWood (Bollywood & Desi)
       moviesmod: 'mod',
       modworld: 'mod',
-      bollyflix: 'hdhub4u',
-      moviesflix: 'vega',
-      extramovies: 'world4u',
-      world4ufree: 'world4u',
-      skymovieshd: 'movies4u',
-      filmyfly: 'movies4u',
-      topmovies: 'drive',
-      katmoviehd: 'drive',
-      kat: 'drive',
-      cinevood: '1cinevood',
-      luxmovies: 'luxMovies',
-      eonmovies: 'eonMovies',
-      moviezwap: 'moviezwap',
-      zeefliz: 'zeefliz',
-      movies4u: 'movies4u',
       hdhub: 'hdhub4u',
+      moviesdrive: 'drive',
+      mx: 'mxplayer',
 
       // Hollywood & OTT Series
       moviebox: 'movieBoxWeb',
       movieboxweb: 'movieBoxWeb',
-      showbox: 'movieBoxWeb',
       multimovies: 'multi',
-      gokuhd: 'movieBoxWeb',
-      protonmovies: 'protonMovies',
-      ridomovies: 'protonMovies',
-      flixhq: 'movieBoxWeb',
+      netflix: 'netflixMirror',
+      disney: 'disneyMirror',
+      prime: 'primeMirror',
 
-      // Anime & Asian Drama
-      hianime: 'animeworld',
-      kisskh: 'animeworld',
-      gogoanime: 'animeworld',
-      animerulz: 'animesalt',
-      anikoto: 'animeworld',
-      animeworld: 'animeworld',
-      dramacool: 'animeworld',
+      // Anime
+      hianime: 'hiAnime',
 
       // Torrents
       thepiratebay: 'tpb',
-      yts: 'tpb',
-      '1337x': 'tpb',
+      piratebay: 'tpb',
     };
     return map[p.toLowerCase()] || p;
   }
@@ -93,9 +71,28 @@ class ZendaEngine {
   getProviderContext(providerValue) {
     const pVal = this.normalizeProvider(providerValue);
     const resolvedBaseUrl = domainResolver.getBaseUrl(pVal) || '';
+
+    const scopedAxios = (urlOrConfig, config) => {
+      let merged = {};
+      if (typeof urlOrConfig === 'string') {
+        merged = { ...(config || {}), url: urlOrConfig };
+      } else {
+        merged = { ...(urlOrConfig || {}) };
+      }
+      if (!merged.baseURL && resolvedBaseUrl) {
+        merged.baseURL = resolvedBaseUrl;
+      }
+      return smartAxios(merged);
+    };
+    scopedAxios.get = (url, cfg) => scopedAxios(url, { ...(cfg || {}), method: 'GET' });
+    scopedAxios.post = (url, data, cfg) => scopedAxios(url, { ...(cfg || {}), method: 'POST', data });
+    scopedAxios.put = (url, data, cfg) => scopedAxios(url, { ...(cfg || {}), method: 'PUT', data });
+    scopedAxios.delete = (url, cfg) => scopedAxios(url, { ...(cfg || {}), method: 'DELETE' });
+    scopedAxios.defaults = { baseURL: resolvedBaseUrl, headers: { ...DEFAULT_HEADERS } };
+
     return {
       baseUrl: resolvedBaseUrl,
-      axios: smartAxios,
+      axios: scopedAxios,
       cheerio,
       commonHeaders: { ...DEFAULT_HEADERS },
       Aes: {},
