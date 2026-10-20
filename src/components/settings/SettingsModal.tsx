@@ -32,6 +32,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose();
   };
 
+  const handleSelectPlayer = (optId: ExternalPlayerType) => {
+    setPlayer(optId);
+    onSave({
+      defaultPlayer: optId,
+      customPlayerScheme: scheme,
+    });
+  };
+
+  const handleCloseModal = () => {
+    onSave({
+      defaultPlayer: player,
+      customPlayerScheme: scheme,
+    });
+    onClose();
+  };
+
   const isAllSelected = availableProviders.length > 0 && settings.installedExtensions.length === availableProviders.length;
 
   const handleToggleSelectAll = () => {
@@ -123,7 +139,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <button
-              onClick={onClose}
+              onClick={handleCloseModal}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -146,7 +162,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <button
-            onClick={onClose}
+            onClick={handleCloseModal}
             style={{
               width: "36px",
               height: "36px",
@@ -210,7 +226,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 return (
                   <div
                     key={opt.id}
-                    onClick={() => setPlayer(opt.id)}
+                    onClick={() => handleSelectPlayer(opt.id)}
                     style={{
                       display: "flex",
                       alignItems: "center",

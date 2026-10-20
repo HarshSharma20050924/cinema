@@ -22,6 +22,17 @@ export const launchExternalPlayer = (
 
   const cleanTitle = (title || "video").replace(/[\r\n]/g, " ").trim() || "stream";
 
+  // If user selected in-app Web player, route directly to web playback
+  if (_player === "web") {
+    if (typeof window !== "undefined") {
+      const u = new URL(window.location.href);
+      u.searchParams.set("play", streamUrl);
+      u.searchParams.set("title", cleanTitle);
+      window.location.href = u.toString();
+    }
+    return;
+  }
+
   const isMovieBox =
     streamUrl.includes("hakunaymatata") ||
     streamUrl.includes("moviebox") ||

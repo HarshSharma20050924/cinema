@@ -195,12 +195,9 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         type: s.type,
       }));
     }
-    // Default server cascade if single link passed
+    // Single primary stream server
     return [
-      { id: 0, name: "Nebula", link: playbackUrl || "" },
-      { id: 1, name: "River", link: playbackUrl || "" },
-      { id: 2, name: "Titan", link: playbackUrl || "" },
-      { id: 3, name: "HubCDN", link: playbackUrl || "" },
+      { id: 0, name: "Direct Stream", link: playbackUrl || "" },
     ];
   }, [initialServers, playbackUrl]);
 
@@ -292,7 +289,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
     if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
 
-    // Auto failover timeout: If server does not load manifest in 4.8 seconds, advance to next
+    // Auto failover timeout: Allow 16 seconds for initial CDN buffer / proxy negotiation
     serverProbeTimeoutRef.current = setTimeout(() => {
       setServerStatuses((prev) => ({ ...prev, [serverIdx]: "failed" }));
       if (serverIdx + 1 < serverList.length) {
@@ -300,7 +297,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       } else {
         setPlayerStatus("error");
       }
-    }, 4800);
+    }, 16000);
 
     const isM3u8 = safeUrl.includes(".m3u8") || safeUrl.includes("/hls/") || safeUrl.includes("/stream/");
 
@@ -359,8 +356,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         setServerStatuses((prev) => ({ ...prev, [serverIdx]: "success" }));
         setPlayerStatus("starting");
         video.play().catch(() => {});
-        setTimeout(() => setPlayerStatus("ready"), 1100);
-        video.removeEventListener("loadedmetadata", onLoaded);
+        setTimeout(() => setPlayerStatus("ready"), 500);
       };
       const onError = () => {
         if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
@@ -370,10 +366,16 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         } else {
           setPlayerStatus("error");
         }
-        video.removeEventListener("error", onError);
       };
-      video.addEventListener("loadedmetadata", onLoaded);
-      video.addEventListener("error", onError);
+
+      if (video.readyState >= 1) {
+        onLoaded();
+      } else {
+        video.addEventListener("loadedmetadata", onLoaded, { once: true });
+        video.addEventListener("loadeddata", onLoaded, { once: true });
+        video.addEventListener("canplay", onLoaded, { once: true });
+        video.addEventListener("error", onError, { once: true });
+      }
     }
   }, [serverList, getPlayableUrl]);
 

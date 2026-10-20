@@ -487,6 +487,23 @@ export default function App() {
     return () => window.removeEventListener("hashchange", syncHash);
   }, [selectedPersonId]);
 
+  // Synchronize ?play= parameter from URL (e.g. from /vlc/ page or direct links)
+  useEffect(() => {
+    const syncPlayFromUrl = () => {
+      if (typeof window === "undefined") return;
+      const p = new URLSearchParams(window.location.search).get("play");
+      const t = new URLSearchParams(window.location.search).get("title") || "Cinema Stream";
+      if (p) {
+        setPlaybackUrl(p);
+        setPlayerModalState((prev) => (prev?.url === p ? prev : { url: p, title: t }));
+      }
+    };
+
+    syncPlayFromUrl();
+    window.addEventListener("popstate", syncPlayFromUrl);
+    return () => window.removeEventListener("popstate", syncPlayFromUrl);
+  }, []);
+
   const handleOpenPerson = (personId: number) => {
     setSelectedPersonId(personId);
     window.location.hash = `#!/person/${personId}`;
@@ -834,9 +851,13 @@ export default function App() {
     saveNavigationState({ playbackUrl: url });
   };
 
-  // External Player launcher (Direct VLC)
-  const handlePlayExternal = (url: string, player: ExternalPlayerType = "vlc", title?: string) => {
-    const finalPlayer = player || settings.defaultPlayer || "vlc";
+  // Player launcher - routes to in-app Web Player if defaultPlayer is "web"
+  const handlePlayExternal = (url: string, player?: ExternalPlayerType, title?: string) => {
+    const finalPlayer = player || settings.defaultPlayer || "web";
+    if (finalPlayer === "web") {
+      handleOpenStreamPlayer(url, title);
+      return;
+    }
     launchExternalPlayer(url, finalPlayer, settings.customPlayerScheme, title);
   };
 

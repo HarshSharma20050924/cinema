@@ -417,6 +417,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     setResolvingKey(key);
 
     try {
+      const backendUrl = getBackendUrl();
       if (primaryLink.startsWith("tpb:")) {
         const parts = primaryLink.split(":");
         const infoHash = parts[2] || "";
@@ -516,6 +517,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     setDownloadingKey(key);
 
     try {
+      const backendUrl = getBackendUrl();
       if (primaryLink.startsWith("tpb:")) {
         const parts = primaryLink.split(":");
         const infoHash = parts[2] || "";

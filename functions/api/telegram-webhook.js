@@ -2296,6 +2296,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     const keyboard = [];
     uniqueMirrors.slice(0, 4).forEach((m) => {
       const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(m.url)}&title=${encodeURIComponent(cleanTitle)}`;
+      const webPlayerUrl = `${DEFAULT_WEB_URL}/?play=${encodeURIComponent(m.url)}&title=${encodeURIComponent(cleanTitle)}`;
       let dlUrl = m.url;
       if (dlUrl.includes('pixeldrain.dev/api/file/') || dlUrl.includes('pixeldrain.com/api/file/')) {
         const t = dlUrl.split('/file/')[1]?.split('?')[0];
@@ -2304,10 +2305,11 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         dlUrl = `${DEFAULT_WEB_URL}/api/download?url=${encodeURIComponent(dlUrl)}&filename=${encodeURIComponent(cleanTitle.replace(/[^\w\s.-]/g, '') + '.mp4')}`;
       }
 
-      // Compact mobile-friendly buttons that never truncate on smartphones
+      // Compact mobile-friendly buttons: VLC, Direct Web Player, Download
       keyboard.push([
         { text: `🎬 VLC (${m.sName})`, url: vlcRedirectUrl },
-        { text: `📥 Download`, url: dlUrl }
+        { text: `🌐 Web Player`, url: webPlayerUrl },
+        { text: `📥 DL`, url: dlUrl }
       ]);
     });
 
