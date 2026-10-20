@@ -13,7 +13,7 @@ export interface MoreLinksModalProps {
   data: MoreLinksModalData | null;
   onClose: () => void;
   onDownloadUrl: (url: string, serverName: string, label?: string) => void;
-  onPlayStream?: (url: string, title?: string) => void;
+  onPlayStream?: (url: string, title?: string, servers?: Array<{ server: string; link: string }>) => void;
 }
 
 export const MoreLinksModal: React.FC<MoreLinksModalProps> = ({
@@ -44,7 +44,8 @@ export const MoreLinksModal: React.FC<MoreLinksModalProps> = ({
     setStreamingIdx(idx);
     try {
       if (onPlayStream) {
-        onPlayStream(url, `${data.title} ${data.subtitle ? `• ${data.subtitle}` : ""}`);
+        const srvList = (data.links || []).map((l) => ({ server: l.name, link: l.url }));
+        onPlayStream(url, data.title, srvList);
       }
     } finally {
       setTimeout(() => {

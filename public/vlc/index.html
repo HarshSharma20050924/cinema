@@ -150,6 +150,14 @@
       <span>▶️</span> Launch VLC Media Player
     </button>
 
+    <a class="btn btn-secondary" id="webBtn" href="#" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2);">
+      <span>🌐</span> Play in Web Browser Player
+    </a>
+
+    <a class="btn btn-secondary" id="playlistBtn" href="#" download="stream.m3u">
+      <span>📥</span> Download .m3u Playlist for VLC
+    </a>
+
     <button class="btn btn-secondary" id="androidBtn" style="display: none;">
       <span>📱</span> Open in Android VLC App
     </button>
@@ -159,12 +167,12 @@
     </a>
 
     <p style="font-size: 12px; color: #94a3b8; margin: 10px 0 14px; line-height: 1.4;">
-      💡 <b>High Performance Stream:</b> Use VLC Player for zero buffering. To download without speed limits or errors, use <b>@cinemaisherebtw_bot</b>.
+      💡 <b>High Performance Stream:</b> If VLC reports "unable to open MRL", use <b>Play in Web Browser Player</b> or tap <b>Download .m3u Playlist</b>.
     </p>
 
-    <div class="copy-box" id="copyBox" title="Click to copy stream URL">
+    <div class="copy-box" id="copyBox" title="Click to copy playable stream URL">
       <span id="urlPreview">https://...</span>
-      <div id="copyToast" style="display: none; color: #4ade80; font-weight: 600; margin-top: 4px;">Copied to clipboard!</div>
+      <div id="copyToast" style="display: none; color: #4ade80; font-weight: 600; margin-top: 4px;">Copied Playable Stream to clipboard!</div>
     </div>
 
     <div class="footer">
@@ -192,11 +200,40 @@
       } catch (_) {}
 
       document.getElementById('titleText').textContent = title;
-      document.getElementById('urlPreview').textContent = streamUrl;
+
+      const isDirectCors =
+        streamUrl.includes('pixeldrain.dev') ||
+        streamUrl.includes('pixeldrain.com') ||
+        streamUrl.includes('gofile.io') ||
+        streamUrl.includes('r2.dev');
+
+      let ref = '';
+      if (streamUrl.includes('hakunaymatata.com') || streamUrl.includes('moviebox') || streamUrl.includes('inmoviebox')) {
+        ref = 'https://officialmoviebox.com/';
+      } else if (streamUrl.includes('zenoak.top') || streamUrl.includes('paleoak.top') || streamUrl.includes('vidbolt')) {
+        ref = 'https://vidbolt.net/';
+      } else if (streamUrl.includes('cursed.st') || streamUrl.includes('cno.to')) {
+        ref = 'https://cno.to/';
+      } else if (streamUrl.includes('multimovies')) {
+        ref = 'https://multimovies.courses/';
+      } else if (streamUrl.includes('mxplayer')) {
+        ref = 'https://www.mxplayer.in/';
+      }
+
+      const playableUrl = !isDirectCors && !streamUrl.includes('/api/proxy')
+        ? window.location.origin + '/api/proxy?url=' + encodeURIComponent(streamUrl) + (ref ? '&referer=' + encodeURIComponent(ref) : '')
+        : streamUrl;
+
+      const playlistUrl = window.location.origin + '/api/playlist.m3u?url=' + encodeURIComponent(streamUrl) + '&title=' + encodeURIComponent(title);
+
+      document.getElementById('urlPreview').textContent = playableUrl;
+      document.getElementById('webBtn').href = '/?play=' + encodeURIComponent(streamUrl) + '&title=' + encodeURIComponent(title);
+      document.getElementById('playlistBtn').href = playlistUrl;
+      document.getElementById('playlistBtn').download = title.replace(/[^a-zA-Z0-9_-]/g, '_') + '.m3u';
 
       // Construct Protocols
-      const vlcProtocol = 'vlc://' + streamUrl;
-      const androidIntent = 'intent:' + streamUrl + '#Intent;action=android.intent.action.VIEW;type=video/*;package=org.videolan.vlc;end';
+      const vlcProtocol = 'vlc://' + playlistUrl;
+      const androidIntent = 'intent:' + playableUrl + '#Intent;action=android.intent.action.VIEW;type=video/*;package=org.videolan.vlc;end';
       const isAndroid = /Android/i.test(navigator.userAgent);
 
       if (isAndroid) {
@@ -224,19 +261,15 @@
         triggerVlc();
       };
 
-      document.getElementById('webBtn').onclick = function () {
-        window.location.href = '/?play=' + encodeURIComponent(streamUrl);
-      };
-
       // Copy to clipboard
       const copyBox = document.getElementById('copyBox');
       const copyToast = document.getElementById('copyToast');
       copyBox.onclick = function () {
         if (navigator.clipboard) {
-          navigator.clipboard.writeText(streamUrl).then(showToast);
+          navigator.clipboard.writeText(playableUrl).then(showToast);
         } else {
           const ta = document.createElement('textarea');
-          ta.value = streamUrl;
+          ta.value = playableUrl;
           document.body.appendChild(ta);
           ta.select();
           document.execCommand('copy');

@@ -35,8 +35,14 @@ export interface DetailsModalProps {
   onGoHome: () => void;
   onSelectCategoryNav?: (type: "home" | "movies" | "tv" | "categories") => void;
   activeNavTab?: string;
-  onClose: () => void;
-  onPlayStream: (url: string, title?: string) => void;
+  onPlayStream: (
+    url: string,
+    title?: string,
+    servers?: StreamItem[],
+    backdrop?: string,
+    poster?: string,
+    runtime?: string | number
+  ) => void;
   onPlayExternal?: (url: string, player: ExternalPlayerType) => void;
   onSelectRecommended?: (post: Post) => void;
   onSelectPerson?: (personId: number) => void;
@@ -416,7 +422,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         const infoHash = parts[2] || "";
         const encName = parts.slice(3).join(":") || encodeURIComponent(cleanFileName);
         const streamUrl = `${backendUrl}/api/stream/torrent?hash=${infoHash}&name=${encName}`;
-        onPlayStream(streamUrl, displayTitle);
+        onPlayStream(streamUrl, displayTitle, [{ server: "Torrent Stream", link: streamUrl }], details?.backdrop, details?.poster, details?.runtime);
         return;
       }
 
@@ -492,7 +498,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       }
 
       if (chosen) {
-        onPlayStream(chosen, displayTitle);
+        onPlayStream(chosen, displayTitle, list && list.length > 0 ? list : undefined, details?.backdrop, details?.poster, details?.runtime);
       }
     } catch (err) {
       console.warn("Play release resolution error:", err);
@@ -805,8 +811,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         data={moreLinksData}
         onClose={() => setMoreLinksData(null)}
         onDownloadUrl={handleDownloadDirectUrl}
-        onPlayStream={(url, title) => {
-          onPlayStream(url, title);
+        onPlayStream={(url, title, srvs) => {
+          onPlayStream(url, title, srvs, details?.backdrop, details?.poster, details?.runtime);
           setMoreLinksData(null);
         }}
       />

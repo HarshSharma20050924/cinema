@@ -29,7 +29,13 @@ export interface DetailsLinksDrawerProps {
   onPlayRelease: (key: string, primaryLink: string) => void;
   onDownloadRelease: (key: string, primaryLink: string, label: string) => void;
   onDownloadDirectUrl: (url: string, serverName: string, label?: string) => void;
-  onPlayStream: (url: string, title?: string) => void;
+  onPlayStream: (
+    url: string,
+    title?: string,
+    servers?: StreamItem[],
+    backdrop?: string,
+    poster?: string
+  ) => void;
   onOpenMoreLinks: (data: {
     title: string;
     subtitle?: string;
@@ -658,7 +664,11 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                 onClick={() => {
                                   triggerDirectAction(mKey, () => {
                                     if (activeTab === "stream") {
-                                      onPlayStream(s.link, `${displayTitle} - ${ep.title} (${s.server || "Stream"})`);
+                                      onPlayStream(
+                                        s.link,
+                                        `${displayTitle} - ${ep.title} (${s.server || "Stream"})`,
+                                        availableServers
+                                      );
                                     } else {
                                       onDownloadDirectUrl(s.link, s.server, ep.title);
                                     }
@@ -926,7 +936,11 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                                 onClick={() => {
                                   triggerDirectAction(mKey, () => {
                                     if (activeTab === "stream") {
-                                      onPlayStream(s.link, `${displayTitle} - ${pack.seasonName || pack.title} (${s.server || "Stream"})`);
+                                      onPlayStream(
+                                        s.link,
+                                        `${displayTitle} - ${pack.seasonName || pack.title} (${s.server || "Stream"})`,
+                                        servers
+                                      );
                                     } else {
                                       onDownloadDirectUrl(s.link, s.server, pack.quality || pack.title);
                                     }
@@ -1272,7 +1286,11 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                           onClick={() => {
                             triggerDirectAction(mKey, () => {
                               if (activeTab === "stream") {
-                                onPlayStream(s.link, `${displayTitle} - ${rel.title} (${s.server || "Stream"})`);
+                                onPlayStream(
+                                  s.link,
+                                  `${displayTitle} - ${rel.title} (${s.server || "Stream"})`,
+                                  servers
+                                );
                               } else {
                                 onDownloadDirectUrl(s.link, s.server, rel.quality || rel.title);
                               }
@@ -1469,7 +1487,7 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
                   disabled={activeDirectActionKey === `stream_direct_${i}`}
                   onClick={() => {
                     triggerDirectAction(`stream_direct_${i}`, () => {
-                      onPlayStream(s.link, `${displayTitle} (${s.server || "Stream"})`);
+                      onPlayStream(s.link, `${displayTitle} (${s.server || "Stream"})`, streams);
                     });
                   }}
                   style={{

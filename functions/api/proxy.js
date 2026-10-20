@@ -53,6 +53,18 @@ export async function onRequest(context) {
   } else if (host.includes('hakunaymatata.com') || host.includes('inmoviebox.com') || host.includes('moviebox')) {
     refererHeader = 'https://officialmoviebox.com/';
     originHeader = 'https://officialmoviebox.com';
+  } else if (host.includes('zenoak.top') || host.includes('paleoak.top') || host.includes('vidbolt')) {
+    refererHeader = 'https://vidbolt.net/';
+    originHeader = 'https://vidbolt.net';
+  } else if (host.includes('cursed.st') || host.includes('cno.to')) {
+    refererHeader = 'https://cno.to/';
+    originHeader = 'https://cno.to';
+  } else if (host.includes('multimovies')) {
+    refererHeader = 'https://multimovies.courses/';
+    originHeader = 'https://multimovies.courses';
+  } else if (host.includes('mxplayer') || host.includes('d3sgzbosmwirao.cloudfront.net')) {
+    refererHeader = 'https://www.mxplayer.in/';
+    originHeader = 'https://www.mxplayer.in';
   }
 
   const isMovieBox = host.includes('hakunaymatata.com') || host.includes('inmoviebox.com') || host.includes('moviebox');
@@ -181,6 +193,47 @@ export async function onRequest(context) {
       responseHeaders.set('Access-Control-Allow-Origin', '*');
       responseHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
       responseHeaders.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+
+      const contentType = (upstream.headers.get('content-type') || '').toLowerCase();
+      const isM3u8 = contentType.includes('mpegurl') || targetUrl.includes('.m3u8');
+
+      if (isM3u8 && request.method !== 'HEAD') {
+        try {
+          let m3u8Text = await upstream.text();
+          const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+          const targetOrigin = new URL(targetUrl).origin;
+          const currentOrigin = url.origin;
+
+          // Rewrite non-comment lines (URIs) to route through /api/proxy
+          m3u8Text = m3u8Text.replace(/^(?!#)(\S+)/gm, (match) => {
+            let resolved = match;
+            if (match.startsWith('/')) {
+              resolved = targetOrigin + match;
+            } else if (!match.startsWith('http://') && !match.startsWith('https://')) {
+              resolved = baseUrl + match;
+            }
+            return `${currentOrigin}/api/proxy?url=${encodeURIComponent(resolved)}&referer=${encodeURIComponent(refererHeader)}`;
+          });
+
+          // Also rewrite URI="..." inside tag lines (e.g. #EXT-X-KEY, #EXT-X-MEDIA)
+          m3u8Text = m3u8Text.replace(/URI="([^"]+)"/g, (match, p1) => {
+            let resolved = p1;
+            if (p1.startsWith('/')) {
+              resolved = targetOrigin + p1;
+            } else if (!p1.startsWith('http://') && !p1.startsWith('https://')) {
+              resolved = baseUrl + p1;
+            }
+            return `URI="${currentOrigin}/api/proxy?url=${encodeURIComponent(resolved)}&referer=${encodeURIComponent(refererHeader)}"`;
+          });
+
+          responseHeaders.set('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
+          responseHeaders.delete('Content-Length');
+          return new Response(m3u8Text, {
+            status: 200,
+            headers: responseHeaders,
+          });
+        } catch (_) {}
+      }
 
       return new Response(upstream.body, {
         status: upstream.status,

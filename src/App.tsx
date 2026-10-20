@@ -17,6 +17,7 @@ import { HeroSpotlight } from "./components/hero/HeroSpotlight";
 import { MediaGrid } from "./components/media/MediaGrid";
 import { Footer } from "./components/layout/Footer";
 import { DetailsModal } from "./components/details/DetailsModal";
+import { VideoPlayerModal } from "./components/player/VideoPlayerModal";
 import { PersonDetailsModal } from "./components/person/PersonDetailsModal";
 import { DownloadManagerModal } from "./components/downloads/DownloadManagerModal";
 import { OnboardingModal } from "./components/setup/OnboardingModal";
@@ -438,6 +439,14 @@ export default function App() {
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(
     initialNavState?.playbackUrl || null
   );
+  const [playerModalState, setPlayerModalState] = useState<{
+    url: string;
+    title: string;
+    backdrop?: string;
+    poster?: string;
+    servers?: StreamItem[];
+    runtime?: string | number;
+  } | null>(null);
   const [downloadManagerOpen, setDownloadManagerOpen] = useState(false);
 
   // Cast / Person Details State & URL Hash Synchronization (e.g. #!/person/3223)
@@ -769,7 +778,44 @@ export default function App() {
 
   const handleClosePlayer = () => {
     setPlaybackUrl(null);
+    setPlayerModalState(null);
     saveNavigationState({ playbackUrl: null });
+    if (typeof window !== "undefined" && window.location.search.includes("play=")) {
+      const u = new URL(window.location.href);
+      u.searchParams.delete("play");
+      u.searchParams.delete("title");
+      window.history.replaceState(null, "", u.pathname + (u.search ? u.search : ""));
+    }
+  };
+
+  // Open butter-smooth Cinema Video Player with full movie title & servers
+  const handleOpenStreamPlayer = (
+    url: string,
+    title?: string,
+    servers?: StreamItem[],
+    backdrop?: string,
+    poster?: string,
+    runtime?: string | number
+  ) => {
+    const rawTitle = title || selectedPost?.title || details?.title || "Cinema Stream";
+    const cleanMovieTitle = rawTitle
+      .replace(/\b(1080p|720p|2160p|4k|uhd|hdr|web-dl|webrip|bluray|x264|x265|hevc|aac|dual\s*audio|hindi|english|org|subs?)\b/gi, "")
+      .replace(/\[.*?\]/g, "")
+      .replace(/\(.*?\)/g, "")
+      .replace(/[\._-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    setPlayerModalState({
+      url,
+      title: cleanMovieTitle || rawTitle,
+      servers,
+      backdrop: backdrop || details?.backdrop || selectedPost?.image,
+      poster: poster || details?.poster || selectedPost?.image,
+      runtime: runtime || details?.runtime,
+    });
+    setPlaybackUrl(url);
+    saveNavigationState({ playbackUrl: url });
   };
 
   // External Player launcher (Direct VLC)
@@ -1551,7 +1597,7 @@ export default function App() {
           activeNavTab={activeNavTab}
           defaultPlayer={settings.defaultPlayer}
           onClose={handleCloseDetails}
-          onPlayStream={(url, title) => handlePlayExternal(url, "vlc", title)}
+          onPlayStream={handleOpenStreamPlayer}
           onPlayExternal={handlePlayExternal}
           onSelectRecommended={(p) => handleSelectPost(p)}
           onSelectPerson={handleOpenPerson}
@@ -1663,6 +1709,19 @@ export default function App() {
 
       {/* 8. Direct In-App Auto-Updater Modal (Zero Redirects) */}
       <UpdateModal />
+
+      {/* 9. Butter-Smooth In-App Video Player (Matching CNO.TO aesthetic exactly with Red Theme & Server Retry) */}
+      {(playerModalState || playbackUrl) && (
+        <VideoPlayerModal
+          playbackUrl={playerModalState?.url || playbackUrl}
+          title={playerModalState?.title || selectedPost?.title || details?.title || "Cinema Stream"}
+          backdrop={playerModalState?.backdrop || details?.backdrop || selectedPost?.image}
+          poster={playerModalState?.poster || details?.poster || selectedPost?.image}
+          servers={playerModalState?.servers}
+          runtime={playerModalState?.runtime || details?.runtime}
+          onClose={handleClosePlayer}
+        />
+      )}
     </div>
   );
 }
