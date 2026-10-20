@@ -25,12 +25,15 @@ export async function onRequestPost(context) {
       });
     }
 
+    const existing = await db.prepare("SELECT id FROM bot_links WHERE id = ?").bind(id).first();
+    const alreadyPosted = Boolean(existing);
+
     const serialized = typeof link === 'string' ? link : JSON.stringify(link);
     await db.prepare(
       "INSERT OR REPLACE INTO bot_links (id, provider, link, title, created_at) VALUES (?, ?, ?, ?, ?)"
     ).bind(id, provider, serialized, title || '', Date.now()).run();
 
-    return new Response(JSON.stringify({ ok: true, id }), {
+    return new Response(JSON.stringify({ ok: true, id, alreadyPosted }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

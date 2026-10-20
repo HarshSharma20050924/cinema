@@ -42,11 +42,11 @@ async function startServer() {
       console.warn('Cluster sync startup error:', err.message);
     });
 
-    // Channel Poster is now manual/selective - disabled by default
-    if (process.env.ENABLE_AUTO_POSTER === 'true') {
+    // 24/7 Dedicated Multi-Channel Poster (Runs on all servers with cluster deduplication)
+    if (process.env.ENABLE_AUTO_POSTER !== 'false') {
       try {
-        const { start247AutoPoster } = require('./services/channelPosterWorker.cjs');
-        start247AutoPoster();
+        const { startMultiChannelPoster } = require('./services/multiChannelPoster.cjs');
+        startMultiChannelPoster();
       } catch (err) {
         console.warn('AutoPoster startup notice:', err.message);
       }

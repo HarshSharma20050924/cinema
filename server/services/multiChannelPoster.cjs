@@ -165,15 +165,23 @@ async function postToDedicatedChannel(item, provKey, channelId) {
   const storeId = hashString(`${provKey}:${item.link || ''}`);
   const directStartParam = `p_${storeId}_${provKey}_${cleanTitleParam}`;
 
-  // Sync to D1 bot_links BEFORE posting for instant opening
+  // Sync to D1 bot_links BEFORE posting for instant opening and distributed cluster deduplication
+  let alreadyPostedInCluster = false;
   try {
-    await axios.post(`${WEB_URL}/api/store-link`, {
+    const storeRes = await axios.post(`${WEB_URL}/api/store-link`, {
       id: storeId,
       provider: provKey,
       link: item.link || '',
       title: item.title || '',
-    }, { timeout: 3500 });
+    }, { timeout: 4000 });
+    if (storeRes.data?.alreadyPosted) {
+      alreadyPostedInCluster = true;
+    }
   } catch (_) {}
+
+  if (alreadyPostedInCluster) {
+    return { ok: false, duplicate: true };
+  }
 
   const text = `🎬 <b>${displayTitle}</b>\n\n` +
     `📦 <b>Source:</b> <code>${provKey.toUpperCase()}</code>\n` +
@@ -294,10 +302,12 @@ async function checkLatestReleases() {
           console.log(`📢 [New Release] Posting to ${channel.title}: "${post.title}"`);
           const res = await postToDedicatedChannel(post, extId, channel.channelId);
 
-          if (res?.ok) {
+          if (res?.ok || res?.duplicate) {
             recordHistory(key);
-            newInExt++;
-            await sleep(2500); // Flood prevention
+            if (res?.ok) {
+              newInExt++;
+              await sleep(2500); // Flood prevention
+            }
           }
         }
 
