@@ -39,6 +39,10 @@ async function addAdmins() {
       targetBot = `@${categoryBots['4k'].username}`;
     } else if (categoryBots['series']?.categories?.includes(extId)) {
       targetBot = `@${categoryBots['series'].username}`;
+    } else if (categoryBots['desi']?.categories?.includes(extId)) {
+      targetBot = `@${categoryBots['desi'].username}`;
+    } else if (categoryBots['anime']?.categories?.includes(extId)) {
+      targetBot = `@${categoryBots['anime'].username}`;
     }
 
     const inputPeer = new Api.InputPeerChannel({

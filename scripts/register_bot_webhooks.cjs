@@ -2,7 +2,7 @@ const axios = require('axios');
 
 const BOTS = [
   {
-    name: 'Cinema Desi / General Bot',
+    name: 'Cinema Torrents / General Bot',
     username: 'cinemaisherebtw_bot',
     token: '8887103348:AAFYcYbWEm8adSF4fpLUcUliJKTmqGxvEe4',
   },
@@ -15,6 +15,16 @@ const BOTS = [
     name: 'Cinema OTT Series Bot',
     username: 'CinemaOTT_Series_Bot',
     token: '8920144104:AAHfAYWcZAat4yiesDZ3yU_8BAIEfNzrzPQ',
+  },
+  {
+    name: 'Cinema Bollywood Bot',
+    username: 'CinemaBollywood_Ultra_bot',
+    token: '8760012910:AAF_KZe9G-_vsCMQ_Sa277tEjzN3zfgn_xc',
+  },
+  {
+    name: 'Cinema Anime Bot',
+    username: 'CinemaAnime_Ultra_bot',
+    token: '8580045392:AAGIXhweajJXCGVfL05o3xqJhw_6zNBRMm0',
   },
 ];
 

@@ -128,9 +128,21 @@ function hashString(str) {
   return Math.abs(hash).toString(16);
 }
 
+function cleanDisplayTitle(rawTitle) {
+  if (!rawTitle) return 'Untitled Release';
+  return String(rawTitle)
+    .replace(/^[\s🎬📺📥⚡📦⬇️▶️]+/gu, '')
+    .replace(/\[\s*(?:dual\s*audio|hindi|eng|org|bluray|hevc|x264|x265|720p|1080p|480p|2160p|4k)[^\]]*\]/gi, '')
+    .replace(/\{[^}]*\}/g, '')
+    .replace(/\((?:season\s*\d+\s*[-+–—]\s*\d+|seasons?\s*\d+[^)]*)\)/gi, '')
+    .replace(/\b(?:480p|720p|1080p|2160p|4k|bluray|web-dl|webrip|hdrip|hevc|x264|x265|dd5\.1|dual audio|full show|full movie|clean)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function postToDedicatedChannel(item, provKey, channelId) {
   const bot = getBotForExtension(provKey);
-  const title = escapeHtml(item.title || 'Untitled Release');
+  const displayTitle = escapeHtml(cleanDisplayTitle(item.title));
   const targetChatId = channelId.startsWith('-100') ? channelId : `-100${channelId}`;
 
   // Clean title for deep link parameter (max 24 chars to stay well within Telegram 64 char limit)
@@ -152,16 +164,19 @@ async function postToDedicatedChannel(item, provKey, channelId) {
     title: item.title || '',
   }, { timeout: 4000 }).catch(() => {});
 
-  const text = `🎬 <b>${title}</b>\n\n` +
+  const text = `🎬 <b>${displayTitle}</b>\n\n` +
     `📦 <b>Source:</b> <code>${provKey.toUpperCase()}</code>\n` +
-    `⚡ <b>Playback:</b> Fast Cloud Streaming &amp; Direct Downloads\n\n` +
+    `⚡ <b>Quality:</b> Cloud Streaming &amp; Direct Downloads\n\n` +
     `👇 <i>Tap below to stream or download in VLC / Web Player:</i>`;
 
+  // Stacked buttons: 100% full width on mobile, perfectly fit without splitting or overflowing
   const keyboard = {
     inline_keyboard: [
       [
         { text: '🎬 Stream & Download', url: `https://t.me/${bot.username}?start=${directStartParam}` },
-        { text: '🌐 Watch on Web', url: `${WEB_URL}` },
+      ],
+      [
+        { text: '🌐 Watch on Cinema Web', url: `${WEB_URL}` },
       ],
     ],
   };
@@ -269,8 +284,11 @@ function startMultiChannelPoster() {
 module.exports = {
   startMultiChannelPoster,
   checkLatestReleases,
+  getBotForExtension,
+  postToDedicatedChannel,
 };
 
-if (require.main === module) {
+// Always start daemon when launched via PM2 or node directly
+if (!process.env.DO_NOT_AUTOSTART) {
   startMultiChannelPoster();
 }

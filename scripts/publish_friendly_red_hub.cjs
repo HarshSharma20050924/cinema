@@ -78,12 +78,12 @@ Sabhi websites ke alag-alag channels bana diye hain taaki aapko direct fast link
 Apni pasand ke channel link par tap karke join kar lo 👇
 </blockquote>
 
-🔴 <b>4K ULTRA HD MOVIES</b>
+🔴 <b>4K ULTRA HD MOVIES</b> (Bot: @Cinema4K_Ultra_813_bot)
 • <b>4K HDHub:</b> ${getShortLink('4khdhub')}
 • <b>UHDMovies:</b> ${getShortLink('uhdmovies')}
 • <b>CinemaLuxe:</b> ${getShortLink('cinemaluxe')}
 
-🔴 <b>BOLLYWOOD &amp; SOUTH (HINDI DUBBED)</b>
+🔴 <b>CINEMAWOOD (BOLLYWOOD &amp; SOUTH)</b> (Bot: @CinemaBollywood_Ultra_bot)
 • <b>HDHub4u:</b> ${getShortLink('hdhub4u')}
 • <b>VegaMovies:</b> ${getShortLink('vega')}
 • <b>MoviesMod:</b> ${getShortLink('moviesmod')}
@@ -103,7 +103,7 @@ Apni pasand ke channel link par tap karke join kar lo 👇
 • <b>Zeefliz:</b> ${getShortLink('zeefliz')}
 • <b>Movies4u:</b> ${getShortLink('movies4u')}
 
-🔴 <b>HOLLYWOOD &amp; WEB SERIES</b>
+🔴 <b>HOLLYWOOD &amp; WEB SERIES</b> (Bot: @CinemaOTT_Series_Bot)
 • <b>MovieBox:</b> ${getShortLink('movieBoxWeb')}
 • <b>MultiMovies:</b> ${getShortLink('multimovies')}
 • <b>GokuHD:</b> ${getShortLink('gokuhd')}
@@ -112,7 +112,7 @@ Apni pasand ke channel link par tap karke join kar lo 👇
 • <b>FlixHQ:</b> ${getShortLink('flixhq')}
 • <b>ProtonMovies:</b> ${getShortLink('protonmovies')}
 
-🔴 <b>ANIME &amp; K-DRAMA</b>
+🔴 <b>ANIME &amp; ASIAN DRAMA</b> (Bot: @CinemaAnime_Ultra_bot)
 • <b>HiAnime:</b> ${getShortLink('hianime')}
 • <b>GogoAnime:</b> ${getShortLink('gogoanime')}
 • <b>AnimeRulz:</b> ${getShortLink('animerulz')}
@@ -121,7 +121,7 @@ Apni pasand ke channel link par tap karke join kar lo 👇
 • <b>KissKH (K-Drama):</b> ${getShortLink('kisskh')}
 • <b>DramaCool:</b> ${getShortLink('dramacool')}
 
-🔴 <b>TORRENT CHANNELS</b>
+🔴 <b>TORRENT CHANNELS</b> (Bot: @cinemaisherebtw_bot)
 • <b>YTS Movies:</b> ${getShortLink('yts')}
 • <b>1337x:</b> ${getShortLink('1337x')}
 • <b>ThePirateBay:</b> ${getShortLink('thepiratebay')}
