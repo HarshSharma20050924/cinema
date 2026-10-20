@@ -159,26 +159,26 @@ async function renderSettingsMenu(chatId, token, db, userId, messageId = null) {
   const activeExt = profile.extensions.find(e => e.value.toLowerCase() === (settings.active_provider || '').toLowerCase()) || profile.extensions[0];
   const isSearchAll = settings.search_mode === 'all';
   
-  let text = `<b>Extension & Search Settings</b>\n`;
+  let text = `⚙️ <b>Extension & Search Settings</b>\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `Bot: <b>${escapeHtml(profile.name)}</b>\n`;
-  text += `Active Extension: <code>${escapeHtml(activeExt?.name || settings.active_provider.toUpperCase())}</code>\n`;
-  text += `Search Mode: ${isSearchAll ? `<b>All Extensions in ${escapeHtml(profile.name)}</b>` : `<b>Single (${escapeHtml(activeExt?.name)})</b>`}\n\n`;
+  text += `🎬 Bot: <b>${escapeHtml(profile.name)}</b>\n`;
+  text += `🧩 Active Extension: <code>${escapeHtml(activeExt?.name || settings.active_provider.toUpperCase())}</code>\n`;
+  text += `🔍 Search Mode: ${isSearchAll ? `<b>🌐 All Extensions in ${escapeHtml(profile.name)}</b>` : `<b>🎯 Single (${escapeHtml(activeExt?.name)})</b>`}\n\n`;
   text += `<i>Tap below to switch extension or toggle search mode:</i>`;
 
   const keyboard = [];
   
   // 1. Search Scope Toggle button
   const toggleLabel = isSearchAll 
-    ? 'Switch to: Single Extension' 
-    : `Search All in ${profile.name}`;
+    ? '🎯 Switch to: Single Extension' 
+    : `🌐 Search All in ${profile.name}`;
   keyboard.push([{ text: toggleLabel, callback_data: 'toggle_scope' }]);
 
   // 2. Extension Selection Grid
   const extButtons = profile.extensions.map(ext => {
     const isSelected = ext.value.toLowerCase() === (settings.active_provider || '').toLowerCase();
     return {
-      text: isSelected ? `✓ ${ext.name}` : ext.name,
+      text: isSelected ? `✅ ${ext.name}` : `⚪ ${ext.name}`,
       callback_data: `set_ext:${ext.value}`
     };
   });
@@ -188,8 +188,8 @@ async function renderSettingsMenu(chatId, token, db, userId, messageId = null) {
   }
 
   keyboard.push([
-    { text: 'Search Movies / Series', switch_inline_query_current_chat: '' },
-    { text: 'Cinema Web', url: DEFAULT_WEB_URL }
+    { text: '🔍 Search Movies / Series', switch_inline_query_current_chat: '' },
+    { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL }
   ]);
 
   return sendOrEdit(token, chatId, messageId, {
@@ -351,25 +351,30 @@ function sanitizeCleanTitle(rawTitle, fallback = 'Media Release') {
 // Check if an item is a series or movie
 function isSeriesItem(item, meta, rawGroups) {
   if (meta?.type === 'series' || meta?.type === 'tv') return true;
-  if (meta?.type === 'movie') return false;
 
-  const titleText = `${item?.title || ''} ${meta?.title || ''}`.toLowerCase();
-  if (/\b(?:season\s*\d+|s\d{1,2}\b|episodes?|ep\s*\d+|e\d{1,3}\b)/i.test(titleText)) {
-    return true;
-  }
-
-  if (Array.isArray(rawGroups)) {
+  // 1. Check if any group contains multiple episodes, episode links, or season titles
+  if (Array.isArray(rawGroups) && rawGroups.length > 0) {
     for (const g of rawGroups) {
-      const gTitle = (g?.title || '').toLowerCase();
-      if (/\b(?:season\s*\d+|s\d{1,2}\b|all\s*episodes|batch\s*pack)/i.test(gTitle)) {
+      if (g?.episodesLink) return true;
+      if (Array.isArray(g?.directLinks) && g.directLinks.length > 1) return true;
+      const gTitle = `${g?.title || ''} ${g?.dub || ''} ${g?.quality || ''}`.toLowerCase();
+      if (/\b(?:season\s*\d+|s\d{1,2}\b|all\s*episodes|batch\s*pack|episode\s*\d+|ep\s*\d+)/i.test(gTitle)) {
         return true;
       }
       if (Array.isArray(g?.directLinks)) {
-        const epTitles = g.directLinks.filter(l => /\b(?:ep(?:isode)?\s*\d+|e\d{1,3}\b)/i.test(l?.title || ''));
-        if (epTitles.length > 1) return true;
+        const hasEpInDl = g.directLinks.some(l => /\b(?:ep(?:isode)?\s*\d+|e\d{1,3}\b)/i.test(l?.title || ''));
+        if (hasEpInDl) return true;
       }
     }
   }
+
+  // 2. Check title for season, episode, or series markers
+  const titleText = `${item?.title || ''} ${meta?.title || ''}`.toLowerCase();
+  if (/\b(?:season\s*\d+|s\d{1,2}\b|episodes?|ep\s*\d+|e\d{1,3}\b|series\b|k-drama|drama)/i.test(titleText)) {
+    return true;
+  }
+
+  if (meta?.type === 'movie') return false;
   return false;
 }
 
@@ -433,6 +438,16 @@ function extractCleanResolution(str) {
   return res;
 }
 
+function extractActualEpisode(str) {
+  if (!str) return null;
+  const s = String(str);
+  const m = s.match(/(?:ep(?:isode)?\.?\s*|e)(\d{1,4})\b/i);
+  if (m) return parseInt(m[1], 10);
+  const numMatch = s.match(/^\s*(\d{1,4})\.?\s+/);
+  if (numMatch) return parseInt(numMatch[1], 10);
+  return null;
+}
+
 // Cleanly format individual episode titles (e.g. "Game of Thrones • S8 Ep 1 [720p]")
 function formatCleanEpisodeTitle(seriesTitle, groupTitle, epTitle, epNum) {
   const cleanSeries = cleanMediaTitle(seriesTitle) || 'Series';
@@ -467,13 +482,18 @@ function formatPackButtonLabel(rawTitle, defaultLabel = 'Season Pack') {
   const season = seasonNum !== null ? `S${seasonNum}` : '';
 
   let res = extractCleanResolution(str);
+  let size = '';
+  const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb))\b\]?/i);
+  if (sizeMatch) size = sizeMatch[1].toUpperCase().replace(/\s+/, '');
+
   const parts = [];
   if (season) parts.push(season);
   if (res) parts.push(res);
   parts.push('Pack');
 
   let lbl = parts.join(' ');
-  if (lbl.length > 26) lbl = lbl.slice(0, 25) + '…';
+  if (size) lbl += ` [${size}]`;
+  if (lbl.length > 25) lbl = lbl.slice(0, 24) + '…';
   return lbl;
 }
 
@@ -545,7 +565,7 @@ function formatEpisodeButtonLabel(rawTitle, epCount, rawQuality = '', groupIndex
     return formatPackButtonLabel(str, `Season Pack ${groupIndex + 1}`);
   }
 
-  const seasonNum = extractActualSeason(str) || extractActualSeason(qStr) || extractActualSeason(dubStr);
+  const seasonNum = extractActualSeason(dubStr) || extractActualSeason(str) || extractActualSeason(qStr);
   const season = seasonNum !== null ? `S${seasonNum}` : '';
 
   let res = '';
@@ -1941,8 +1961,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       });
     }
 
-    let resMsg = `<b>${escapeHtml(cleanTitle)}</b>\n`;
-    resMsg += `Source: <b>${escapeHtml(item.provider ? item.provider.toUpperCase() : 'CINEMA')}</b>\n`;
+    let resMsg = `🎬 <b>${escapeHtml(cleanTitle)}</b>\n`;
+    resMsg += `🌐 Source: <b>${escapeHtml(item.provider ? item.provider.toUpperCase() : 'CINEMA')}</b>\n`;
     resMsg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     resMsg += `<code>[■■■■■■■■■■] 100% Ready</code>\n\n`;
     resMsg += `<i>Choose your preferred option below to play in VLC or download:</i>\n`;
@@ -1998,14 +2018,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
       // Always pair VLC and Download together symmetrically in the same row
       keyboard.push([
-        { text: `VLC Player (${m.sName})`, url: vlcRedirectUrl },
-        { text: `Download (${m.sName})`, url: dlUrl }
+        { text: `🎬 VLC Player (${m.sName})`, url: vlcRedirectUrl },
+        { text: `📥 Download (${m.sName})`, url: dlUrl }
       ]);
     });
 
     keyboard.push([
-      { text: 'Cinema Web', url: DEFAULT_WEB_URL },
-      { text: 'Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+      { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
+      { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
     ]);
 
     return sendOrEdit(token, chatId, waitMsgId, {
@@ -2045,7 +2065,7 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   const currentPage = Math.max(1, Math.min(page, totalPages));
   const searchStoreId = existingStoreId || (await storeLink(db, 'global', results, query));
 
-  let text = `<b>Results for "${escapeHtml(query)}"</b>\n`;
+  let text = `🔍 <b>Results for "${escapeHtml(query)}"</b>\n`;
   if (totalPages > 1) {
     text += `<b>Page ${currentPage} of ${totalPages}</b> (${results.length} total matches)\n`;
   }
@@ -2064,13 +2084,13 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
     const clean = sanitizeCleanTitle(item.title);
     const res = extractCleanResolution(item.title);
     const resTag = res ? ` • ${res}` : '';
-    let baseLabel = `${clean.slice(0, 26)}${clean.length > 26 ? '…' : ''}${resTag} [${prov}]`;
+    let baseLabel = `🎬 ${clean.slice(0, 24)}${clean.length > 24 ? '…' : ''}${resTag} [${prov}]`;
     
     let finalLabel = baseLabel;
     if (seenLabels.has(baseLabel)) {
       const count = seenLabels.get(baseLabel) + 1;
       seenLabels.set(baseLabel, count);
-      finalLabel = `${clean.slice(0, 22)}${clean.length > 22 ? '…' : ''}${resTag} (${count}) [${prov}]`;
+      finalLabel = `🎬 ${clean.slice(0, 20)}${clean.length > 20 ? '…' : ''}${resTag} (${count}) [${prov}]`;
     } else {
       seenLabels.set(baseLabel, 1);
     }
@@ -2080,18 +2100,18 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   if (totalPages > 1) {
     const navRow = [];
     if (currentPage > 1) {
-      navRow.push({ text: 'Prev', callback_data: `spage:${searchStoreId}:${currentPage - 1}` });
+      navRow.push({ text: '⬅️ Prev', callback_data: `spage:${searchStoreId}:${currentPage - 1}` });
     }
-    navRow.push({ text: `Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
+    navRow.push({ text: `📄 Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
     if (currentPage < totalPages) {
-      navRow.push({ text: 'Next', callback_data: `spage:${searchStoreId}:${currentPage + 1}` });
+      navRow.push({ text: 'Next ➡️', callback_data: `spage:${searchStoreId}:${currentPage + 1}` });
     }
     keyboard.push(navRow);
   }
 
   keyboard.push([
-    { text: 'Settings', callback_data: 'bot_settings' },
-    { text: 'Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }
+    { text: '⚙️ Settings', callback_data: 'bot_settings' },
+    { text: '🔄 Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }
   ]);
 
   return { text, keyboard: { inline_keyboard: keyboard } };
@@ -2101,7 +2121,7 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
 async function showItemDetails(chatId, item, token, db, requestUrl, messageId = null, page = 1, itemStoreIdParam = null, loadMsgId = null) {
   let meta = null;
   const itemLinkObj = typeof item.link === 'object' && !Array.isArray(item.link) ? item.link : null;
-  const actualLink = itemLinkObj?.url || (typeof item.link === 'string' ? item.link : null);
+  let actualLink = itemLinkObj?.url || (typeof item.link === 'string' ? item.link : null);
 
   if (itemLinkObj?.cachedMeta) {
     meta = itemLinkObj.cachedMeta;
@@ -2109,7 +2129,48 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
     meta = await callCinemaApi(requestUrl, '/meta', { provider: item.provider, link: actualLink });
   }
 
-  const rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
+  let rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
+
+  // SMART FALLBACK: If rawGroups is empty (e.g. broken provider like flixhq or dead channel link),
+  // immediately auto-recover by querying working active providers for the title
+  if (!rawGroups || rawGroups.length === 0) {
+    const rawSearchTitle = sanitizeCleanTitle(item.title || meta?.title || '');
+    if (rawSearchTitle && rawSearchTitle.length > 2) {
+      const profile = getBotProfile(token);
+      const candidates = [
+        profile.defaultProvider,
+        'netflixMirror',
+        'hdhub4u',
+        'movieBoxWeb',
+        'castle',
+        'multi',
+        '4khdhub',
+        'uhd'
+      ].filter((p, idx, arr) => p && p !== item.provider && arr.indexOf(p) === idx);
+
+      for (const cand of candidates) {
+        try {
+          const sRes = await callCinemaApi(requestUrl, '/search', { provider: cand, q: rawSearchTitle });
+          if (Array.isArray(sRes) && sRes.length > 0) {
+            const best = sRes[0];
+            const bLink = typeof best.link === 'string' ? best.link : best.link?.url;
+            if (bLink) {
+              const mRes = await callCinemaApi(requestUrl, '/meta', { provider: cand, link: bLink });
+              const mGroups = mRes?.linkList || mRes?.downloadLinks || mRes?.episodes || [];
+              if (Array.isArray(mGroups) && mGroups.length > 0) {
+                meta = mRes;
+                rawGroups = mGroups;
+                item.provider = cand;
+                item.providerName = getProviderDisplayName(cand);
+                actualLink = bLink;
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+  }
 
   // Sort groups: prioritize Indian languages (Hindi, Dual, Tamil, Telugu), then Original, then English
   if (Array.isArray(rawGroups) && rawGroups.length > 1) {
@@ -2128,15 +2189,15 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
 
   const cleanTitle = sanitizeCleanTitle(meta?.title || item.title);
   const yearStr = meta?.year ? ` (${meta.year})` : '';
-  const ratingStr = meta?.rating ? `Rating: <b>${escapeHtml(meta.rating)}/10</b> • ` : '';
+  const ratingStr = meta?.rating ? `⭐ Rating: <b>${escapeHtml(meta.rating)}/10</b> • ` : '';
   const provDisplayName = item.providerName || (item.provider ? item.provider.toUpperCase() : 'CINEMA');
   const posterUrl = meta?.poster || meta?.image || item.image || item.poster || null;
 
-  let itemText = `<b>${escapeHtml(cleanTitle)}${yearStr}</b>\n`;
+  let itemText = `🎬 <b>${escapeHtml(cleanTitle)}${yearStr}</b>\n`;
   itemText += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  itemText += `${ratingStr}Source: <b>${escapeHtml(provDisplayName)}</b>\n`;
-  itemText += `Audio: ${escapeHtml(audio)}\n`;
-  itemText += `Releases: <code>${escapeHtml(resolutions)}</code>\n`;
+  itemText += `${ratingStr}🌐 Source: <b>${escapeHtml(provDisplayName)}</b>\n`;
+  itemText += `🔊 Audio: ${escapeHtml(audio)}\n`;
+  itemText += `💿 Releases: <code>${escapeHtml(resolutions)}</code>\n`;
   if (meta?.synopsis) {
     let syn = meta.synopsis.trim();
     if (syn.length > 180) syn = syn.slice(0, 177) + '…';
@@ -2165,7 +2226,59 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       const dLinks = group.directLinks || [];
       const isPackGroup = group.quality === 'Pack' || /(full\s*season\s*packs?|season\s*packs?|batch\s*packs?|all\s*episodes\s*zip)/i.test(group.title || '');
 
-      if (!isSeries) {
+      if (isPackGroup && dLinks.length > 0) {
+        // SERIES PACK
+        for (const pack of dLinks) {
+          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+          const packSeason = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(pack.title) || extractActualSeason(item.title);
+          const sStr = packSeason ? `S${packSeason} ` : '';
+          const pTitle = `${cleanBase} • ${sStr}Season Pack`;
+          const pStoreId = await storeLink(db, item.provider, pack.link, pTitle);
+          const pLabel = formatPackButtonLabel(`${group.title || ''} ${pack.title || ''}`);
+          rowBatch.push({ text: `📦 ${pLabel}`, callback_data: `resopt:${pStoreId}` });
+        }
+      } else if (dLinks.length > 1) {
+        // SERIES: Multiple episodes in season
+        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+        const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title);
+        const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
+        const groupStoredTitle = `${cleanBase} • ${sStr}`;
+        const epGroupStoreId = await storeLink(db, item.provider, {
+          episodes: dLinks,
+          allGroups: rawGroups,
+          groupTitle: group.title,
+          seriesTitle: meta?.title || item.title,
+          provider: item.provider
+        }, groupStoredTitle);
+        const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, startIndex + i, group.dub || group.language || '');
+        rowBatch.push({ text: `📺 ${label}`, callback_data: `eps:${epGroupStoreId}` });
+      } else if (group.episodesLink) {
+        // SERIES: External episodes index link
+        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+        const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title);
+        const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
+        const groupStoredTitle = `${cleanBase} • ${sStr}`;
+        const epGroupStoreId = await storeLink(db, item.provider, {
+          episodesLink: group.episodesLink,
+          allGroups: rawGroups,
+          groupTitle: group.title,
+          seriesTitle: meta?.title || item.title,
+          provider: item.provider
+        }, groupStoredTitle);
+        const label = formatEpisodeButtonLabel(group.title, 0, group.quality, startIndex + i, group.dub || group.language || '');
+        rowBatch.push({ text: `📺 ${label}`, callback_data: `eps:${epGroupStoreId}` });
+      } else if (isSeries) {
+        // SERIES: Group with single episode link (e.g. Movies4u, MX Player, Anime, etc.)
+        const targetLink = dLinks[0]?.link || group.link || actualLink;
+        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+        const epNum = extractActualEpisode(group.title) || extractActualEpisode(dLinks[0]?.title) || (startIndex + i + 1);
+        const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title) || 1;
+        const resLabel = extractCleanResolution(group.title || group.quality);
+        const epTitle = `${cleanBase} • S${seasonNum} Ep ${epNum}${resLabel ? ` [${resLabel}]` : ''}`;
+        const epStoreId = await storeLink(db, item.provider, targetLink, epTitle);
+        const epBtnLabel = resLabel ? `Ep ${epNum} [${resLabel}]` : `Ep ${epNum}`;
+        rowBatch.push({ text: `▶️ ${epBtnLabel}`, callback_data: `resopt:${epStoreId}` });
+      } else {
         // MOVIE: Each quality group is a direct stream resolution (resopt:)
         const targetLink = dLinks[0]?.link || group.link || actualLink;
         const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
@@ -2173,54 +2286,7 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
         const qTitle = resLabel ? `${cleanBase} [${resLabel}]` : cleanBase;
         const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
         const label = formatQualityButtonLabel(group.title || group.quality, 'Play Movie');
-        rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });
-      } else if (isPackGroup && dLinks.length > 0) {
-        // SERIES PACK
-        for (const pack of dLinks) {
-          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-          const seasonNum = extractActualSeason(pack.title) || extractActualSeason(item.title);
-          const sStr = seasonNum ? `S${seasonNum} ` : '';
-          const pTitle = `${cleanBase} • ${sStr}Season Pack`;
-          const pStoreId = await storeLink(db, item.provider, pack.link, pTitle);
-          const pLabel = formatPackButtonLabel(pack.title);
-          rowBatch.push({ text: pLabel, callback_data: `resopt:${pStoreId}` });
-        }
-      } else if (dLinks.length > 1) {
-        // SERIES: Multiple episodes in season
-        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-        const seasonNum = extractActualSeason(group.title) || extractActualSeason(item.title);
-        const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
-        const groupStoredTitle = `${cleanBase} • ${sStr}`;
-        const epGroupStoreId = await storeLink(db, item.provider, {
-          episodes: dLinks,
-          allGroups: rawGroups,
-          groupTitle: group.title,
-          seriesTitle: meta?.title || item.title
-        }, groupStoredTitle);
-        const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, startIndex + i, group.dub || group.language || '');
-        rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
-      } else if (group.episodesLink) {
-        // SERIES: External episodes index link
-        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-        const seasonNum = extractActualSeason(group.title) || extractActualSeason(item.title);
-        const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
-        const groupStoredTitle = `${cleanBase} • ${sStr}`;
-        const epGroupStoreId = await storeLink(db, item.provider, {
-          episodesLink: group.episodesLink,
-          allGroups: rawGroups,
-          groupTitle: group.title,
-          seriesTitle: meta?.title || item.title
-        }, groupStoredTitle);
-        const label = formatEpisodeButtonLabel(group.title, 0, group.quality, startIndex + i, group.dub || group.language || '');
-        rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
-      } else {
-        const targetLink = dLinks[0]?.link || group.link || actualLink;
-        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-        const resLabel = extractCleanResolution(group.title || group.quality);
-        const qTitle = resLabel ? `${cleanBase} [${resLabel}]` : cleanBase;
-        const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
-        const label = formatQualityButtonLabel(group.title || group.quality, `Quality ${startIndex + i + 1}`);
-        rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });
+        rowBatch.push({ text: `▶️ ${label}`, callback_data: `resopt:${qStoreId}` });
       }
     }
 
@@ -2230,23 +2296,30 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
 
     if (totalPages > 1) {
       const navRow = [];
-      if (currentPage > 1) navRow.push({ text: 'Prev', callback_data: `qpage:${itemStoreId}:${currentPage - 1}` });
-      navRow.push({ text: `Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
-      if (currentPage < totalPages) navRow.push({ text: 'Next', callback_data: `qpage:${itemStoreId}:${currentPage + 1}` });
+      if (currentPage > 1) navRow.push({ text: '⬅️ Prev', callback_data: `qpage:${itemStoreId}:${currentPage - 1}` });
+      navRow.push({ text: `📄 Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
+      if (currentPage < totalPages) navRow.push({ text: 'Next ➡️', callback_data: `qpage:${itemStoreId}:${currentPage + 1}` });
       keyboard.push(navRow);
     }
   } else {
     const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-    const storeId = await storeLink(db, item.provider, actualLink, cleanBase);
-    keyboard.push([{ text: `Play ${cleanBase.slice(0, 24)}`, callback_data: `resopt:${storeId}` }]);
+    if (isSeries) {
+      itemText += `\n\n⚠️ <i>No streams or episodes currently found on <b>${escapeHtml(provDisplayName)}</b>. Tap below to switch extension:</i>`;
+      keyboard.push([
+        { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+      ]);
+    } else {
+      const storeId = await storeLink(db, item.provider, actualLink, cleanBase);
+      keyboard.push([{ text: `▶️ Play ${cleanBase.slice(0, 22)}`, callback_data: `resopt:${storeId}` }]);
+    }
   }
 
   keyboard.push([
-    { text: 'Settings', callback_data: 'bot_settings' },
-    { text: 'Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+    { text: '⚙️ Settings', callback_data: 'bot_settings' },
+    { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
   ]);
   keyboard.push([
-    { text: 'Cinema Web', url: DEFAULT_WEB_URL }
+    { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL }
   ]);
 
   // If editing an existing message (e.g. Next / Prev page pagination on poster card)
