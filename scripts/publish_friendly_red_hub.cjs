@@ -51,14 +51,15 @@ async function publishFriendlyRedHub() {
 
   await sleep(1000);
 
-  // 2. Message 1: Red Visual Banner + Friendly Intro
-  console.log('📤 Sending Red Themed Visual Banner...');
-  const bannerCaption = `🔴 <b>CINEMA OFFICIAL CHANNELS</b> 🔴
+  // 2. Message 1: Official Hub Intro
+  const bannerCaption = `🎬 <b>CINEMA OFFICIAL NETWORK</b>
 
 <blockquote>
-<b>Bina Ads aur Popups ke Movies Dekho &amp; Download Karo</b>
-Sabhi websites ke alag-alag channels bana diye hain taaki aapko direct fast links mile bina kisi wait ke.
-</blockquote>`;
+<b>Stream &amp; Download Movies and Series with Zero Ads</b>
+Dedicated channels with instant 1-click cloud streaming and direct download links.
+</blockquote>
+
+📁 <b>1-Click All Channels Folder:</b> <a href="https://t.me/addlist/dPkh4Vq3iCg4MWFl">Tap to Add All 38 Channels into 1 Folder</a>`;
 
   await client.sendFile(inputPeer, {
     file: BANNER_PATH,
@@ -68,22 +69,22 @@ Sabhi websites ke alag-alag channels bana diye hain taaki aapko direct fast link
 
   await sleep(1500);
 
-  // 3. Message 2: Mobile-Optimized Directory (Single line per link, friendly names)
+  // 3. Message 2: Mobile-Optimized Directory
   console.log('📤 Sending Mobile-Friendly Channel Directory...');
 
-  const directoryMessage = `🔴 <b>ALL MOVIE &amp; SERIES CHANNELS</b>
+  const directoryMessage = `✨ <b>ALL MOVIE &amp; SERIES CHANNELS</b>
 ━━━━━━━━━━━━━━━━━━━━
 
 <blockquote>
-Apni pasand ke channel link par tap karke join kar lo 👇
+Tap on any channel link below to join instantly:
 </blockquote>
 
-🔴 <b>4K ULTRA HD MOVIES</b> (Bot: @Cinema4K_Ultra_813_bot)
+💎 <b>4K ULTRA HD MOVIES</b> (Bot: @Cinema4K_Ultra_813_bot)
 • <b>4K HDHub:</b> ${getShortLink('4khdhub')}
 • <b>UHDMovies:</b> ${getShortLink('uhdmovies')}
 • <b>CinemaLuxe:</b> ${getShortLink('cinemaluxe')}
 
-🔴 <b>CINEMAWOOD (BOLLYWOOD &amp; SOUTH)</b> (Bot: @CinemaBollywood_Ultra_bot)
+🎬 <b>CINEMAWOOD (BOLLYWOOD &amp; SOUTH)</b> (Bot: @CinemaBollywood_Ultra_bot)
 • <b>HDHub4u:</b> ${getShortLink('hdhub4u')}
 • <b>VegaMovies:</b> ${getShortLink('vega')}
 • <b>MoviesMod:</b> ${getShortLink('moviesmod')}
@@ -103,7 +104,7 @@ Apni pasand ke channel link par tap karke join kar lo 👇
 • <b>Zeefliz:</b> ${getShortLink('zeefliz')}
 • <b>Movies4u:</b> ${getShortLink('movies4u')}
 
-🔴 <b>HOLLYWOOD &amp; WEB SERIES</b> (Bot: @CinemaOTT_Series_Bot)
+📺 <b>HOLLYWOOD &amp; WEB SERIES</b> (Bot: @CinemaOTT_Series_Bot)
 • <b>MovieBox:</b> ${getShortLink('movieBoxWeb')}
 • <b>MultiMovies:</b> ${getShortLink('multimovies')}
 • <b>GokuHD:</b> ${getShortLink('gokuhd')}
@@ -112,7 +113,7 @@ Apni pasand ke channel link par tap karke join kar lo 👇
 • <b>FlixHQ:</b> ${getShortLink('flixhq')}
 • <b>ProtonMovies:</b> ${getShortLink('protonmovies')}
 
-🔴 <b>ANIME &amp; ASIAN DRAMA</b> (Bot: @CinemaAnime_Ultra_bot)
+⚡ <b>ANIME &amp; ASIAN DRAMA</b> (Bot: @CinemaAnime_Ultra_bot)
 • <b>HiAnime:</b> ${getShortLink('hianime')}
 • <b>GogoAnime:</b> ${getShortLink('gogoanime')}
 • <b>AnimeRulz:</b> ${getShortLink('animerulz')}
@@ -121,38 +122,41 @@ Apni pasand ke channel link par tap karke join kar lo 👇
 • <b>KissKH (K-Drama):</b> ${getShortLink('kisskh')}
 • <b>DramaCool:</b> ${getShortLink('dramacool')}
 
-🔴 <b>TORRENT CHANNELS</b> (Bot: @cinemaisherebtw_bot)
+⚓ <b>TORRENT ARCHIVES</b> (Bot: @cinemaisherebtw_bot)
 • <b>YTS Movies:</b> ${getShortLink('yts')}
 • <b>1337x:</b> ${getShortLink('1337x')}
 • <b>ThePirateBay:</b> ${getShortLink('thepiratebay')}
 
 ━━━━━━━━━━━━━━━━━━━━
-🌐 <b>Direct Website:</b> https://cinema-dwh.pages.dev`;
+🌐 <b>Web Player:</b> https://cinema-dwh.pages.dev`;
 
   // Clean, big mobile thumb tap buttons for main channels
   const mobileButtons = [
     [
-      client.buildReplyMarkup({ text: '🔴 4K HDHub', url: getFullLink('4khdhub') }),
-      client.buildReplyMarkup({ text: '🔴 UHDMovies', url: getFullLink('uhdmovies') }),
+      client.buildReplyMarkup({ text: '📁 Add All Channels to 1 Folder (1-Click)', url: 'https://t.me/addlist/dPkh4Vq3iCg4MWFl' }),
     ],
     [
-      client.buildReplyMarkup({ text: '🔴 HDHub4u', url: getFullLink('hdhub4u') }),
-      client.buildReplyMarkup({ text: '🔴 VegaMovies', url: getFullLink('vega') }),
+      client.buildReplyMarkup({ text: '💎 4K HDHub', url: getFullLink('4khdhub') }),
+      client.buildReplyMarkup({ text: '💎 UHDMovies', url: getFullLink('uhdmovies') }),
     ],
     [
-      client.buildReplyMarkup({ text: '🔴 MoviesMod', url: getFullLink('moviesmod') }),
-      client.buildReplyMarkup({ text: '🔴 MoviesDrive', url: getFullLink('drive') }),
+      client.buildReplyMarkup({ text: '🎬 HDHub4u', url: getFullLink('hdhub4u') }),
+      client.buildReplyMarkup({ text: '🎬 VegaMovies', url: getFullLink('vega') }),
     ],
     [
-      client.buildReplyMarkup({ text: '🔴 KatMovies', url: getFullLink('katmoviehd') }),
-      client.buildReplyMarkup({ text: '🔴 MovieBox', url: getFullLink('movieBoxWeb') }),
+      client.buildReplyMarkup({ text: '🎬 MoviesMod', url: getFullLink('moviesmod') }),
+      client.buildReplyMarkup({ text: '🎬 MoviesDrive', url: getFullLink('drive') }),
     ],
     [
-      client.buildReplyMarkup({ text: '🔴 HiAnime', url: getFullLink('hianime') }),
-      client.buildReplyMarkup({ text: '🔴 KissKH', url: getFullLink('kisskh') }),
+      client.buildReplyMarkup({ text: '🎬 KatMovies', url: getFullLink('katmoviehd') }),
+      client.buildReplyMarkup({ text: '📺 MovieBox', url: getFullLink('movieBoxWeb') }),
     ],
     [
-      client.buildReplyMarkup({ text: '🔴 YTS Torrents', url: getFullLink('yts') }),
+      client.buildReplyMarkup({ text: '⚡ HiAnime', url: getFullLink('hianime') }),
+      client.buildReplyMarkup({ text: '⚡ KissKH', url: getFullLink('kisskh') }),
+    ],
+    [
+      client.buildReplyMarkup({ text: '⚓ YTS Torrents', url: getFullLink('yts') }),
       client.buildReplyMarkup({ text: '🌐 Web Player', url: 'https://cinema-dwh.pages.dev' }),
     ],
   ];
@@ -168,25 +172,25 @@ Apni pasand ke channel link par tap karke join kar lo 👇
 
   // 4. Message 3: Simple & Friendly How-to-Watch Guide
   console.log('📤 Sending Simple How-To-Watch Guide...');
-  const friendlyGuide = `🔴 <b>HOW TO PLAY MOVIES WITHOUT BUFFERING</b>
+  const friendlyGuide = `🍿 <b>HOW TO STREAM MOVIES WITHOUT BUFFERING</b>
 ━━━━━━━━━━━━━━━━━━━━
 
 <blockquote>
-Bina ruke aur bina kisi ad ke dekhne ke liye sabse best tarika:
+Recommended guide for the fastest playback with zero advertisements:
 </blockquote>
 
-📱 <b>Phone me kaise dekhein (Android &amp; iPhone):</b>
-1. Play Store ya App Store se <b>VLC Player</b> download kar lo.
-2. Channel me kisi bhi movie ke <b>Stream &amp; Download</b> par tap karo.
-3. Apni pasand ki quality chuno (720p / 1080p / 4K).
-4. <b>Open in VLC</b> select karo — movie turant play ho jayegi, jisme aap Hindi/English audio aur subtitles bhi change kar sakte ho!
+📱 <b>On Mobile (Android &amp; iOS):</b>
+1. Install <b>VLC Player</b> from the Play Store or App Store.
+2. In any channel, tap <b>Stream &amp; Download</b> under your movie.
+3. Select your preferred resolution (720p / 1080p / 4K).
+4. Tap <b>Open in VLC</b> — playback starts immediately with dual-audio and subtitle selection support.
 
-💻 <b>Laptop ya PC me kaise dekhein:</b>
-• VLC Player kholo ➔ <code>Ctrl + N</code> dabao ➔ link paste karo aur bina download kiye dekho!
-• Ya direct browser me https://cinema-dwh.pages.dev khol kar dekho.
+💻 <b>On PC / Laptop:</b>
+• Open VLC Player ➔ Press <code>Ctrl + N</code> ➔ Paste the stream link to watch instantly.
+• Or open our Web Player directly at https://cinema-dwh.pages.dev
 
 ━━━━━━━━━━━━━━━━━━━━
-❤️ <i>Apne friends ke sath bhi share karo taaki sab free me movies dekh sakein!</i>`;
+❤️ <i>Share Cinema with your friends to enjoy ad-free streaming!</i>`;
 
   await client.sendMessage(inputPeer, {
     message: friendlyGuide,

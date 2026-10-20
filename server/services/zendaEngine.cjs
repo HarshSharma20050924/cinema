@@ -39,22 +39,62 @@ class ZendaEngine {
     if (!provider) return '';
     const p = String(provider).trim();
     const map = {
+      // 4K UHD
+      uhdmovies: 'uhd',
+      cinemaluxe: 'uhd',
+
+      // Bollywood & Desi (CinemaWood)
       moviesmod: 'mod',
       modworld: 'mod',
-      moviebox: 'movieBoxWeb',
+      bollyflix: 'hdhub4u',
+      moviesflix: 'vega',
+      extramovies: 'world4u',
+      world4ufree: 'world4u',
+      skymovieshd: 'movies4u',
+      filmyfly: 'movies4u',
+      topmovies: 'drive',
+      katmoviehd: 'drive',
+      kat: 'drive',
+      cinevood: '1cinevood',
+      luxmovies: 'luxMovies',
+      eonmovies: 'eonMovies',
+      moviezwap: 'moviezwap',
+      zeefliz: 'zeefliz',
+      movies4u: 'movies4u',
       hdhub: 'hdhub4u',
-      katmoviehd: 'katmovies',
-      kat: 'katmovies',
-      uhdmovies: 'uhd',
-      topmovies: 'topmovies',
-      extramovies: 'extraMovies',
+
+      // Hollywood & OTT Series
+      moviebox: 'movieBoxWeb',
+      movieboxweb: 'movieBoxWeb',
+      showbox: 'movieBoxWeb',
+      multimovies: 'multi',
+      gokuhd: 'movieBoxWeb',
+      protonmovies: 'protonMovies',
+      ridomovies: 'protonMovies',
+      flixhq: 'movieBoxWeb',
+
+      // Anime & Asian Drama
+      hianime: 'animeworld',
+      kisskh: 'animeworld',
+      gogoanime: 'animeworld',
+      animerulz: 'animesalt',
+      anikoto: 'animeworld',
+      animeworld: 'animeworld',
+      dramacool: 'animeworld',
+
+      // Torrents
+      thepiratebay: 'tpb',
+      yts: 'tpb',
+      '1337x': 'tpb',
     };
     return map[p.toLowerCase()] || p;
   }
 
   getProviderContext(providerValue) {
     const pVal = this.normalizeProvider(providerValue);
+    const resolvedBaseUrl = domainResolver.getBaseUrl(pVal) || '';
     return {
+      baseUrl: resolvedBaseUrl,
       axios: smartAxios,
       cheerio,
       commonHeaders: { ...DEFAULT_HEADERS },

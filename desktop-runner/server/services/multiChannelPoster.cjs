@@ -114,6 +114,15 @@ async function tgCall(token, method, data) {
     });
     return res.data;
   } catch (err) {
+    const retryAfter = err.response?.data?.parameters?.retry_after;
+    if (retryAfter && retryAfter > 0) {
+      console.log(`⏳ Telegram Flood Wait: sleeping ${retryAfter}s...`);
+      await sleep(retryAfter * 1000 + 500);
+      try {
+        const retryRes = await axios.post(`https://api.telegram.org/bot${token}/${method}`, data, { timeout: 10000 });
+        return retryRes.data;
+      } catch (_) {}
+    }
     console.warn(`[TG API ${method}] Error:`, err.response?.data?.description || err.message);
     return null;
   }
@@ -184,16 +193,19 @@ async function postToDedicatedChannel(item, provKey, channelId) {
   const posterUrl = item.image || item.poster || null;
 
   if (posterUrl && (posterUrl.startsWith('http://') || posterUrl.startsWith('https://'))) {
-    return tgCall(bot.token, 'sendPhoto', {
+    const photoRes = await tgCall(bot.token, 'sendPhoto', {
       chat_id: targetChatId,
       photo: posterUrl,
       caption: text,
       parse_mode: 'HTML',
       reply_markup: keyboard,
     });
+    if (photoRes?.ok) {
+      return photoRes;
+    }
   }
 
-  return tgCall(bot.token, 'sendMessage', {
+  return await tgCall(bot.token, 'sendMessage', {
     chat_id: targetChatId,
     text,
     parse_mode: 'HTML',
@@ -253,7 +265,7 @@ async function checkLatestReleases() {
           if (res?.ok) {
             recordHistory(key);
             newInExt++;
-            await sleep(1500); // Flood prevention
+            await sleep(2500); // Flood prevention
           }
         }
 
