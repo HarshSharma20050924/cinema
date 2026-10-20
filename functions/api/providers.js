@@ -64,7 +64,7 @@ export async function onRequest(context) {
         version: p.version,
         icon: p.icon,
         type: p.type || "global",
-        disabled: Boolean(p.disabled),
+        disabled: p.value === "multi" ? false : Boolean(p.disabled),
       }));
     }
 
@@ -133,6 +133,9 @@ export async function onRequest(context) {
         }
         if (UNSUPPORTED_PROVIDERS.has(valLower)) {
           return false;
+        }
+        if (valLower === 'multi') {
+          return true;
         }
         return !p.disabled;
       })

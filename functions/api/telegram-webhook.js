@@ -607,6 +607,75 @@ function formatEpisodeButtonLabel(rawTitle, epCount, rawQuality = '', groupIndex
   return main;
 }
 
+// Cleanly extract Resolution, Language & Server Host for stream mirror buttons
+function formatStreamMirrorLabel(m, mediaTitle) {
+  const rawServer = String(m?.server || 'Direct Link').trim();
+  const rawQual = String(m?.quality || m?.resolution || '').trim();
+
+  // 1. Extract resolution tag (4K, 1080p, 720p, 480p, 360p)
+  let qTag = '';
+  if (/\b(2160p|4k|uhd)\b/i.test(rawQual)) qTag = '4K';
+  else if (/\b1080p?\b/i.test(rawQual)) qTag = '1080p';
+  else if (/\b720p?\b/i.test(rawQual)) qTag = '720p';
+  else if (/\b480p?\b/i.test(rawQual)) qTag = '480p';
+  else if (/\b360p?\b/i.test(rawQual)) qTag = '360p';
+  else if (/^\d{3,4}$/.test(rawQual)) qTag = `${rawQual}p`;
+
+  if (!qTag) {
+    const sMatch = (rawServer + ' ' + (m?.link || '')).match(/\b(2160p|4k|uhd|1080p|720p|480p|360p)\b/i);
+    if (sMatch) {
+      qTag = sMatch[1].toUpperCase();
+      if (qTag === '2160P' || qTag === 'UHD') qTag = '4K';
+      else if (!qTag.endsWith('P') && qTag !== '4K') qTag += 'p';
+    }
+  }
+
+  // 2. Clean server / host string
+  let cleanSrv = rawServer
+    .replace(/\s*\(download\s*only\)/i, '')
+    .replace(/^Server\s*/i, '')
+    .trim();
+
+  // Strip media title if present at start (e.g. "Game of Thrones - Hindi, English - 720p")
+  if (mediaTitle && mediaTitle.length > 2) {
+    const escaped = mediaTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    cleanSrv = cleanSrv.replace(new RegExp(`^${escaped}[\\s-:|–—]*`, 'i'), '').trim();
+    cleanSrv = cleanSrv.replace(/^(?:series|movie|season\s*\d+|s\d{1,2})[\s-:|–—]*/i, '').trim();
+  }
+
+  // Extract language if present (e.g. Hindi, English, Tamil, Telugu, Dual)
+  let lang = '';
+  if (/dual\s*audio/i.test(cleanSrv) || (/\bhindi\b/i.test(cleanSrv) && /\benglish\b/i.test(cleanSrv))) lang = 'Dual';
+  else if (/\bhindi\b/i.test(cleanSrv)) lang = 'Hindi';
+  else if (/\btamil\b/i.test(cleanSrv)) lang = 'Tamil';
+  else if (/\btelugu\b/i.test(cleanSrv)) lang = 'Telugu';
+  else if (/\benglish\b/i.test(cleanSrv)) lang = 'Eng';
+  else if (/\bpunjabi\b/i.test(cleanSrv)) lang = 'Punjabi';
+
+  // Extract cloud host if recognized
+  let host = '';
+  if (/pixeldrain/i.test(cleanSrv) || /pixeldrain/i.test(m?.link || '')) host = 'Pixeldrain';
+  else if (/gdrive|google/i.test(cleanSrv) || /drive\.google/i.test(m?.link || '')) host = 'GDrive';
+  else if (/hubcloud|hubdrive/i.test(cleanSrv)) host = 'HubCloud';
+  else if (/vidbolt/i.test(cleanSrv)) host = 'VidBolt';
+  else if (/filmu/i.test(cleanSrv)) host = 'Filmu';
+  else if (/streamtape/i.test(cleanSrv)) host = 'StreamTape';
+  else if (/dood/i.test(cleanSrv)) host = 'Dood';
+
+  const parts = [];
+  if (host) parts.push(host);
+  if (lang && !host) parts.push(lang);
+  if (qTag) parts.push(qTag);
+
+  let label = parts.join(' ');
+  if (!label) {
+    label = cleanSrv.replace(/[\s-:|–—]+$/, '').trim() || 'Fast Server';
+    if (label.length > 15) label = label.slice(0, 14) + '…';
+  }
+
+  return label;
+}
+
 // Extract overall badges for item card header
 function extractQualityBadges(title, linkList = []) {
   const allTexts = [title || ''];
@@ -876,8 +945,9 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
       });
 
       const controller = new AbortController();
-      const isSlowEndpoint = endpoint.includes('/streams') || endpoint.includes('/search') || endpoint.includes('/meta') || endpoint.includes('/episodes');
-      const timeoutMs = isSlowEndpoint ? 6500 : 3500;
+      const isStreams = endpoint.includes('/streams');
+      const isSlowEndpoint = isStreams || endpoint.includes('/search') || endpoint.includes('/meta') || endpoint.includes('/episodes');
+      const timeoutMs = isStreams ? 16000 : (isSlowEndpoint ? 10000 : 4000);
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(url.toString(), {
@@ -1618,6 +1688,89 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     return showItemDetails(chatId, item, token, db, requestUrl, messageId, page, itemStoreId);
   }
 
+  // Season Quality / Options Picker: sq:<sqStoreId>
+  if (data.startsWith('sq:')) {
+    const sqStoreId = data.replace('sq:', '');
+    const sqData = await getStoredLink(db, sqStoreId);
+    if (!sqData) {
+      return tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Session expired.', show_alert: true });
+    }
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
+
+    const info = sqData.link || {};
+    const seasonNum = info.seasonNum || 1;
+    const seasonGroups = info.groups || [];
+    const seriesTitle = info.seriesTitle || sqData.title;
+    const cleanSeries = sanitizeCleanTitle(seriesTitle);
+
+    let text = `🎬 <b>${escapeHtml(cleanSeries)} • Season ${seasonNum}</b>\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `<i>Choose your preferred resolution/quality for Season ${seasonNum}:</i>`;
+
+    const keyboard = [];
+    const rowBatch = [];
+
+    for (let i = 0; i < seasonGroups.length; i++) {
+      const group = seasonGroups[i];
+      const dLinks = group.directLinks || [];
+      const isPackGroup = group.quality === 'Pack' || /(full\s*season\s*packs?|season\s*packs?|batch\s*packs?|all\s*episodes\s*zip)/i.test(group.title || '');
+
+      if (isPackGroup && dLinks.length > 0) {
+        for (const pack of dLinks) {
+          const pTitle = `${cleanSeries} • S${seasonNum} Season Pack`;
+          const pStoreId = await storeLink(db, sqData.provider, pack.link, pTitle);
+          const pLabel = formatPackButtonLabel(`${group.title || ''} ${pack.title || ''}`);
+          rowBatch.push({ text: `📦 ${pLabel}`, callback_data: `resopt:${pStoreId}` });
+        }
+      } else if (dLinks.length > 1) {
+        // Episodes inside this quality
+        const epGroupStoreId = await storeLink(db, sqData.provider, {
+          episodes: dLinks,
+          groupTitle: group.title,
+          seriesTitle: seriesTitle,
+          provider: sqData.provider
+        }, `${cleanSeries} • Season ${seasonNum}`);
+        const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, i, group.dub || group.language || '');
+        rowBatch.push({ text: `📺 ${label}`, callback_data: `eps:${epGroupStoreId}` });
+      } else if (group.episodesLink) {
+        const epGroupStoreId = await storeLink(db, sqData.provider, {
+          episodesLink: group.episodesLink,
+          groupTitle: group.title,
+          seriesTitle: seriesTitle,
+          provider: sqData.provider
+        }, `${cleanSeries} • Season ${seasonNum}`);
+        const label = formatEpisodeButtonLabel(group.title, 0, group.quality, i, group.dub || group.language || '');
+        rowBatch.push({ text: `📺 ${label}`, callback_data: `eps:${epGroupStoreId}` });
+      } else {
+        // Single link (stream / episode list page)
+        const targetLink = dLinks[0]?.link || group.link;
+        const resLabel = extractCleanResolution(group.title || group.quality);
+        const epTitle = `${cleanSeries} • S${seasonNum}${resLabel ? ` [${resLabel}]` : ''}`;
+        const epStoreId = await storeLink(db, sqData.provider, targetLink, epTitle);
+        const qLabel = formatQualityButtonLabel(group.title || group.quality, `Quality ${i + 1}`);
+        rowBatch.push({ text: `⚡ ${qLabel}`, callback_data: `resopt:${epStoreId}` });
+      }
+    }
+
+    for (let i = 0; i < rowBatch.length; i += 2) {
+      keyboard.push(rowBatch.slice(i, i + 2));
+    }
+
+    const navRow = [];
+    if (info.itemStoreId) {
+      navRow.push({ text: '⬅️ All Seasons', callback_data: `item:${info.itemStoreId}` });
+    }
+    navRow.push({ text: '🌐 Cinema Web', url: DEFAULT_WEB_URL });
+    keyboard.push(navRow);
+
+    return tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: keyboard }
+    });
+  }
+
   // Episodes Pagination: eps:<storeId> or epage:<storeId>:<page>
   if (data.startsWith('eps:') || data.startsWith('epage:')) {
     let epGroupStoreId;
@@ -1922,7 +2075,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       }, 2300);
     }
 
-    const mirrors = await fetchPromise;
+    const safetyTimeout = new Promise((resolve) => setTimeout(() => resolve(null), 18000));
+    const mirrors = await Promise.race([fetchPromise, safetyTimeout]);
     if (progressTimer1) clearTimeout(progressTimer1);
     if (progressTimer2) clearTimeout(progressTimer2);
 
@@ -1988,13 +2142,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       if (seenDedupe.has(dedupeKey)) return;
       seenDedupe.add(dedupeKey);
 
-      let rawServer = (m.server || 'Direct Link').trim();
-      let sName = rawServer.replace(/\s*\(download\s*only\)/i, '').replace(/^Server\s*/i, '').trim();
-      if (!sName || sName.toLowerCase() === 'mirror') sName = 'Fast Server';
-      sName = sName.slice(0, 12);
-
+      const baseLabel = formatStreamMirrorLabel(m, cleanTitle);
+      let sName = baseLabel;
       if (seenNames.has(sName)) {
-        sName = `${sName} ${uniqueMirrors.length + 1}`;
+        let counter = 2;
+        while (seenNames.has(`${baseLabel} (${counter})`)) {
+          counter++;
+        }
+        sName = `${baseLabel} (${counter})`;
       }
       seenNames.add(sName);
 
@@ -2213,93 +2368,164 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       url: actualLink,
       cachedMeta: meta
     }, item.title));
-    const pageSize = 8;
-    const totalPages = Math.ceil(rawGroups.length / pageSize) || 1;
-    const currentPage = Math.max(1, Math.min(page, totalPages));
-    const startIndex = (currentPage - 1) * pageSize;
-    const pageItems = rawGroups.slice(startIndex, startIndex + pageSize);
+    // Check if multiple seasons are detected across groups
+    const seasonMap = new Map();
+    let hasMultiSeason = false;
 
-    // Render quality / episode batches in compact mobile rows (up to 2 per row)
-    const rowBatch = [];
-    for (let i = 0; i < pageItems.length; i++) {
-      const group = pageItems[i];
-      const dLinks = group.directLinks || [];
-      const isPackGroup = group.quality === 'Pack' || /(full\s*season\s*packs?|season\s*packs?|batch\s*packs?|all\s*episodes\s*zip)/i.test(group.title || '');
-
-      if (isPackGroup && dLinks.length > 0) {
-        // SERIES PACK
-        for (const pack of dLinks) {
-          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-          const packSeason = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(pack.title) || extractActualSeason(item.title);
-          const sStr = packSeason ? `S${packSeason} ` : '';
-          const pTitle = `${cleanBase} • ${sStr}Season Pack`;
-          const pStoreId = await storeLink(db, item.provider, pack.link, pTitle);
-          const pLabel = formatPackButtonLabel(`${group.title || ''} ${pack.title || ''}`);
-          rowBatch.push({ text: `📦 ${pLabel}`, callback_data: `resopt:${pStoreId}` });
+    if (isSeries) {
+      for (const group of rawGroups) {
+        const sNum = extractActualSeason(group.dub) || extractActualSeason(group.title);
+        if (sNum !== null && sNum !== undefined) {
+          if (!seasonMap.has(sNum)) seasonMap.set(sNum, []);
+          seasonMap.get(sNum).push(group);
         }
-      } else if (dLinks.length > 1) {
-        // SERIES: Multiple episodes in season
-        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-        const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title);
-        const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
-        const groupStoredTitle = `${cleanBase} • ${sStr}`;
-        const epGroupStoreId = await storeLink(db, item.provider, {
-          episodes: dLinks,
-          allGroups: rawGroups,
-          groupTitle: group.title,
-          seriesTitle: meta?.title || item.title,
-          provider: item.provider
-        }, groupStoredTitle);
-        const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, startIndex + i, group.dub || group.language || '');
-        rowBatch.push({ text: `📺 ${label}`, callback_data: `eps:${epGroupStoreId}` });
-      } else if (group.episodesLink) {
-        // SERIES: External episodes index link
-        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-        const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title);
-        const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
-        const groupStoredTitle = `${cleanBase} • ${sStr}`;
-        const epGroupStoreId = await storeLink(db, item.provider, {
-          episodesLink: group.episodesLink,
-          allGroups: rawGroups,
-          groupTitle: group.title,
-          seriesTitle: meta?.title || item.title,
-          provider: item.provider
-        }, groupStoredTitle);
-        const label = formatEpisodeButtonLabel(group.title, 0, group.quality, startIndex + i, group.dub || group.language || '');
-        rowBatch.push({ text: `📺 ${label}`, callback_data: `eps:${epGroupStoreId}` });
-      } else if (isSeries) {
-        // SERIES: Group with single episode link (e.g. Movies4u, MX Player, Anime, etc.)
-        const targetLink = dLinks[0]?.link || group.link || actualLink;
-        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-        const epNum = extractActualEpisode(group.title) || extractActualEpisode(dLinks[0]?.title) || (startIndex + i + 1);
-        const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title) || 1;
-        const resLabel = extractCleanResolution(group.title || group.quality);
-        const epTitle = `${cleanBase} • S${seasonNum} Ep ${epNum}${resLabel ? ` [${resLabel}]` : ''}`;
-        const epStoreId = await storeLink(db, item.provider, targetLink, epTitle);
-        const epBtnLabel = resLabel ? `Ep ${epNum} [${resLabel}]` : `Ep ${epNum}`;
-        rowBatch.push({ text: `▶️ ${epBtnLabel}`, callback_data: `resopt:${epStoreId}` });
-      } else {
-        // MOVIE: Each quality group is a direct stream resolution (resopt:)
-        const targetLink = dLinks[0]?.link || group.link || actualLink;
-        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-        const resLabel = extractCleanResolution(group.title || group.quality);
-        const qTitle = resLabel ? `${cleanBase} [${resLabel}]` : cleanBase;
-        const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
-        const label = formatQualityButtonLabel(group.title || group.quality, 'Play Movie');
-        rowBatch.push({ text: `▶️ ${label}`, callback_data: `resopt:${qStoreId}` });
+      }
+      if (seasonMap.size > 1) {
+        hasMultiSeason = true;
       }
     }
 
-    for (let i = 0; i < rowBatch.length; i += 2) {
-      keyboard.push(rowBatch.slice(i, i + 2));
-    }
+    if (hasMultiSeason) {
+      // Clustered Multi-Season Mode: Render seasons ascending (Season 1 to Season N)
+      const sortedSeasonNums = Array.from(seasonMap.keys()).sort((a, b) => a - b);
+      const pageSize = 12;
+      const totalPages = Math.ceil(sortedSeasonNums.length / pageSize) || 1;
+      const currentPage = Math.max(1, Math.min(page, totalPages));
+      const startIndex = (currentPage - 1) * pageSize;
+      const pageSeasons = sortedSeasonNums.slice(startIndex, startIndex + pageSize);
 
-    if (totalPages > 1) {
-      const navRow = [];
-      if (currentPage > 1) navRow.push({ text: '⬅️ Prev', callback_data: `qpage:${itemStoreId}:${currentPage - 1}` });
-      navRow.push({ text: `📄 Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
-      if (currentPage < totalPages) navRow.push({ text: 'Next ➡️', callback_data: `qpage:${itemStoreId}:${currentPage + 1}` });
-      keyboard.push(navRow);
+      const rowBatch = [];
+      for (const sNum of pageSeasons) {
+        const seasonGroups = seasonMap.get(sNum) || [];
+        if (seasonGroups.length === 1 && (seasonGroups[0].directLinks?.length || 0) > 1) {
+          // Direct episode list available for this season (e.g. Castle TV)
+          const singleGroup = seasonGroups[0];
+          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+          const groupStoredTitle = `${cleanBase} • Season ${sNum}`;
+          const epGroupStoreId = await storeLink(db, item.provider, {
+            episodes: singleGroup.directLinks,
+            allGroups: rawGroups,
+            groupTitle: singleGroup.title,
+            seriesTitle: meta?.title || item.title,
+            provider: item.provider
+          }, groupStoredTitle);
+          rowBatch.push({ text: `📺 Season ${sNum}`, callback_data: `eps:${epGroupStoreId}` });
+        } else {
+          // Multiple qualities or single season pack (e.g. Movies4u, Vega, MoviesMod)
+          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+          const sqStoreId = await storeLink(db, item.provider, {
+            seasonNum: sNum,
+            groups: seasonGroups,
+            seriesTitle: meta?.title || item.title,
+            itemStoreId: itemStoreId,
+            provider: item.provider
+          }, `${cleanBase} • Season ${sNum}`);
+          rowBatch.push({ text: `📺 Season ${sNum}`, callback_data: `sq:${sqStoreId}` });
+        }
+      }
+
+      for (let i = 0; i < rowBatch.length; i += 2) {
+        keyboard.push(rowBatch.slice(i, i + 2));
+      }
+
+      if (totalPages > 1) {
+        const navRow = [];
+        if (currentPage > 1) navRow.push({ text: '⬅️ Prev', callback_data: `qpage:${itemStoreId}:${currentPage - 1}` });
+        navRow.push({ text: `📄 Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
+        if (currentPage < totalPages) navRow.push({ text: 'Next ➡️', callback_data: `qpage:${itemStoreId}:${currentPage + 1}` });
+        keyboard.push(navRow);
+      }
+    } else {
+      // Standard Single-Season / Movie / Episode list
+      const pageSize = 8;
+      const totalPages = Math.ceil(rawGroups.length / pageSize) || 1;
+      const currentPage = Math.max(1, Math.min(page, totalPages));
+      const startIndex = (currentPage - 1) * pageSize;
+      const pageItems = rawGroups.slice(startIndex, startIndex + pageSize);
+
+      const rowBatch = [];
+      for (let i = 0; i < pageItems.length; i++) {
+        const group = pageItems[i];
+        const dLinks = group.directLinks || [];
+        const isPackGroup = group.quality === 'Pack' || /(full\s*season\s*packs?|season\s*packs?|batch\s*packs?|all\s*episodes\s*zip)/i.test(group.title || '');
+
+        if (isPackGroup && dLinks.length > 0) {
+          for (const pack of dLinks) {
+            const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+            const packSeason = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(pack.title) || extractActualSeason(item.title);
+            const sStr = packSeason ? `S${packSeason} ` : '';
+            const pTitle = `${cleanBase} • ${sStr}Season Pack`;
+            const pStoreId = await storeLink(db, item.provider, pack.link, pTitle);
+            const pLabel = formatPackButtonLabel(`${group.title || ''} ${pack.title || ''}`);
+            rowBatch.push({ text: `📦 ${pLabel}`, callback_data: `resopt:${pStoreId}` });
+          }
+        } else if (dLinks.length > 1) {
+          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+          const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title);
+          const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
+          const groupStoredTitle = `${cleanBase} • ${sStr}`;
+          const epGroupStoreId = await storeLink(db, item.provider, {
+            episodes: dLinks,
+            allGroups: rawGroups,
+            groupTitle: group.title,
+            seriesTitle: meta?.title || item.title,
+            provider: item.provider
+          }, groupStoredTitle);
+          const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, startIndex + i, group.dub || group.language || '');
+          rowBatch.push({ text: `📺 ${label}`, callback_data: `eps:${epGroupStoreId}` });
+        } else if (group.episodesLink) {
+          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+          const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title);
+          const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
+          const groupStoredTitle = `${cleanBase} • ${sStr}`;
+          const epGroupStoreId = await storeLink(db, item.provider, {
+            episodesLink: group.episodesLink,
+            allGroups: rawGroups,
+            groupTitle: group.title,
+            seriesTitle: meta?.title || item.title,
+            provider: item.provider
+          }, groupStoredTitle);
+          const label = formatEpisodeButtonLabel(group.title, 0, group.quality, startIndex + i, group.dub || group.language || '');
+          rowBatch.push({ text: `📺 ${label}`, callback_data: `eps:${epGroupStoreId}` });
+        } else if (isSeries) {
+          const targetLink = dLinks[0]?.link || group.link || actualLink;
+          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+          const epNum = extractActualEpisode(group.title) || extractActualEpisode(dLinks[0]?.title);
+          const seasonNum = extractActualSeason(group.dub) || extractActualSeason(group.title) || extractActualSeason(item.title) || 1;
+          const resLabel = extractCleanResolution(group.title || group.quality);
+          if (epNum !== null && epNum !== undefined) {
+            const epTitle = `${cleanBase} • S${seasonNum} Ep ${epNum}${resLabel ? ` [${resLabel}]` : ''}`;
+            const epStoreId = await storeLink(db, item.provider, targetLink, epTitle);
+            const epBtnLabel = resLabel ? `Ep ${epNum} [${resLabel}]` : `Ep ${epNum}`;
+            rowBatch.push({ text: `▶️ ${epBtnLabel}`, callback_data: `resopt:${epStoreId}` });
+          } else {
+            const qLabel = formatQualityButtonLabel(group.title || group.quality, `Quality ${startIndex + i + 1}`);
+            const qTitle = `${cleanBase} • S${seasonNum}${resLabel ? ` [${resLabel}]` : ''}`;
+            const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
+            rowBatch.push({ text: `⚡ ${qLabel}`, callback_data: `resopt:${qStoreId}` });
+          }
+        } else {
+          const targetLink = dLinks[0]?.link || group.link || actualLink;
+          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+          const resLabel = extractCleanResolution(group.title || group.quality);
+          const qTitle = resLabel ? `${cleanBase} [${resLabel}]` : cleanBase;
+          const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
+          const label = formatQualityButtonLabel(group.title || group.quality, 'Play Movie');
+          rowBatch.push({ text: `▶️ ${label}`, callback_data: `resopt:${qStoreId}` });
+        }
+      }
+
+      for (let i = 0; i < rowBatch.length; i += 2) {
+        keyboard.push(rowBatch.slice(i, i + 2));
+      }
+
+      if (totalPages > 1) {
+        const navRow = [];
+        if (currentPage > 1) navRow.push({ text: '⬅️ Prev', callback_data: `qpage:${itemStoreId}:${currentPage - 1}` });
+        navRow.push({ text: `📄 Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
+        if (currentPage < totalPages) navRow.push({ text: 'Next ➡️', callback_data: `qpage:${itemStoreId}:${currentPage + 1}` });
+        keyboard.push(navRow);
+      }
     }
   } else {
     const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
