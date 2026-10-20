@@ -37,9 +37,31 @@ class ManifestService {
     try {
       const res = await axios.get(`${ZENDA_RAW}/manifest.json`, { timeout: 8000 });
       if (Array.isArray(res.data)) {
+        const UNSUPPORTED = new Set([
+          'katmoviehd', 'bollyflix', 'moviesflix', 'extramovies', 'world4ufree',
+          'skymovieshd', 'cinevood', 'luxmovies', 'eonmovies', 'cinemaluxe',
+          'gokuhd', 'ridomovies', 'protonmovies', 'kisskh', 'gogoanime',
+          'animerulz', 'yts', '1337x', 'moviesapi', 'kartoons', 'cinefreak',
+          'everything', 'uniquestream', 'moviebox', 'skymoviehd'
+        ]);
+
+        const FORCE_ENABLED = new Set([
+          'multi', 'movieBoxWeb', 'netflixMirror', 'disneyMirror', 'primeMirror',
+          'castle', 'mxplayer', 'animesalt', 'animeworld', 'hiAnime', '4khdhub',
+          'hdhub4u', 'vega', 'drive', 'moviesmod', 'mod', 'uhd', 'movies4u', 'topmovies',
+          'tpb', 'gramcinema', 'olamovies', 'showbox', 'flixhq', 'dramacool', 'filmyfly',
+          'moviezwap', 'zeefliz', 'torrentio', 'autoEmbed', 'anikoto'
+        ]);
+
         remoteList = res.data.map((p) => {
+          const valLower = (p.value || '').toLowerCase();
           const isLegacyMovieBoxApp = p.value === 'movieBox';
           const isMovieBoxWeb = p.value === 'movieBoxWeb';
+          const isUnsupported = UNSUPPORTED.has(valLower);
+          const isForceEnabled = FORCE_ENABLED.has(valLower) || FORCE_ENABLED.has(p.value);
+
+          let isDisabled = Boolean(p.disabled) || isLegacyMovieBoxApp || isUnsupported;
+          if (isForceEnabled) isDisabled = false;
 
           return {
             name: isMovieBoxWeb ? 'MovieBox' : p.display_name,
@@ -47,7 +69,7 @@ class ManifestService {
             version: p.version,
             icon: p.icon || '',
             type: p.type || 'global',
-            disabled: Boolean(p.disabled) || isLegacyMovieBoxApp,
+            disabled: isDisabled,
           };
         });
       }

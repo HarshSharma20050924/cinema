@@ -294,13 +294,24 @@ app.get('/api/admin/providers', requireAdmin, async (req, res) => {
     }
   } catch (_) {}
 
+  const UNSUPPORTED = new Set([
+    'katmoviehd', 'bollyflix', 'moviesflix', 'extramovies', 'world4ufree',
+    'skymovieshd', 'cinevood', 'luxmovies', 'eonmovies', 'cinemaluxe',
+    'gokuhd', 'ridomovies', 'protonmovies', 'kisskh', 'gogoanime',
+    'animerulz', 'yts', '1337x', 'moviesapi', 'kartoons', 'cinefreak',
+    'everything', 'uniquestream', 'moviebox', 'skymoviehd'
+  ]);
+
   const extensions = masterList.map(ext => {
-    const cfg = providersConfig[ext.value];
-    const isHidden = cfg?.hidden === true || cfg?.enabled === false;
+    const valLower = (ext.value || '').toLowerCase();
+    const cfg = providersConfig[ext.value] || providersConfig[valLower];
+    const isUnsupported = UNSUPPORTED.has(valLower);
+    const isHidden = cfg?.hidden === true || cfg?.enabled === false || (cfg?.enabled !== true && isUnsupported);
     return {
       ...ext,
       enabled: !isHidden,
       hidden: isHidden,
+      hasStreamModule: !isUnsupported,
     };
   });
 

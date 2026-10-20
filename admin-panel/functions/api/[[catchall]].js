@@ -627,13 +627,24 @@ export async function onRequest(context) {
         }
       } catch (_) {}
 
+      const UNSUPPORTED = new Set([
+        'katmoviehd', 'bollyflix', 'moviesflix', 'extramovies', 'world4ufree',
+        'skymovieshd', 'cinevood', 'luxmovies', 'eonmovies', 'cinemaluxe',
+        'gokuhd', 'ridomovies', 'protonmovies', 'kisskh', 'gogoanime',
+        'animerulz', 'yts', '1337x', 'moviesapi', 'kartoons', 'cinefreak',
+        'everything', 'uniquestream', 'moviebox', 'skymoviehd'
+      ]);
+
       const extensions = masterList.map(ext => {
-        const cfg = savedConfig[ext.value];
-        const isHidden = cfg?.hidden === true || cfg?.enabled === false;
+        const valLower = (ext.value || '').toLowerCase();
+        const cfg = savedConfig[ext.value] || savedConfig[valLower];
+        const isUnsupported = UNSUPPORTED.has(valLower);
+        const isHidden = cfg?.hidden === true || cfg?.enabled === false || (cfg?.enabled !== true && isUnsupported);
         return {
           ...ext,
           enabled: !isHidden,
           hidden: isHidden,
+          hasStreamModule: !isUnsupported,
         };
       });
 

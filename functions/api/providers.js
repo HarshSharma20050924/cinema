@@ -105,14 +105,24 @@ export async function onRequest(context) {
       }
     }
 
-    // 4. Filter according to Administrator's config
+    const UNSUPPORTED_PROVIDERS = new Set([
+      'katmoviehd', 'bollyflix', 'moviesflix', 'extramovies', 'world4ufree',
+      'skymovieshd', 'cinevood', 'luxmovies', 'eonmovies', 'cinemaluxe',
+      'gokuhd', 'ridomovies', 'protonmovies', 'kisskh', 'gogoanime',
+      'animerulz', 'yts', '1337x', 'moviesapi', 'kartoons', 'cinefreak',
+      'everything', 'uniquestream', 'moviebox', 'skymoviehd'
+    ]);
+
+    // 4. Filter according to Administrator's config & stream support
     // Admin config in D1/KV has 100% precedence:
     // - If admin explicitly enabled it -> Include it
     // - If admin explicitly hidden/disabled it -> Exclude it
-    // - If not touched by admin yet -> Keep active (exclude dead upstream)
+    // - If non-streaming or unsupported -> Exclude it
     const filteredProviders = providers
       .filter((p) => {
-        const cfg = adminConfig[p.value];
+        const val = p.value || '';
+        const valLower = val.toLowerCase();
+        const cfg = adminConfig[val] || adminConfig[valLower];
         if (cfg) {
           if (cfg.hidden === true || cfg.enabled === false) {
             return false;
@@ -120,6 +130,9 @@ export async function onRequest(context) {
           if (cfg.enabled === true) {
             return true;
           }
+        }
+        if (UNSUPPORTED_PROVIDERS.has(valLower)) {
+          return false;
         }
         return !p.disabled;
       })
