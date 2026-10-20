@@ -655,9 +655,10 @@ function formatStreamMirrorLabel(m, mediaTitle) {
   // Extract cloud host if recognized
   let host = '';
   if (/pixeldrain/i.test(cleanSrv) || /pixeldrain/i.test(m?.link || '')) host = 'Pixeldrain';
-  else if (/gdrive|google/i.test(cleanSrv) || /drive\.google/i.test(m?.link || '')) host = 'GDrive';
+  else if (/\bgd\b|gdrive|google|g-direct|gdflix/i.test(cleanSrv) || /drive\.google/i.test(m?.link || '')) host = 'GDrive';
   else if (/hubcloud|hubdrive/i.test(cleanSrv)) host = 'HubCloud';
-  else if (/vidbolt/i.test(cleanSrv)) host = 'VidBolt';
+  else if (/vidbolt/i.test(cleanSrv) || /vidbolt/i.test(m?.link || '')) host = 'VidBolt';
+  else if (/streamhg/i.test(cleanSrv) || /streamhg/i.test(m?.link || '')) host = 'StreamHG';
   else if (/filmu/i.test(cleanSrv)) host = 'Filmu';
   else if (/streamtape/i.test(cleanSrv)) host = 'StreamTape';
   else if (/dood/i.test(cleanSrv)) host = 'Dood';
@@ -670,8 +671,8 @@ function formatStreamMirrorLabel(m, mediaTitle) {
   let label = parts.join(' ');
   if (!label) {
     label = cleanSrv.replace(/[\s-:|–—]+$/, '').trim() || 'Fast Server';
-    if (label.length > 15) label = label.slice(0, 14) + '…';
   }
+  if (label.length > 12) label = label.slice(0, 11).trim();
 
   return label;
 }
@@ -2034,6 +2035,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     // Progressive real visual progress bar updates while resolving
     let progressTimer1 = null;
     let progressTimer2 = null;
+    let progressTimer3 = null;
 
     if (waitMsgId) {
       progressTimer1 = setTimeout(async () => {
@@ -2068,17 +2070,39 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
               `<i>Verifying high-speed stream links...</i>`,
             parse_mode: 'HTML',
             reply_markup: {
-              inline_keyboard: [[{ text: 'Verifying Streams • 90%', callback_data: 'noop' }]]
+              inline_keyboard: [[{ text: 'Verifying Streams • 90%', callback_data: `resopt:${qStoreId}` }]]
             }
           });
         } catch (_) {}
       }, 2300);
+
+      progressTimer3 = setTimeout(async () => {
+        try {
+          await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
+          await tgCall(token, 'editMessageText', {
+            chat_id: chatId,
+            message_id: waitMsgId,
+            text: `<b>Resolving Cloud Streams...</b>\n` +
+              `<b>${escapeHtml(cleanTitle)}</b>\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `<code>[■■■■■■■■■□] 95%</code>\n\n` +
+              `<i>Server node is processing mirrors... If slow, tap Retry:</i>`,
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '🔄 Tap to Retry / Refresh', callback_data: `resopt:${qStoreId}` }]
+              ]
+            }
+          });
+        } catch (_) {}
+      }, 4200);
     }
 
     const safetyTimeout = new Promise((resolve) => setTimeout(() => resolve(null), 18000));
     const mirrors = await Promise.race([fetchPromise, safetyTimeout]);
     if (progressTimer1) clearTimeout(progressTimer1);
     if (progressTimer2) clearTimeout(progressTimer2);
+    if (progressTimer3) clearTimeout(progressTimer3);
 
     const uniqueMap = new Map();
     (mirrors || []).forEach(s => {
@@ -2119,7 +2143,6 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     resMsg += `🌐 Source: <b>${escapeHtml(item.provider ? item.provider.toUpperCase() : 'CINEMA')}</b>\n`;
     resMsg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     resMsg += `<code>[■■■■■■■■■■] 100% Ready</code>\n\n`;
-    resMsg += `<i>Choose your preferred option below to play in VLC or download:</i>\n`;
 
     // Deduplicate mirrors and pair VLC + Download symmetrically
     const uniqueMirrors = [];
@@ -2160,6 +2183,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       });
     });
 
+    if (uniqueMirrors.length > 0) {
+      resMsg += `<b>Available Mirrors:</b>\n`;
+      uniqueMirrors.slice(0, 4).forEach((m, idx) => {
+        resMsg += `• <b>Option ${idx + 1}:</b> <code>${escapeHtml(m.sName)}</code>\n`;
+      });
+      resMsg += `\n<i>Choose your preferred option below to play in VLC or download:</i>\n`;
+    }
+
     const keyboard = [];
     uniqueMirrors.slice(0, 4).forEach((m) => {
       const vlcRedirectUrl = `${DEFAULT_WEB_URL}/vlc/?url=${encodeURIComponent(m.url)}&title=${encodeURIComponent(cleanTitle)}`;
@@ -2171,10 +2202,10 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         dlUrl = `${DEFAULT_WEB_URL}/api/download?url=${encodeURIComponent(dlUrl)}&filename=${encodeURIComponent(cleanTitle.replace(/[^\w\s.-]/g, '') + '.mp4')}`;
       }
 
-      // Always pair VLC and Download together symmetrically in the same row
+      // Compact mobile-friendly buttons that never truncate on smartphones
       keyboard.push([
-        { text: `🎬 VLC Player (${m.sName})`, url: vlcRedirectUrl },
-        { text: `📥 Download (${m.sName})`, url: dlUrl }
+        { text: `🎬 VLC (${m.sName})`, url: vlcRedirectUrl },
+        { text: `📥 Download`, url: dlUrl }
       ]);
     });
 

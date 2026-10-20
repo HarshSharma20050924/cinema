@@ -14,6 +14,7 @@ const BOTS = [
   { username: 'CinemaOTT_Series_Bot', logo: 'bot_series_logo.png', name: 'Cinema OTT Series Bot' },
   { username: 'Cinema4K_Ultra_813_bot', logo: 'bot_4k_logo.png', name: 'Cinema 4K Bot' },
   { username: 'CinemaAnime_Ultra_bot', logo: 'bot_anime_logo.png', name: 'Cinema Anime Bot' },
+  { username: 'cinemaisherebtw_bot', logo: 'bot_cinema_logo.png', name: 'Cinema Main Bot' },
 ];
 
 async function sleep(ms) {

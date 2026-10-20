@@ -1,112 +1,147 @@
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-def generate_all_vega_logos():
-    base_logo_path = 'public/logo.png'
+def generate_all_channel_logos():
     output_dir = 'server/data/channel_logos'
     os.makedirs(output_dir, exist_ok=True)
 
     inter_bold = './vega-app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_bold.ttf'
+    if not os.path.exists(inter_bold):
+        inter_bold = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 
-    # All actual catalog providers from Vega (filtering out pure iframe resolvers like autoEmbed, vidsrc)
     providers = [
-        {"id": "hdhub4u", "label": "HDHUB4U"},
-        {"id": "4khdhub", "label": "4K HDHUB"},
-        {"id": "vega", "label": "VEGAMOVIES"},
-        {"id": "moviesmod", "label": "MOVIESMOD"},
-        {"id": "drive", "label": "MOVIESDRIVE"},
-        {"id": "katmoviehd", "label": "KATMOVIES"},
-        {"id": "topmovies", "label": "TOPMOVIES"},
-        {"id": "uhdmovies", "label": "UHDMOVIES"},
-        {"id": "movieBoxWeb", "label": "MOVIEBOX"},
-        {"id": "bollyflix", "label": "BOLLYFLIX"},
-        {"id": "moviesflix", "label": "MOVIESFLIX"},
-        {"id": "extramovies", "label": "EXTRAMOVIES"},
-        {"id": "multimovies", "label": "MULTIMOVIES"},
-        {"id": "world4ufree", "label": "WORLD4UFREE"},
-        {"id": "skymovieshd", "label": "SKYMOVIESHD"},
-        {"id": "filmyfly", "label": "FILMYFLY"},
-        {"id": "cinevood", "label": "CINEVOOD"},
-        {"id": "luxmovies", "label": "LUXMOVIES"},
-        {"id": "eonmovies", "label": "EONMOVIES"},
-        {"id": "moviezwap", "label": "MOVIEZWAP"},
-        {"id": "dramacool", "label": "DRAMACOOL"},
-        {"id": "kisskh", "label": "KISSKH"},
-        {"id": "gogoanime", "label": "GOGOANIME"},
-        {"id": "animerulz", "label": "ANIMERULZ"},
-        {"id": "animeworld", "label": "ANIMEWORLD"},
-        {"id": "anikoto", "label": "ANIKOTO"},
-        {"id": "hianime", "label": "HIANIME"},
-        {"id": "yts", "label": "YTS"},
-        {"id": "1337x", "label": "1337X"},
-        {"id": "thepiratebay", "label": "PIRATEBAY"},
-        {"id": "gokuhd", "label": "GOKUHD"},
-        {"id": "showbox", "label": "SHOWBOX"},
-        {"id": "ridomovies", "label": "RIDOMOVIES"},
-        {"id": "flixhq", "label": "FLIXHQ"},
-        {"id": "protonmovies", "label": "PROTONMOVIES"},
-        {"id": "cinemaluxe", "label": "CINEMALUXE"},
-        {"id": "zeefliz", "label": "ZEEFLIZ"},
-        {"id": "movies4u", "label": "MOVIES4U"},
-        {"id": "netflixMirror", "label": "NETFLIX"},
-        {"id": "disneyMirror", "label": "DISNEY+"},
-        {"id": "primeMirror", "label": "PRIME VIDEO"},
-        {"id": "castle", "label": "CASTLE"},
-        {"id": "mxplayer", "label": "MX PLAYER"},
-        {"id": "animesalt", "label": "ANIMESALT"},
+        {"id": "hdhub4u", "label": "HDHUB4U", "code": "HD"},
+        {"id": "4khdhub", "label": "4K HDHUB", "code": "4K"},
+        {"id": "vega", "label": "VEGAMOVIES", "code": "VM"},
+        {"id": "moviesmod", "label": "MOVIESMOD", "code": "MM"},
+        {"id": "drive", "label": "MOVIESDRIVE", "code": "MD"},
+        {"id": "katmoviehd", "label": "KATMOVIES", "code": "KM"},
+        {"id": "topmovies", "label": "TOPMOVIES", "code": "TM"},
+        {"id": "uhdmovies", "label": "UHDMOVIES", "code": "UH"},
+        {"id": "uhd", "label": "UHDMOVIES", "code": "UH"},
+        {"id": "movieBoxWeb", "label": "MOVIEBOX", "code": "MB"},
+        {"id": "bollyflix", "label": "BOLLYFLIX", "code": "BF"},
+        {"id": "moviesflix", "label": "MOVIESFLIX", "code": "MF"},
+        {"id": "extramovies", "label": "EXTRAMOVIES", "code": "EM"},
+        {"id": "multimovies", "label": "MULTIMOVIES", "code": "MM"},
+        {"id": "multi", "label": "MULTIMOVIES", "code": "MM"},
+        {"id": "world4ufree", "label": "WORLD4UFREE", "code": "W4"},
+        {"id": "skymovieshd", "label": "SKYMOVIESHD", "code": "SM"},
+        {"id": "filmyfly", "label": "FILMYFLY", "code": "FF"},
+        {"id": "cinevood", "label": "CINEVOOD", "code": "CV"},
+        {"id": "luxmovies", "label": "LUXMOVIES", "code": "LM"},
+        {"id": "eonmovies", "label": "EONMOVIES", "code": "EM"},
+        {"id": "moviezwap", "label": "MOVIEZWAP", "code": "MZ"},
+        {"id": "dramacool", "label": "DRAMACOOL", "code": "DC"},
+        {"id": "kisskh", "label": "KISSKH", "code": "KH"},
+        {"id": "gogoanime", "label": "GOGOANIME", "code": "GA"},
+        {"id": "animerulz", "label": "ANIMERULZ", "code": "AR"},
+        {"id": "animeworld", "label": "ANIMEWORLD", "code": "AW"},
+        {"id": "anikoto", "label": "ANIKOTO", "code": "AK"},
+        {"id": "hianime", "label": "HIANIME", "code": "HA"},
+        {"id": "yts", "label": "YTS", "code": "YT"},
+        {"id": "1337x", "label": "1337X", "code": "13"},
+        {"id": "thepiratebay", "label": "PIRATEBAY", "code": "PB"},
+        {"id": "tpb", "label": "PIRATEBAY", "code": "PB"},
+        {"id": "gokuhd", "label": "GOKUHD", "code": "GK"},
+        {"id": "showbox", "label": "SHOWBOX", "code": "SB"},
+        {"id": "ridomovies", "label": "RIDOMOVIES", "code": "RM"},
+        {"id": "flixhq", "label": "FLIXHQ", "code": "FH"},
+        {"id": "protonmovies", "label": "PROTONMOVIES", "code": "PM"},
+        {"id": "cinemaluxe", "label": "CINEMALUXE", "code": "CL"},
+        {"id": "zeefliz", "label": "ZEEFLIZ", "code": "ZF"},
+        {"id": "movies4u", "label": "MOVIES4U", "code": "M4"},
+        {"id": "netflixMirror", "label": "NETFLIX", "code": "NF"},
+        {"id": "disneyMirror", "label": "DISNEY+", "code": "DP"},
+        {"id": "primeMirror", "label": "PRIME VIDEO", "code": "PV"},
+        {"id": "castle", "label": "CASTLE", "code": "CA"},
+        {"id": "mxplayer", "label": "MX PLAYER", "code": "MX"},
+        {"id": "animesalt", "label": "ANIMESALT", "code": "AS"},
+        {"id": "gramcinema", "label": "GRAMCINEMA", "code": "GC"},
+        {"id": "olamovies", "label": "OLAMOVIES", "code": "OM"},
         # Category Bots
-        {"id": "bot_desi", "label": "CINEMAWOOD"},
-        {"id": "bot_series", "label": "OTT SERIES"},
-        {"id": "bot_4k", "label": "CINEMA 4K"},
-        {"id": "bot_anime", "label": "ANIME"}
+        {"id": "bot_desi", "label": "CINEMAWOOD", "code": "CW"},
+        {"id": "bot_series", "label": "OTT SERIES", "code": "OS"},
+        {"id": "bot_4k", "label": "CINEMA 4K", "code": "4K"},
+        {"id": "bot_anime", "label": "ANIME", "code": "AN"},
+        {"id": "bot_cinema", "label": "CINEMA", "code": "CN"},
     ]
 
-    base_img = Image.open(base_logo_path).convert("RGBA")
-    w, h = base_img.size
+    w, h = 512, 512
+    mono_font = ImageFont.truetype(inter_bold, 175)
+
+    top_color = (229, 9, 20)       # Vivid Cinema Red
+    bottom_color = (160, 8, 8)     # Deep Cinema Red
 
     for item in providers:
-        img = base_img.copy()
+        img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
 
-        # 1. Smooth gradient vignette at bottom
-        gradient_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        g_draw = ImageDraw.Draw(gradient_layer)
-        start_y = int(h * 0.73)
+        # 1. Linear Red Gradient Canvas
+        for y in range(h):
+            ratio = y / float(h)
+            r = int(top_color[0] * (1 - ratio) + bottom_color[0] * ratio)
+            g = int(top_color[1] * (1 - ratio) + bottom_color[1] * ratio)
+            b = int(top_color[2] * (1 - ratio) + bottom_color[2] * ratio)
+            draw.line([(0, y), (w, y)], fill=(r, g, b, 255))
+
+        # 2. Subtle central spotlight
+        highlight = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        h_draw = ImageDraw.Draw(highlight)
+        h_draw.ellipse([70, 50, 442, 422], fill=(255, 75, 75, 30))
+        img = Image.alpha_composite(img, highlight)
+        draw = ImageDraw.Draw(img)
+
+        # 3. Two-letter Bold Black Monogram in Center (Camera removed!)
+        code = item["code"]
+        bbox = draw.textbbox((0, 0), code, font=mono_font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        tx = (w - tw) // 2
+        ty = (h // 2) - (th // 2) - 22
+
+        # Draw subtle deep shadow for 3D punch
+        draw.text((tx + 2, ty + 3), code, font=mono_font, fill=(50, 4, 4, 130))
+        # Draw solid bold black monogram
+        draw.text((tx, ty), code, font=mono_font, fill=(15, 15, 18, 255))
+
+        # 4. Smooth bottom vignette for label readability
+        vignette = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        v_draw = ImageDraw.Draw(vignette)
+        start_y = int(h * 0.70)
         for y in range(start_y, h):
-            alpha = int(220 * ((y - start_y) / (h - start_y)))
-            g_draw.line([(0, y), (w, y)], fill=(10, 10, 14, alpha))
+            alpha = int(230 * ((y - start_y) / (h - start_y)))
+            v_draw.line([(0, y), (w, y)], fill=(8, 8, 12, alpha))
+        img = Image.alpha_composite(img, vignette)
+        draw = ImageDraw.Draw(img)
 
-        img = Image.alpha_composite(img, gradient_layer)
-
-        # 2. Sleek typography with letter-spacing
+        # 5. Spaced label at bottom
         label = item["label"]
         if len(label) <= 6:
             spaced_label = "   ".join(list(label))
-            font_size = 25
+            lbl_size = 26
         elif len(label) <= 9:
             spaced_label = "  ".join(list(label))
-            font_size = 23
+            lbl_size = 24
         elif len(label) <= 12:
             spaced_label = " ".join(list(label))
-            font_size = 21
+            lbl_size = 22
         else:
             spaced_label = " ".join(list(label))
-            font_size = 18
+            lbl_size = 19
 
-        font = ImageFont.truetype(inter_bold, font_size)
-        draw = ImageDraw.Draw(img)
+        lbl_font = ImageFont.truetype(inter_bold, lbl_size)
+        lbbox = draw.textbbox((0, 0), spaced_label, font=lbl_font)
+        ltw = lbbox[2] - lbbox[0]
+        ltx = (w - ltw) // 2
+        lty = int(h * 0.82)
 
-        bbox = draw.textbbox((0, 0), spaced_label, font=font)
-        tw = bbox[2] - bbox[0]
-
-        tx = (w - tw) // 2
-        ty = int(h * 0.82)
-
-        draw.text((tx, ty), spaced_label, font=font, fill=(255, 255, 255, 255))
+        draw.text((ltx, lty), spaced_label, font=lbl_font, fill=(255, 255, 255, 255))
 
         out_path = os.path.join(output_dir, f"{item['id']}_logo.png")
         img.convert("RGB").save(out_path, "PNG")
 
-    print(f"✅ Generated {len(providers)} minimal logos successfully in {output_dir}")
+    print(f"✅ Generated {len(providers)} bold monogram logos successfully in {output_dir}")
 
 if __name__ == '__main__':
-    generate_all_vega_logos()
+    generate_all_channel_logos()
