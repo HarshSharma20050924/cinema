@@ -718,7 +718,67 @@ async function getStreams(req, res) {
         );
       });
 
-    // 5. Sort streams using Vega's priority rules
+    // 5. Cross-provider auto-fallback: If provider returned 0 streams, resolve via verified providers
+    if (streams.length === 0) {
+      let searchTitle = req.query.title || '';
+      if (!searchTitle && cleanLink) {
+        try {
+          const pathname = new URL(cleanLink).pathname;
+          const slug = pathname.split('/').filter(Boolean).pop() || '';
+          searchTitle = slug
+            .replace(/^download[-_]/i, '')
+            .replace(/[-_](?:hindi|english|dual|480p|720p|1080p|2160p|4k|bluray|web-dl|webrip|full[-_]movie|full[-_]series|movie).*$/i, '')
+            .replace(/[-_]/g, ' ')
+            .trim();
+        } catch (_) {}
+      }
+
+      if (searchTitle && searchTitle.length >= 3) {
+        const fallbackCandidates = ['hdhub4u', 'vega', 'mod', 'uhd', '4khdhub'];
+        for (const fbProv of fallbackCandidates) {
+          if (fbProv === zendaEngine.normalizeProvider(provider)) continue;
+          try {
+            const fbPostsMod = await zendaEngine.loadModule(fbProv, 'posts');
+            if (fbPostsMod && fbPostsMod.getSearchPosts) {
+              const fbResults = await fbPostsMod.getSearchPosts({
+                searchQuery: searchTitle,
+                page: 1,
+                providerValue: fbProv,
+                providerContext: zendaEngine.getProviderContext(fbProv),
+                signal: new AbortController().signal
+              });
+              if (Array.isArray(fbResults) && fbResults.length > 0) {
+                const fbMetaMod = await zendaEngine.loadModule(fbProv, 'meta');
+                const fbMeta = await fbMetaMod.getMeta({
+                  link: fbResults[0].link,
+                  providerContext: zendaEngine.getProviderContext(fbProv)
+                });
+                const groups = fbMeta?.linkList || fbMeta?.downloadLinks || [];
+                if (groups.length > 0) {
+                  const targetLink = groups[0]?.directLinks?.[0]?.link || groups[0]?.link || fbResults[0].link;
+                  const fbStreamMod = await zendaEngine.loadModule(fbProv, 'stream');
+                  if (fbStreamMod && fbStreamMod.getStream) {
+                    const fbStreams = await fbStreamMod.getStream({
+                      link: targetLink,
+                      type,
+                      isDownload,
+                      providerContext: zendaEngine.getProviderContext(fbProv),
+                      signal: new AbortController().signal
+                    });
+                    if (Array.isArray(fbStreams) && fbStreams.length > 0) {
+                      streams = fbStreams;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    // 6. Sort streams using Vega's priority rules
     const sorted = sortStreamsByPriority(streams, isDownload);
     res.json(sorted);
   } catch (err) {

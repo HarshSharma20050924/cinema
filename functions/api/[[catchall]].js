@@ -93,17 +93,10 @@ export async function onRequest(context) {
       }
     }
 
-    // Always ensure 24/7 Render Cloud Engine is in candidate list
+    // Ensure 24/7 Render Cloud Engine is in candidate list as fallback
     const RENDER_PRIMARY = "https://cinema-4h7t.onrender.com";
     if (!candidates.includes(RENDER_PRIMARY)) {
-      candidates.push(RENDER_PRIMARY);
-    }
-
-    // For general API calls, prioritize Render (the 24/7 dedicated compute engine)
-    if (!isRelayOnlyRoute && candidates.includes(RENDER_PRIMARY)) {
-      const idx = candidates.indexOf(RENDER_PRIMARY);
-      candidates.splice(idx, 1);
-      candidates.unshift(RENDER_PRIMARY); // Place at top of candidate list
+      candidates.push(RENDER_PRIMARY); // Place at end as fallback after live mobile/local runners
     }
 
     // Helper to fetch live providers directly from Zenda GitHub manifest
