@@ -495,14 +495,40 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       }
 
       if (!chosen) {
-        chosen = list[0]?.link || primaryLink;
+        chosen = sortedStreamable[0]?.link || list[0]?.link || primaryLink;
       }
 
       if (chosen) {
         if (defaultPlayer && defaultPlayer !== "web" && onPlayExternal) {
           onPlayExternal(chosen, defaultPlayer, displayTitle);
         } else {
-          onPlayStream(chosen, displayTitle, list && list.length > 0 ? list : undefined, details?.backdrop, details?.poster, details?.runtime);
+          // Build comprehensive server cascade for retry failover in Video Player
+          const allCandidateServers: StreamItem[] = [];
+          allCandidateServers.push({
+            server: sortedStreamable[0]?.server || list[0]?.server || "Primary Stream",
+            link: chosen,
+          });
+
+          for (const s of sortedStreamable) {
+            if (s.link && !allCandidateServers.some((c) => c.link === s.link)) {
+              allCandidateServers.push(s);
+            }
+          }
+
+          for (const s of list) {
+            if (s.link && !allCandidateServers.some((c) => c.link === s.link)) {
+              allCandidateServers.push(s);
+            }
+          }
+
+          onPlayStream(
+            chosen,
+            displayTitle,
+            allCandidateServers.length > 0 ? allCandidateServers : undefined,
+            details?.backdrop,
+            details?.poster,
+            details?.runtime
+          );
         }
       }
     } catch (err) {

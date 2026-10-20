@@ -185,8 +185,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const serverProbeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Parse candidate servers
-  const serverList = useMemo(() => {
+  // Candidate servers state supporting multi-server retry failover
+  const [serverList, setServerList] = useState<Array<{ id: number; name: string; link: string; type?: string }>>(() => {
     if (initialServers && initialServers.length > 0) {
       return initialServers.map((s, idx) => ({
         id: idx,
@@ -195,11 +195,120 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         type: s.type,
       }));
     }
-    // Single primary stream server
-    return [
-      { id: 0, name: "Direct Stream", link: playbackUrl || "" },
+
+    const raw = playbackUrl || "";
+    if (!raw) return [{ id: 0, name: "Direct Stream", link: "" }];
+
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const isDirectCors =
+      raw.includes("pixeldrain.dev") ||
+      raw.includes("pixeldrain.com") ||
+      raw.includes("gofile.io") ||
+      raw.includes("r2.dev");
+
+    // Resilient server cascade: Direct -> Edge Proxy -> Render Nodes
+    const baseList: Array<{ id: number; name: string; link: string; type?: string }> = [
+      { id: 0, name: "Direct CDN (Fastest)", link: raw },
     ];
-  }, [initialServers, playbackUrl]);
+
+    if (!isDirectCors && origin) {
+      baseList.push({
+        id: 1,
+        name: "Edge Proxy (CORS Injected)",
+        link: `${origin}/api/proxy?url=${encodeURIComponent(raw)}`,
+      });
+      baseList.push({
+        id: 2,
+        name: "Cluster Alpha (cinema-1)",
+        link: `https://cinema-1-zjrx.onrender.com/api/proxy?url=${encodeURIComponent(raw)}`,
+      });
+      baseList.push({
+        id: 3,
+        name: "Cluster Beta (cinema-2)",
+        link: `https://cinema-2-mg14.onrender.com/api/proxy?url=${encodeURIComponent(raw)}`,
+      });
+      baseList.push({
+        id: 4,
+        name: "Cluster Gamma (cinema-3)",
+        link: `https://cinema-3-euoh.onrender.com/api/proxy?url=${encodeURIComponent(raw)}`,
+      });
+      baseList.push({
+        id: 5,
+        name: "Cluster Delta (cinema-4)",
+        link: `https://cinema-4-260y.onrender.com/api/proxy?url=${encodeURIComponent(raw)}`,
+      });
+    }
+
+    return baseList;
+  });
+
+  // Sync if initialServers updates from parent
+  useEffect(() => {
+    if (initialServers && initialServers.length > 0) {
+      setServerList(
+        initialServers.map((s, idx) => ({
+          id: idx,
+          name: s.server || `Server ${idx + 1}`,
+          link: s.link,
+          type: s.type,
+        }))
+      );
+    }
+  }, [initialServers]);
+
+  // Background scraper discovery: find additional working stream mirrors for this title
+  useEffect(() => {
+    if (!title || (initialServers && initialServers.length > 2)) return;
+    const clean = title
+      .replace(/\b(1080p|720p|2160p|4k|uhd|hdr|web-dl|webrip|bluray|x264|x265|hevc|aac|dual\s*audio|hindi|english|org|subs?)\b/gi, "")
+      .replace(/\[.*?\]/g, "")
+      .replace(/\(.*?\)/g, "")
+      .replace(/[\._-]+/g, " ")
+      .trim();
+
+    if (!clean || clean.length < 2) return;
+
+    const controller = new AbortController();
+    fetch(`/api/global-search?q=${encodeURIComponent(clean)}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : []))
+      .then(async (matches: any[]) => {
+        if (!Array.isArray(matches) || matches.length === 0) return;
+        const candidates = matches.filter(
+          (m) => m && (m.provider === "vega" || m.provider === "hdhub4u" || m.provider === "mod" || m.provider === "movieBoxWeb")
+        );
+        for (const cand of candidates.slice(0, 2)) {
+          try {
+            const metaRes = await fetch(`/api/meta?provider=${encodeURIComponent(cand.provider)}&link=${encodeURIComponent(cand.link)}`, { signal: controller.signal });
+            if (!metaRes.ok) continue;
+            const meta = await metaRes.json();
+            const candPrimary = meta.linkList?.[0]?.directLinks?.[0]?.link || meta.linkList?.[0]?.link;
+            if (!candPrimary) continue;
+            const sRes = await fetch(`/api/streams?provider=${encodeURIComponent(cand.provider)}&link=${encodeURIComponent(candPrimary)}&download=true&title=${encodeURIComponent(clean)}`, { signal: controller.signal });
+            if (!sRes.ok) continue;
+            const sList: any[] = await sRes.json();
+            if (Array.isArray(sList) && sList.length > 0) {
+              setServerList((prev) => {
+                const next = [...prev];
+                for (const s of sList) {
+                  if (s.link && !next.some((n) => n.link === s.link)) {
+                    next.push({
+                      id: next.length,
+                      name: `${cand.provider.toUpperCase()} • ${s.server || `Mirror ${next.length + 1}`}`,
+                      link: s.link,
+                      type: s.type,
+                    });
+                  }
+                }
+                return next;
+              });
+            }
+          } catch (_) {}
+        }
+      })
+      .catch(() => {});
+
+    return () => controller.abort();
+  }, [title, initialServers]);
 
   // Player State
   const [playerStatus, setPlayerStatus] = useState<"fetching" | "starting" | "ready" | "error">("fetching");
@@ -235,17 +344,23 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     setTimeout(() => setToastMessage((curr) => (curr === msg ? null : curr)), 2500);
   }, []);
 
-  // Compute safe proxied URL so CDN doesn't block VLC or HLS with 403 Forbidden
+  // Compute safe proxied URL so CDN doesn't block player
   const getPlayableUrl = useCallback((rawUrl: string) => {
     if (!rawUrl) return "";
-    const isDirectCors =
+    // If the server URL is already a cluster node or proxy URL, return as is without re-wrapping
+    if (
+      rawUrl.includes("/api/proxy") ||
+      rawUrl.includes("onrender.com") ||
       rawUrl.includes("pixeldrain.dev") ||
       rawUrl.includes("pixeldrain.com") ||
       rawUrl.includes("gofile.io") ||
-      rawUrl.includes("r2.dev");
+      rawUrl.includes("r2.dev")
+    ) {
+      return rawUrl;
+    }
 
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    if (!isDirectCors && !rawUrl.includes("/api/proxy") && origin) {
+    if (origin) {
       return `${origin}/api/proxy?url=${encodeURIComponent(rawUrl)}`;
     }
     return rawUrl;
@@ -264,7 +379,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     }
   }, [isPlaying, activeMenu]);
 
-  // Connect active server stream with HLS / HTML5 Video
+  // Connect active server stream with HLS / HTML5 Video with full multi-server retry failover
   const connectToServer = useCallback((serverIdx: number) => {
     const target = serverList[serverIdx];
     if (!target || !target.link) {
@@ -289,15 +404,23 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
     if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
 
-    // Auto failover timeout: Allow 16 seconds for initial CDN buffer / proxy negotiation
-    serverProbeTimeoutRef.current = setTimeout(() => {
-      setServerStatuses((prev) => ({ ...prev, [serverIdx]: "failed" }));
-      if (serverIdx + 1 < serverList.length) {
-        connectToServer(serverIdx + 1);
+    // Failover helper: records failure and advances to the next available server in the cascade
+    const handleServerFail = (idx: number, reason: string) => {
+      if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
+      setServerStatuses((prev) => ({ ...prev, [idx]: "failed" }));
+      if (idx + 1 < serverList.length) {
+        const next = serverList[idx + 1];
+        showToast(`Server ${idx + 1} unavailable (${reason}). Auto-retrying with ${next.name}...`);
+        connectToServer(idx + 1);
       } else {
         setPlayerStatus("error");
       }
-    }, 16000);
+    };
+
+    // Auto failover timeout: Allow 12 seconds for initial connection & buffer negotiation
+    serverProbeTimeoutRef.current = setTimeout(() => {
+      handleServerFail(serverIdx, "Timeout");
+    }, 12000);
 
     const isM3u8 = safeUrl.includes(".m3u8") || safeUrl.includes("/hls/") || safeUrl.includes("/stream/");
 
@@ -332,20 +455,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
         setTimeout(() => {
           setPlayerStatus("ready");
-        }, 1100);
+          showToast(`Connected to ${target.name}`);
+        }, 600);
       });
 
       hls.on(Hls.Events.ERROR, (_ev, data) => {
         if (data.fatal) {
-          if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
-          setServerStatuses((prev) => ({ ...prev, [serverIdx]: "failed" }));
           hls.destroy();
-
-          if (serverIdx + 1 < serverList.length) {
-            connectToServer(serverIdx + 1);
-          } else {
-            setPlayerStatus("error");
-          }
+          handleServerFail(serverIdx, "Stream Error");
         }
       });
     } else {
@@ -356,16 +473,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         setServerStatuses((prev) => ({ ...prev, [serverIdx]: "success" }));
         setPlayerStatus("starting");
         video.play().catch(() => {});
-        setTimeout(() => setPlayerStatus("ready"), 500);
+        setTimeout(() => {
+          setPlayerStatus("ready");
+          showToast(`Connected to ${target.name}`);
+        }, 500);
       };
+
       const onError = () => {
-        if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
-        setServerStatuses((prev) => ({ ...prev, [serverIdx]: "failed" }));
-        if (serverIdx + 1 < serverList.length) {
-          connectToServer(serverIdx + 1);
-        } else {
-          setPlayerStatus("error");
-        }
+        handleServerFail(serverIdx, "Format/Network Error");
       };
 
       if (video.readyState >= 1) {
@@ -377,7 +492,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         video.addEventListener("error", onError, { once: true });
       }
     }
-  }, [serverList, getPlayableUrl]);
+  }, [serverList, getPlayableUrl, showToast]);
 
   // Initial stream mount
   useEffect(() => {

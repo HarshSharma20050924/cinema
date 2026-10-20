@@ -36,7 +36,23 @@ const TTL = {
   STREAMS: 3 * 60 * 1000,
 };
 
-async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 15000): Promise<Response> {
+export const RENDER_CLUSTER = [
+  "https://cinema-4h7t.onrender.com",
+  "https://cinema-1-zjrx.onrender.com",
+  "https://cinema-2-mg14.onrender.com",
+  "https://cinema-3-euoh.onrender.com",
+  "https://cinema-4-260y.onrender.com",
+];
+
+let clusterIndex = Math.floor(Math.random() * RENDER_CLUSTER.length);
+
+export function getBalancedRenderCluster(): string[] {
+  const start = clusterIndex % RENDER_CLUSTER.length;
+  clusterIndex++;
+  return [...RENDER_CLUSTER.slice(start), ...RENDER_CLUSTER.slice(0, start)];
+}
+
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 12000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -44,7 +60,34 @@ async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 150
       ...init,
       signal: init?.signal || controller.signal,
     });
+    if (res.ok) return res;
+    if (res.status >= 500 || res.status === 429) {
+      throw new Error(`HTTP ${res.status}`);
+    }
     return res;
+  } catch (primaryErr) {
+    clearTimeout(timer);
+
+    // Failover across the 5 distributed Render cluster nodes for the web page
+    const isApiPath = url.includes("/api/");
+    if (isApiPath) {
+      const apiSuffix = url.substring(url.indexOf("/api/"));
+      const clusterNodes = getBalancedRenderCluster();
+      for (const node of clusterNodes) {
+        try {
+          const clusterUrl = `${node}${apiSuffix}`;
+          const cController = new AbortController();
+          const cTimer = setTimeout(() => cController.abort(), 7000);
+          const cRes = await fetch(clusterUrl, {
+            ...init,
+            signal: cController.signal,
+          });
+          clearTimeout(cTimer);
+          if (cRes.ok) return cRes;
+        } catch (_) {}
+      }
+    }
+    throw primaryErr;
   } finally {
     clearTimeout(timer);
   }
