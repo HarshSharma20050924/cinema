@@ -70,7 +70,9 @@ async function getPosts(req, res) {
 }
 
 async function searchPosts(req, res) {
-  const { provider = "autoEmbed", q = "", page = 1 } = req.query;
+  const qParam = req.query.q || req.query.query || "";
+  const { provider = "autoEmbed", page = 1 } = req.query;
+  const q = qParam;
   if (!q) return res.json([]);
 
   const normQ = q.trim().toLowerCase();

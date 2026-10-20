@@ -183,19 +183,19 @@ async function postToDedicatedChannel(item, provKey, channelId) {
     return { ok: false, duplicate: true };
   }
 
-  const text = `🎬 <b>${displayTitle}</b>\n\n` +
-    `📦 <b>Source:</b> <code>${provKey.toUpperCase()}</code>\n` +
-    `⚡ <b>Quality:</b> Cloud Streaming &amp; Direct Downloads\n\n` +
-    `👇 <i>Tap below to stream or download in VLC / Web Player:</i>`;
+  const text = `<b>${displayTitle}</b>\n\n` +
+    `Source: <code>${provKey.toUpperCase()}</code>\n` +
+    `Quality: High Speed Streaming &amp; Downloads\n\n` +
+    `<i>Tap below to stream or download in VLC / Web Player:</i>`;
 
   // Stacked buttons: 100% full width on mobile, perfectly fit without splitting or overflowing
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '🎬 Stream & Download', url: `https://t.me/${bot.username}?start=${directStartParam}` },
+        { text: 'Stream & Download', url: `https://t.me/${bot.username}?start=${directStartParam}` },
       ],
       [
-        { text: '🌐 Watch on Cinema Web', url: `${WEB_URL}` },
+        { text: 'Watch on Cinema Web', url: `${WEB_URL}` },
       ],
     ],
   };
@@ -241,7 +241,6 @@ const ACTIVE_AUTHENTIC_PROVIDERS = [
   // Cinema Anime
   'animeworld',
   'animesalt',
-  'hiAnime',
 
   // Cinema OTT / Series
   'netflixMirror',

@@ -84,8 +84,22 @@ function startAutoTunnel(port) {
       cf.stdout.on('data', parseOutput);
       cf.stderr.on('data', parseOutput);
 
+      cf.on('close', (code) => {
+        console.warn(`[24/7 Server] Cloudflare tunnel closed with code ${code}`);
+        currentPublicUrl = '';
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
+      });
+
+      cf.on('exit', (code) => {
+        console.warn(`[24/7 Server] Cloudflare tunnel exited with code ${code}`);
+        currentPublicUrl = '';
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
+      });
+
       cf.on('error', (err) => {
         console.warn('[24/7 Server] cloudflared not found or error:', err.message);
+        currentPublicUrl = '';
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
         if (!resolved) resolve(null);
       });
 
@@ -106,7 +120,11 @@ async function initClusterSync(port) {
   if (url) {
     await syncToCluster(url);
     if (heartbeatTimer) clearInterval(heartbeatTimer);
-    heartbeatTimer = setInterval(() => syncToCluster(url), 25000);
+    heartbeatTimer = setInterval(() => {
+      if (currentPublicUrl) {
+        syncToCluster(currentPublicUrl);
+      }
+    }, 30000);
   }
 }
 

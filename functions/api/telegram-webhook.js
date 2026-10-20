@@ -68,8 +68,7 @@ const BOT_PROFILES = {
     defaultProvider: 'animeworld',
     extensions: [
       { name: 'AnimeWorld', value: 'animeworld' },
-      { name: 'AnimeSalt', value: 'animesalt' },
-      { name: 'HiAnime', value: 'hiAnime' }
+      { name: 'AnimeSalt', value: 'animesalt' }
     ]
   },
   // Cinema Torrents Bot
@@ -83,6 +82,34 @@ const BOT_PROFILES = {
     ]
   }
 };
+
+// Robust helper to edit existing message or send a fresh one if editing is not possible (e.g. photo cards)
+async function sendOrEdit(token, chatId, messageId, payload) {
+  if (messageId) {
+    if (payload.text) {
+      const res = await tgCall(token, 'editMessageText', {
+        chat_id: chatId,
+        message_id: messageId,
+        ...payload
+      });
+      if (res && res.ok) return res;
+    }
+    if (payload.caption) {
+      const res = await tgCall(token, 'editMessageCaption', {
+        chat_id: chatId,
+        message_id: messageId,
+        ...payload
+      });
+      if (res && res.ok) return res;
+    }
+  }
+  return tgCall(token, 'sendMessage', {
+    chat_id: chatId,
+    text: payload.text || payload.caption || 'Details:',
+    parse_mode: payload.parse_mode || 'HTML',
+    reply_markup: payload.reply_markup
+  });
+}
 
 function getBotProfile(token) {
   if (token && BOT_PROFILES[token]) {
@@ -132,26 +159,26 @@ async function renderSettingsMenu(chatId, token, db, userId, messageId = null) {
   const activeExt = profile.extensions.find(e => e.value.toLowerCase() === (settings.active_provider || '').toLowerCase()) || profile.extensions[0];
   const isSearchAll = settings.search_mode === 'all';
   
-  let text = `⚙️ <b>Search & Extension Settings</b>\n`;
+  let text = `<b>Extension & Search Settings</b>\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `🤖 <b>Bot:</b> <b>${escapeHtml(profile.name)}</b>\n`;
-  text += `🎯 <b>Active Extension:</b> <code>${escapeHtml(activeExt?.name || settings.active_provider.toUpperCase())}</code>\n`;
-  text += `🔍 <b>Search Scope:</b> ${isSearchAll ? `🌐 <b>All Extensions in ${escapeHtml(profile.name)}</b>` : `🎯 <b>Single Extension (${escapeHtml(activeExt?.name)})</b>`}\n\n`;
-  text += `<i>Tap below to toggle search mode or switch your active extension:</i>`;
+  text += `Bot: <b>${escapeHtml(profile.name)}</b>\n`;
+  text += `Active Extension: <code>${escapeHtml(activeExt?.name || settings.active_provider.toUpperCase())}</code>\n`;
+  text += `Search Mode: ${isSearchAll ? `<b>All Extensions in ${escapeHtml(profile.name)}</b>` : `<b>Single (${escapeHtml(activeExt?.name)})</b>`}\n\n`;
+  text += `<i>Tap below to switch extension or toggle search mode:</i>`;
 
   const keyboard = [];
   
   // 1. Search Scope Toggle button
   const toggleLabel = isSearchAll 
-    ? '🔘 Switch to: Search Single Extension' 
-    : `🌐 Switch to: Search All in ${profile.name}`;
+    ? 'Switch to: Single Extension' 
+    : `Search All in ${profile.name}`;
   keyboard.push([{ text: toggleLabel, callback_data: 'toggle_scope' }]);
 
-  // 2. Extension Selection Grid (strictly within this bot's category)
+  // 2. Extension Selection Grid
   const extButtons = profile.extensions.map(ext => {
     const isSelected = ext.value.toLowerCase() === (settings.active_provider || '').toLowerCase();
     return {
-      text: isSelected ? `✅ ${ext.name}` : ext.name,
+      text: isSelected ? `✓ ${ext.name}` : ext.name,
       callback_data: `set_ext:${ext.value}`
     };
   });
@@ -161,25 +188,14 @@ async function renderSettingsMenu(chatId, token, db, userId, messageId = null) {
   }
 
   keyboard.push([
-    { text: '🔍 Search Movie / Show', switch_inline_query_current_chat: '' },
-    { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL }
+    { text: 'Search Movies / Series', switch_inline_query_current_chat: '' },
+    { text: 'Cinema Web', url: DEFAULT_WEB_URL }
   ]);
 
-  const markup = { inline_keyboard: keyboard };
-  if (messageId) {
-    return tgCall(token, 'editMessageText', {
-      chat_id: chatId,
-      message_id: messageId,
-      text,
-      parse_mode: 'HTML',
-      reply_markup: markup
-    });
-  }
-  return tgCall(token, 'sendMessage', {
-    chat_id: chatId,
+  return sendOrEdit(token, chatId, messageId, {
     text,
     parse_mode: 'HTML',
-    reply_markup: markup
+    reply_markup: { inline_keyboard: keyboard }
   });
 }
 
@@ -308,6 +324,55 @@ function cleanMediaTitle(rawTitle) {
   return str.trim();
 }
 
+// Sanitize title against raw URLs or malformed titles
+function sanitizeCleanTitle(rawTitle, fallback = 'Media Release') {
+  if (!rawTitle) return fallback;
+  let str = String(rawTitle).trim();
+  if (/^https?:/i.test(str)) {
+    try {
+      const u = new URL(str);
+      const parts = u.pathname.split('/').filter(Boolean);
+      const last = parts[parts.length - 1] || parts[parts.length - 2] || '';
+      str = decodeURIComponent(last).replace(/[-_]+/g, ' ').replace(/\.\w+$/, '');
+    } catch (_) {
+      str = '';
+    }
+  }
+  if (!str || /^(?:https?|null|undefined|untitled)$/i.test(str) || str.length < 2) {
+    return fallback;
+  }
+  const cleaned = cleanMediaTitle(str);
+  if (!cleaned || /^(?:https?|null|undefined|untitled)$/i.test(cleaned) || cleaned.length < 2) {
+    return fallback;
+  }
+  return cleaned;
+}
+
+// Check if an item is a series or movie
+function isSeriesItem(item, meta, rawGroups) {
+  if (meta?.type === 'series' || meta?.type === 'tv') return true;
+  if (meta?.type === 'movie') return false;
+
+  const titleText = `${item?.title || ''} ${meta?.title || ''}`.toLowerCase();
+  if (/\b(?:season\s*\d+|s\d{1,2}\b|episodes?|ep\s*\d+|e\d{1,3}\b)/i.test(titleText)) {
+    return true;
+  }
+
+  if (Array.isArray(rawGroups)) {
+    for (const g of rawGroups) {
+      const gTitle = (g?.title || '').toLowerCase();
+      if (/\b(?:season\s*\d+|s\d{1,2}\b|all\s*episodes|batch\s*pack)/i.test(gTitle)) {
+        return true;
+      }
+      if (Array.isArray(g?.directLinks)) {
+        const epTitles = g.directLinks.filter(l => /\b(?:ep(?:isode)?\s*\d+|e\d{1,3}\b)/i.test(l?.title || ''));
+        if (epTitles.length > 1) return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Smart Relevance Ranking for Search Results
 function rankSearchResults(results, query) {
   if (!query || !Array.isArray(results) || results.length <= 1) return results;
@@ -405,16 +470,16 @@ function formatPackButtonLabel(rawTitle, defaultLabel = 'Season Pack') {
   const parts = [];
   if (season) parts.push(season);
   if (res) parts.push(res);
-  else parts.push('Pack');
+  parts.push('Pack');
 
-  let lbl = `📦 ${parts.join(' ')}`;
-  if (lbl.length > 28) lbl = lbl.slice(0, 27) + '…';
+  let lbl = parts.join(' ');
+  if (lbl.length > 26) lbl = lbl.slice(0, 25) + '…';
   return lbl;
 }
 
-// Cleanly extract Resolution, Codec, File Size and Episode badge for compact mobile buttons
+// Cleanly extract Resolution, Codec, File Size for compact mobile buttons
 function formatQualityButtonLabel(rawTitle, defaultLabel = 'Option') {
-  if (!rawTitle) return `⚡ ${defaultLabel}`;
+  if (!rawTitle) return defaultLabel;
   const str = String(rawTitle);
 
   // If this is a pack
@@ -430,14 +495,20 @@ function formatQualityButtonLabel(rawTitle, defaultLabel = 'Option') {
   else if (/\b480p\b/i.test(str)) res = '480p';
   else if (/\b360p\b/i.test(str)) res = '360p';
 
-  // 2. Extract codec / quality tag (HEVC, HQ-Rip, HQ, HDR, 10Bit)
+  // 2. Extract codec / quality tag (HEVC, HQ, HDR, 10Bit)
   let tech = '';
   if (/hevc|x265|10bit/i.test(str)) tech = 'HEVC';
-  else if (/hq[- ]?rip/i.test(str)) tech = 'HQ-Rip';
-  else if (/\bhq\b/i.test(str) && !/hq-hdtc/i.test(str)) tech = 'HQ';
   else if (/hdr/i.test(str)) tech = 'HDR';
 
-  // 3. Extract file size (e.g. [200MB/E], 470MB, 1.1GB, 7GB, 13.8GB, 450 MB)
+  // 3. Extract audio / language
+  let lang = '';
+  if (/dual\s*audio/i.test(str) || (/\bhindi\b/i.test(str) && /\benglish\b/i.test(str))) lang = 'Dual';
+  else if (/hindi/i.test(str)) lang = 'Hindi';
+  else if (/punjabi/i.test(str)) lang = 'Punjabi';
+  else if (/tamil/i.test(str)) lang = 'Tamil';
+  else if (/telugu/i.test(str)) lang = 'Telugu';
+
+  // 4. Extract file size (e.g. 4.89GB, 2.17GB, 450MB)
   let size = '';
   const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
   if (sizeMatch) {
@@ -445,20 +516,21 @@ function formatQualityButtonLabel(rawTitle, defaultLabel = 'Option') {
   }
 
   const parts = [];
+  if (lang) parts.push(lang);
   if (res) parts.push(res);
   if (tech) parts.push(tech);
 
-  const main = parts.join(' ');
-  let lbl = '⚡ ' + (main || 'Quality');
+  const main = parts.join(' • ');
+  let lbl = main || defaultLabel;
   if (size) lbl += ` [${size}]`;
 
   if (!main && !size) {
     let clean = str.replace(/.*?\[/g, '[').trim();
     if (clean.length > 20) clean = clean.slice(-20).trim();
-    lbl = '⚡ ' + (clean || defaultLabel);
+    lbl = clean || defaultLabel;
   }
 
-  if (lbl.length > 28) lbl = lbl.slice(0, 27) + '…';
+  if (lbl.length > 26) lbl = lbl.slice(0, 25) + '…';
   return lbl;
 }
 
@@ -476,7 +548,6 @@ function formatEpisodeButtonLabel(rawTitle, epCount, rawQuality = '', groupIndex
   const seasonNum = extractActualSeason(str) || extractActualSeason(qStr) || extractActualSeason(dubStr);
   const season = seasonNum !== null ? `S${seasonNum}` : '';
 
-  // Priority for resolution: rawQuality first if valid, then after separator, then str
   let res = '';
   const qResMatch = qStr.match(/\b(2160p|4k|1080p|720p|480p|360p)\b/i);
   if (qResMatch) {
@@ -491,28 +562,13 @@ function formatEpisodeButtonLabel(rawTitle, epCount, rawQuality = '', groupIndex
     }
   }
 
-  let codec = '';
-  if (/hevc|10bit|x265/i.test(combined)) codec = 'HEVC';
-
   let lang = '';
   if (/dual\s*audio/i.test(combined) || (/\bhindi\b/i.test(combined) && /\benglish\b/i.test(combined))) lang = 'Dual';
   else if (/hindi/i.test(combined)) lang = 'Hindi';
+  else if (/punjabi/i.test(combined)) lang = 'Punjabi';
   else if (/tamil/i.test(combined)) lang = 'Tamil';
   else if (/telugu/i.test(combined)) lang = 'Telugu';
-  else if (/punjabi/i.test(combined)) lang = 'Punjabi';
-  else if (/malayalam/i.test(combined)) lang = 'Malayalam';
-  else if (/kannada/i.test(combined)) lang = 'Kannada';
-  else if (/bengali|bangla/i.test(combined)) lang = 'Bengali';
-  else if (/original/i.test(combined)) lang = 'Orig';
   else if (/english/i.test(combined)) lang = 'Eng';
-  else if (/korean/i.test(combined)) lang = 'Kor';
-  else if (/japanese/i.test(combined)) lang = 'Jap';
-  else if (/spanish/i.test(combined)) lang = 'Spa';
-  else if (/french/i.test(combined)) lang = 'Fra';
-  else if (/indonesian/i.test(combined)) lang = 'Indo';
-  else if (/arabic/i.test(combined)) lang = 'Ara';
-  else if (/multi\s*audio/i.test(combined)) lang = 'Multi';
-  else if (rawDub && rawDub.length <= 10) lang = rawDub.trim();
 
   let size = '';
   const sizeMatch = str.match(/\[?\b(\d+(?:\.\d+)?\s*(?:gb|mb)(?:\/[a-z]+)?)\b\]?/i);
@@ -522,14 +578,13 @@ function formatEpisodeButtonLabel(rawTitle, epCount, rawQuality = '', groupIndex
   if (season) parts.push(season);
   if (lang) parts.push(lang);
   if (res) parts.push(res);
-  if (codec && !res.includes('HEVC')) parts.push(codec);
 
-  const main = parts.join(' • ') || (season || (epCount > 0 ? `Eps` : `Quality ${groupIndex + 1}`));
-  let lbl = `📺 ${main}`;
-  if (size) lbl += ` [${size}]`;
-  if (epCount > 0) lbl += ` (${epCount})`;
-  if (lbl.length > 28) lbl = lbl.slice(0, 27) + '…';
-  return lbl;
+  let main = parts.join(' • ') || (season || (epCount > 0 ? `Season ${groupIndex + 1}` : `Quality ${groupIndex + 1}`));
+  if (size) main += ` [${size}]`;
+  if (epCount > 0 && !main.includes(season)) main += ` (${epCount} Eps)`;
+
+  if (main.length > 26) main = main.slice(0, 25) + '…';
+  return main;
 }
 
 // Extract overall badges for item card header
@@ -742,38 +797,40 @@ async function getCandidateBackends(db) {
   const candidates = [];
   if (db) {
     try {
-      const urlRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_URL'").first();
-      if (urlRow?.value && /^https?:\/\//i.test(urlRow.value) && !urlRow.value.includes('pages.dev')) {
-        const clean = urlRow.value.replace(/\/+$/, '');
-        candidates.push(clean);
-      }
-
       const poolRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_POOL'").first();
       if (poolRow?.value) {
         const pool = JSON.parse(poolRow.value);
         if (Array.isArray(pool)) {
           const now = Date.now();
-          // Prioritize server_local_dev first, then freshest nodes
-          const sorted = [...pool].sort((a, b) => {
-            if (a?.deviceId === 'server_local_dev' && b?.deviceId !== 'server_local_dev') return -1;
-            if (b?.deviceId === 'server_local_dev' && a?.deviceId !== 'server_local_dev') return 1;
+          // Filter out dead/stale nodes not seen in last 10 minutes
+          const active = pool.filter(n => {
+            const last = n?.lastSeen || 0;
+            return !n.lastSeen || (now - last < 600000);
+          });
+
+          // Prioritize residential phone runners (isPrimary) first, then freshest
+          active.sort((a, b) => {
             if (a?.isPrimary && !b?.isPrimary) return -1;
             if (!a?.isPrimary && b?.isPrimary) return 1;
             return (b?.lastSeen || 0) - (a?.lastSeen || 0);
           });
-          for (const item of sorted) {
-            const isFresh = !item.lastSeen || (now - item.lastSeen < 300000);
+
+          for (const item of active) {
             const u = typeof item === 'string' ? item : item?.url;
-            if (isFresh && u && /^https?:\/\//i.test(u) && !u.includes('pages.dev')) {
+            if (u && /^https?:\/\//i.test(u) && !u.includes('pages.dev')) {
               const clean = u.replace(/\/+$/, '');
-              if (item?.deviceId === 'server_local_dev') {
-                candidates.unshift(clean);
-              } else if (!candidates.includes(clean)) {
+              if (!candidates.includes(clean)) {
                 candidates.push(clean);
               }
             }
           }
         }
+      }
+
+      const urlRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_URL'").first();
+      if (urlRow?.value && /^https?:\/\//i.test(urlRow.value) && !urlRow.value.includes('pages.dev')) {
+        const clean = urlRow.value.replace(/\/+$/, '');
+        if (!candidates.includes(clean)) candidates.push(clean);
       }
     } catch (_) {}
   }
@@ -800,7 +857,7 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
 
       const controller = new AbortController();
       const isSlowEndpoint = endpoint.includes('/streams') || endpoint.includes('/search') || endpoint.includes('/meta') || endpoint.includes('/episodes');
-      const timeoutMs = isSlowEndpoint ? 22000 : 9000;
+      const timeoutMs = isSlowEndpoint ? 6500 : 3500;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(url.toString(), {
@@ -1409,7 +1466,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
   // Switch Extension Menu (Strictly category-scoped to this bot)
   if (data.startsWith('swprov:')) {
-    const query = data.replace('swprov:', '').trim();
+    const rawQuery = data.replace('swprov:', '').trim();
+    const query = sanitizeCleanTitle(rawQuery, 'Content');
     await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
     const profile = getBotProfile(token);
     const settings = await getUserBotSettings(db, userId, profile.key, profile.defaultProvider);
@@ -1418,7 +1476,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     
     // 1. Search All extensions option
     keyboard.push([{
-      text: `🌐 Search ALL Extensions in ${profile.name}`,
+      text: `Search All in ${profile.name}`,
       callback_data: `search_all:${query.slice(0, 30)}`
     }]);
 
@@ -1426,7 +1484,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     const extButtons = profile.extensions.map(ext => {
       const isSelected = ext.value.toLowerCase() === (settings.active_provider || '').toLowerCase();
       return {
-        text: isSelected ? `✅ ${ext.name}` : `🔍 ${ext.name}`,
+        text: isSelected ? `✓ ${ext.name}` : ext.name,
         callback_data: `sprov:${query.slice(0, 25)}:${ext.value}`
       };
     });
@@ -1436,16 +1494,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     }
 
     keyboard.push([
-      { text: '⚙️ Settings', callback_data: 'bot_settings' },
-      { text: '🌐 Cinema Web', url: `${DEFAULT_WEB_URL}/?search=${encodeURIComponent(query)}` }
+      { text: 'Settings', callback_data: 'bot_settings' },
+      { text: 'Cinema Web', url: `${DEFAULT_WEB_URL}/?search=${encodeURIComponent(query)}` }
     ]);
 
-    return tgCall(token, 'editMessageText', {
-      chat_id: chatId,
-      message_id: messageId,
-      text: `🔄 <b>Select an Extension for "${escapeHtml(query)}":</b>\n\n` +
-            `🤖 <b>Bot Category:</b> <b>${escapeHtml(profile.name)}</b>\n` +
-            `<i>Selecting an extension sets it as your active extension.</i>`,
+    return sendOrEdit(token, chatId, messageId, {
+      text: `<b>Select Extension for "${escapeHtml(query)}"</b>\n\n` +
+            `Category: <b>${escapeHtml(profile.name)}</b>\n` +
+            `<i>Choose an extension to search and switch your active provider:</i>`,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard }
     });
@@ -1454,7 +1510,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
   // Search single provider
   if (data.startsWith('sprov:')) {
     const parts = data.replace('sprov:', '').split(':');
-    const query = parts[0];
+    const rawQuery = parts[0];
+    const query = sanitizeCleanTitle(rawQuery, 'Content');
     const prov = parts[1];
     await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
     
@@ -1464,10 +1521,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     const extObj = profile.extensions.find(e => e.value.toLowerCase() === (prov || '').toLowerCase());
     const extDisplayName = extObj?.name || (prov ? prov.toUpperCase() : 'Extension');
 
-    await tgCall(token, 'editMessageText', {
-      chat_id: chatId,
-      message_id: messageId,
-      text: `🔍 Searching <b>"${escapeHtml(query)}"</b> on <b>${escapeHtml(extDisplayName)}</b>...`,
+    await sendOrEdit(token, chatId, messageId, {
+      text: `Searching <b>"${escapeHtml(query)}"</b> on <b>${escapeHtml(extDisplayName)}</b>...`,
       parse_mode: 'HTML'
     });
 
@@ -1479,9 +1534,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     const ranked = rankSearchResults(results, query);
     const formatted = await formatSearchResults(ranked, query, 1, db, null, token);
-    return tgCall(token, 'editMessageText', {
-      chat_id: chatId,
-      message_id: messageId,
+    return sendOrEdit(token, chatId, messageId, {
       text: formatted.text,
       parse_mode: 'HTML',
       reply_markup: formatted.keyboard
@@ -1490,17 +1543,16 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
   // Search all providers in current bot category
   if (data.startsWith('search_all:')) {
-    const query = data.replace('search_all:', '').trim();
+    const rawQuery = data.replace('search_all:', '').trim();
+    const query = sanitizeCleanTitle(rawQuery, 'Content');
     await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
     
     const profile = getBotProfile(token);
     // Save search_mode = 'all' in settings
     await setUserBotSettings(db, userId, profile.key, { search_mode: 'all' });
 
-    await tgCall(token, 'editMessageText', {
-      chat_id: chatId,
-      message_id: messageId,
-      text: `🌐 Searching <b>"${escapeHtml(query)}"</b> across all extensions in <b>${escapeHtml(profile.name)}</b>...`,
+    await sendOrEdit(token, chatId, messageId, {
+      text: `Searching <b>"${escapeHtml(query)}"</b> across all in <b>${escapeHtml(profile.name)}</b>...`,
       parse_mode: 'HTML'
     });
 
@@ -1526,9 +1578,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     const ranked = rankSearchResults(results, query);
     const formatted = await formatSearchResults(ranked, query, 1, db, null, token);
-    return tgCall(token, 'editMessageText', {
-      chat_id: chatId,
-      message_id: messageId,
+    return sendOrEdit(token, chatId, messageId, {
       text: formatted.text,
       parse_mode: 'HTML',
       reply_markup: formatted.keyboard
@@ -1566,31 +1616,31 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     }
 
     // Immediate user feedback loader so season button never feels static
-    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: '📺 Loading episodes... Please wait.' });
-
-    let loaderMsgId = null;
-    if (data.startsWith('eps:')) {
-      const epTitle = cleanMediaTitle(groupDataObj?.seriesTitle || groupData.title || 'Series');
-      const loadRes = await tgCall(token, 'sendMessage', {
-        chat_id: chatId,
-        text: `📺 <b>Loading Episode List...</b>\n` +
-          `🎬 <b>${escapeHtml(epTitle)}</b>\n` +
-          `━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `<code>[■■■■■□□□□□] 50%</code>\n\n` +
-          `🛰️ <i>Extracting season episodes from catalog...</i>`,
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [[{ text: '📺 Fetching Episodes • 50%', callback_data: 'noop' }]]
-        }
-      });
-      loaderMsgId = loadRes?.result?.message_id;
-    }
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Loading episodes... Please wait.' });
 
     const groupDataObj = typeof groupData.link === 'object' && !Array.isArray(groupData.link) ? groupData.link : null;
     let episodes = Array.isArray(groupData.link) ? groupData.link : (groupDataObj?.episodes || []);
     const allGroups = groupDataObj?.allGroups || [];
     const seriesTitle = groupDataObj?.seriesTitle || groupData.title;
     const groupSubTitle = groupDataObj?.groupTitle || '';
+
+    let loaderMsgId = null;
+    if (data.startsWith('eps:')) {
+      const epTitle = sanitizeCleanTitle(seriesTitle || 'Series');
+      const loadRes = await tgCall(token, 'sendMessage', {
+        chat_id: chatId,
+        text: `<b>Loading Episodes...</b>\n` +
+          `<b>${escapeHtml(epTitle)}</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `<code>[■■■■■□□□□□] 50%</code>\n\n` +
+          `<i>Fetching episode list...</i>`,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [[{ text: 'Fetching Episodes • 50%', callback_data: 'noop' }]]
+        }
+      });
+      loaderMsgId = loadRes?.result?.message_id;
+    }
 
     if (episodes.length === 0 && groupDataObj?.episodesLink) {
       await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'typing' });
@@ -1606,24 +1656,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     }
 
     if (episodes.length === 0) {
-      const noEpText = `⚠️ <b>Could not load episode list.</b>\n\n<i>Please tap below to retry, or try another extension:</i>`;
+      const noEpText = `<b>Could not load episode list.</b>\n\n<i>Please tap below to retry, or try another extension:</i>`;
       const noEpMarkup = {
         inline_keyboard: [
-          [{ text: '🔁 Retry Loading Episodes', callback_data: `eps:${epGroupStoreId}` }],
-          [{ text: '🔄 Switch Extension', callback_data: `swprov:${(seriesTitle || '').slice(0, 30)}` }]
+          [{ text: 'Retry Loading Episodes', callback_data: `eps:${epGroupStoreId}` }],
+          [{ text: 'Switch Extension', callback_data: `swprov:${(seriesTitle || '').slice(0, 30)}` }]
         ]
       };
-      if (loaderMsgId) {
-        return tgCall(token, 'editMessageText', {
-          chat_id: chatId,
-          message_id: loaderMsgId,
-          text: noEpText,
-          parse_mode: 'HTML',
-          reply_markup: noEpMarkup
-        });
-      }
-      return tgCall(token, 'sendMessage', {
-        chat_id: chatId,
+      return sendOrEdit(token, chatId, loaderMsgId, {
         text: noEpText,
         parse_mode: 'HTML',
         reply_markup: noEpMarkup
@@ -1634,7 +1674,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     const totalPages = Math.ceil(episodes.length / pageSize) || 1;
     const currentPage = Math.max(1, Math.min(page, totalPages));
 
-    const cleanSeries = cleanMediaTitle(seriesTitle);
+    const cleanSeries = sanitizeCleanTitle(seriesTitle);
     const seasonNum = extractActualSeason(groupSubTitle) || extractActualSeason(groupData.title);
     const resLabel = extractCleanResolution(groupSubTitle);
 
@@ -1642,9 +1682,9 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     if (seasonNum) epHeader += ` • Season ${seasonNum}`;
     if (resLabel) epHeader += ` [${resLabel}]`;
 
-    let epText = `📺 <b>${escapeHtml(epHeader)}</b>\n`;
+    let epText = `<b>${escapeHtml(epHeader)}</b>\n`;
     if (totalPages > 1) {
-      epText += `📄 <b>Page ${currentPage} of ${totalPages}</b> (${episodes.length} Episodes)\n`;
+      epText += `<b>Page ${currentPage} of ${totalPages}</b> (${episodes.length} Episodes)\n`;
     }
     epText += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     epText += `<i>Select an Episode to play or download:</i>`;
@@ -1762,19 +1802,19 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId });
     await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
 
-    const cleanTitle = cleanMediaTitle(item.title);
-    const initialLoader = `⚡ <b>Resolving Stream Links...</b>\n` +
-      `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+    const cleanTitle = sanitizeCleanTitle(item.title);
+    const initialLoader = `<b>Resolving Stream Links...</b>\n` +
+      `<b>${escapeHtml(cleanTitle)}</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
       `<code>[■■■□□□□□□□] 30%</code>\n\n` +
-      `🛰️ <i>Contacting resolver nodes & mirrors...</i>`;
+      `<i>Contacting resolver nodes &amp; mirrors...</i>`;
 
     const waitMsg = await tgCall(token, 'sendMessage', {
       chat_id: chatId,
       text: initialLoader,
       parse_mode: 'HTML',
       reply_markup: {
-        inline_keyboard: [[{ text: '⚡ Resolving Sources • 30%', callback_data: 'noop' }]]
+        inline_keyboard: [[{ text: 'Resolving Sources • 30%', callback_data: 'noop' }]]
       }
     });
     const waitMsgId = waitMsg?.result?.message_id;
@@ -1799,7 +1839,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
           if (fallbackProv !== item.provider && cleanTitle && cleanTitle.length > 2) {
             const rawQ = cleanTitle.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
             if (rawQ) {
-              const fbResults = await callCinemaApi(requestUrl, '/search', { provider: fallbackProv, query: rawQ });
+              const fbResults = await callCinemaApi(requestUrl, '/search', { provider: fallbackProv, q: rawQ });
               if (Array.isArray(fbResults) && fbResults.length > 0) {
                 const bestMatch = fbResults[0];
                 const fbMeta = await callCinemaApi(requestUrl, '/meta', { provider: fallbackProv, link: bestMatch.link });
@@ -1829,14 +1869,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
           await tgCall(token, 'editMessageText', {
             chat_id: chatId,
             message_id: waitMsgId,
-            text: `⚡ <b>Extracting Stream Links...</b>\n` +
-              `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+            text: `<b>Extracting Stream Links...</b>\n` +
+              `<b>${escapeHtml(cleanTitle)}</b>\n` +
               `━━━━━━━━━━━━━━━━━━━━━━\n` +
               `<code>[■■■■■■□□□□] 65%</code>\n\n` +
-              `🔍 <i>Bypassing cloud mirrors & shortlinks...</i>`,
+              `<i>Bypassing cloud mirrors &amp; shortlinks...</i>`,
             parse_mode: 'HTML',
             reply_markup: {
-              inline_keyboard: [[{ text: '🚀 Fetching Mirrors • 65%', callback_data: 'noop' }]]
+              inline_keyboard: [[{ text: 'Fetching Mirrors • 65%', callback_data: 'noop' }]]
             }
           });
         } catch (_) {}
@@ -1848,14 +1888,14 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
           await tgCall(token, 'editMessageText', {
             chat_id: chatId,
             message_id: waitMsgId,
-            text: `⚡ <b>Finalizing Stream...</b>\n` +
-              `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+            text: `<b>Finalizing Stream...</b>\n` +
+              `<b>${escapeHtml(cleanTitle)}</b>\n` +
               `━━━━━━━━━━━━━━━━━━━━━━\n` +
               `<code>[■■■■■■■■■□] 90%</code>\n\n` +
-              `✨ <i>Verifying high-speed 1080p/720p stream links...</i>`,
+              `<i>Verifying high-speed stream links...</i>`,
             parse_mode: 'HTML',
             reply_markup: {
-              inline_keyboard: [[{ text: '✨ Verifying Streams • 90%', callback_data: 'noop' }]]
+              inline_keyboard: [[{ text: 'Verifying Streams • 90%', callback_data: 'noop' }]]
             }
           });
         } catch (_) {}
@@ -1878,41 +1918,31 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
 
     if (validMirrors.length === 0) {
       const botProfile = getBotProfile(token);
-      const errText = `⚠️ <b>Unable to open stream right now.</b>\n\n` +
-            `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
+      const errText = `<b>Unable to open stream right now.</b>\n\n` +
+            `<b>${escapeHtml(cleanTitle)}</b>\n` +
             `<i>The link did not respond in time or provider has no direct stream node.</i>\n\n` +
-            `Please <b>tap again to retry</b>, or search across active extensions:`;
+            `Please tap retry or search across active extensions:`;
       const errMarkup = {
         inline_keyboard: [
           [
-            { text: '🔁 Tap Again to Retry', callback_data: `resopt:${qStoreId}` },
-            { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+            { text: 'Retry', callback_data: `resopt:${qStoreId}` },
+            { text: 'Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
           ],
           [
-            { text: `🌐 Search "${(cleanTitle || '').slice(0, 22)}" across ${botProfile.name}`, callback_data: `search_all:${(cleanTitle || '').slice(0, 30)}` }
+            { text: `Search "${(cleanTitle || '').slice(0, 22)}" in ${botProfile.name}`, callback_data: `search_all:${(cleanTitle || '').slice(0, 30)}` }
           ]
         ]
       };
 
-      if (waitMsgId) {
-        return tgCall(token, 'editMessageText', {
-          chat_id: chatId,
-          message_id: waitMsgId,
-          text: errText,
-          parse_mode: 'HTML',
-          reply_markup: errMarkup
-        });
-      }
-      return tgCall(token, 'sendMessage', {
-        chat_id: chatId,
+      return sendOrEdit(token, chatId, waitMsgId, {
         text: errText,
         parse_mode: 'HTML',
         reply_markup: errMarkup
       });
     }
 
-    let resMsg = `🎬 <b>${escapeHtml(cleanTitle)}</b>\n`;
-    resMsg += `🌐 <b>Source:</b> <b>${escapeHtml(item.provider ? item.provider.toUpperCase() : 'CINEMA')}</b>\n`;
+    let resMsg = `<b>${escapeHtml(cleanTitle)}</b>\n`;
+    resMsg += `Source: <b>${escapeHtml(item.provider ? item.provider.toUpperCase() : 'CINEMA')}</b>\n`;
     resMsg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     resMsg += `<code>[■■■■■■■■■■] 100% Ready</code>\n\n`;
     resMsg += `<i>Choose your preferred option below to play in VLC or download:</i>\n`;
@@ -1926,7 +1956,6 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       const url = m.link || m.url;
       if (!url || typeof url !== 'string' || !url.startsWith('http')) return;
 
-      // Deduplicate Pixeldrain / GDrive tokens so there are no duplicate buttons
       let dedupeKey = url;
       if (url.includes('pixeldrain.com') || url.includes('pixeldrain.dev')) {
         const pdId = url.split('/file/')[1]?.split('?')[0] || url.split('/u/')[1]?.split('?')[0];
@@ -1967,30 +1996,19 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         dlUrl = `${DEFAULT_WEB_URL}/api/download?url=${encodeURIComponent(dlUrl)}&filename=${encodeURIComponent(cleanTitle.replace(/[^\w\s.-]/g, '') + '.mp4')}`;
       }
 
-      // Always pair VLC and Download together symmetrically in the same row!
+      // Always pair VLC and Download together symmetrically in the same row
       keyboard.push([
-        { text: `🎬 VLC (${m.sName})`, url: vlcRedirectUrl },
-        { text: `⬇️ Download (${m.sName})`, url: dlUrl }
+        { text: `VLC Player (${m.sName})`, url: vlcRedirectUrl },
+        { text: `Download (${m.sName})`, url: dlUrl }
       ]);
     });
 
     keyboard.push([
-      { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
-      { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+      { text: 'Cinema Web', url: DEFAULT_WEB_URL },
+      { text: 'Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
     ]);
 
-    if (waitMsgId) {
-      return tgCall(token, 'editMessageText', {
-        chat_id: chatId,
-        message_id: waitMsgId,
-        text: resMsg,
-        parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: keyboard }
-      });
-    }
-
-    return tgCall(token, 'sendMessage', {
-      chat_id: chatId,
+    return sendOrEdit(token, chatId, waitMsgId, {
       text: resMsg,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard }
@@ -2006,15 +2024,15 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   if (!results || results.length === 0) {
     const profile = token ? getBotProfile(token) : null;
     const keyboard = [
-      [{ text: '🔄 Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }]
+      [{ text: 'Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }]
     ];
     if (profile) {
-      keyboard.push([{ text: `🌐 Search ALL Extensions in ${profile.name}`, callback_data: `search_all:${query.slice(0, 30)}` }]);
+      keyboard.push([{ text: `Search All in ${profile.name}`, callback_data: `search_all:${query.slice(0, 30)}` }]);
     }
-    keyboard.push([{ text: '⚙️ Extension Settings', callback_data: 'bot_settings' }]);
+    keyboard.push([{ text: 'Settings', callback_data: 'bot_settings' }]);
 
     return {
-      text: `❌ No results found for <b>"${escapeHtml(query)}"</b>.\n\n` +
+      text: `No results found for <b>"${escapeHtml(query)}"</b>.\n\n` +
         `<i>Try another keyword, switch extension, or search across all extensions in ${escapeHtml(profile?.name || 'this category')}:</i>`,
       keyboard: {
         inline_keyboard: keyboard
@@ -2027,11 +2045,12 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   const currentPage = Math.max(1, Math.min(page, totalPages));
   const searchStoreId = existingStoreId || (await storeLink(db, 'global', results, query));
 
-  let text = `🔍 <b>Results for "${escapeHtml(query)}":</b>\n`;
+  let text = `<b>Results for "${escapeHtml(query)}"</b>\n`;
   if (totalPages > 1) {
-    text += `📄 <b>Page ${currentPage} of ${totalPages}</b> (${results.length} total matches)\n`;
+    text += `<b>Page ${currentPage} of ${totalPages}</b> (${results.length} total matches)\n`;
   }
-  text += `\n<i>Tap any title to view streaming qualities and episodes:</i>\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `<i>Tap any title to view streaming qualities and episodes:</i>\n`;
 
   const keyboard = [];
   const startIndex = (currentPage - 1) * pageSize;
@@ -2042,16 +2061,16 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
     const item = pageItems[i];
     const prov = item.provider || 'default';
     const storeId = await storeLink(db, prov, item.link, item.title);
-    const clean = cleanMediaTitle(item.title);
+    const clean = sanitizeCleanTitle(item.title);
     const res = extractCleanResolution(item.title);
     const resTag = res ? ` • ${res}` : '';
-    let baseLabel = `🎬 ${clean.slice(0, 26)}${clean.length > 26 ? '…' : ''}${resTag} [${prov}]`;
+    let baseLabel = `${clean.slice(0, 26)}${clean.length > 26 ? '…' : ''}${resTag} [${prov}]`;
     
     let finalLabel = baseLabel;
     if (seenLabels.has(baseLabel)) {
       const count = seenLabels.get(baseLabel) + 1;
       seenLabels.set(baseLabel, count);
-      finalLabel = `🎬 ${clean.slice(0, 22)}${clean.length > 22 ? '…' : ''}${resTag} (${count}) [${prov}]`;
+      finalLabel = `${clean.slice(0, 22)}${clean.length > 22 ? '…' : ''}${resTag} (${count}) [${prov}]`;
     } else {
       seenLabels.set(baseLabel, 1);
     }
@@ -2061,18 +2080,18 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   if (totalPages > 1) {
     const navRow = [];
     if (currentPage > 1) {
-      navRow.push({ text: '⬅️ Prev', callback_data: `spage:${searchStoreId}:${currentPage - 1}` });
+      navRow.push({ text: 'Prev', callback_data: `spage:${searchStoreId}:${currentPage - 1}` });
     }
-    navRow.push({ text: `📄 ${currentPage}/${totalPages}`, callback_data: 'noop' });
+    navRow.push({ text: `Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
     if (currentPage < totalPages) {
-      navRow.push({ text: 'Next ➡️', callback_data: `spage:${searchStoreId}:${currentPage + 1}` });
+      navRow.push({ text: 'Next', callback_data: `spage:${searchStoreId}:${currentPage + 1}` });
     }
     keyboard.push(navRow);
   }
 
   keyboard.push([
-    { text: '⚙️ Extension Settings', callback_data: 'bot_settings' },
-    { text: '🔄 Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }
+    { text: 'Settings', callback_data: 'bot_settings' },
+    { text: 'Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }
   ]);
 
   return { text, keyboard: { inline_keyboard: keyboard } };
@@ -2107,25 +2126,26 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
 
   const { resolutions, audio } = extractQualityBadges(meta?.title || item.title, rawGroups);
 
-  const cleanTitle = cleanMediaTitle(meta?.title || item.title);
+  const cleanTitle = sanitizeCleanTitle(meta?.title || item.title);
   const yearStr = meta?.year ? ` (${meta.year})` : '';
-  const ratingStr = meta?.rating ? `⭐ <b>Rating:</b> ${escapeHtml(meta.rating)}/10 • ` : '';
+  const ratingStr = meta?.rating ? `Rating: <b>${escapeHtml(meta.rating)}/10</b> • ` : '';
   const provDisplayName = item.providerName || (item.provider ? item.provider.toUpperCase() : 'CINEMA');
   const posterUrl = meta?.poster || meta?.image || item.image || item.poster || null;
 
-  let itemText = `🎬 <b>${escapeHtml(cleanTitle)}${yearStr}</b>\n`;
+  let itemText = `<b>${escapeHtml(cleanTitle)}${yearStr}</b>\n`;
   itemText += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  itemText += `${ratingStr}🌐 <b>Source:</b> <b>${escapeHtml(provDisplayName)}</b>\n`;
-  itemText += `🔊 <b>Audio:</b> ${escapeHtml(audio)}\n`;
-  itemText += `💿 <b>Releases:</b> <code>${escapeHtml(resolutions)}</code>\n`;
+  itemText += `${ratingStr}Source: <b>${escapeHtml(provDisplayName)}</b>\n`;
+  itemText += `Audio: ${escapeHtml(audio)}\n`;
+  itemText += `Releases: <code>${escapeHtml(resolutions)}</code>\n`;
   if (meta?.synopsis) {
     let syn = meta.synopsis.trim();
     if (syn.length > 180) syn = syn.slice(0, 177) + '…';
-    itemText += `\n📝 <i>${escapeHtml(syn)}</i>\n`;
+    itemText += `\n<i>${escapeHtml(syn)}</i>\n`;
   }
-  itemText += `\n<i>Choose a Quality or Episode below:</i>`;
+  itemText += `\n<i>Choose a quality or episode:</i>`;
 
   const keyboard = [];
+  const isSeries = isSeriesItem(item, meta, rawGroups);
 
   if (rawGroups.length > 0) {
     const itemStoreId = itemStoreIdParam || (await storeLink(db, item.provider, {
@@ -2145,10 +2165,19 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
       const dLinks = group.directLinks || [];
       const isPackGroup = group.quality === 'Pack' || /(full\s*season\s*packs?|season\s*packs?|batch\s*packs?|all\s*episodes\s*zip)/i.test(group.title || '');
 
-      if (isPackGroup && dLinks.length > 0) {
-        // Render each full season pack as an individual pack button
+      if (!isSeries) {
+        // MOVIE: Each quality group is a direct stream resolution (resopt:)
+        const targetLink = dLinks[0]?.link || group.link || actualLink;
+        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
+        const resLabel = extractCleanResolution(group.title || group.quality);
+        const qTitle = resLabel ? `${cleanBase} [${resLabel}]` : cleanBase;
+        const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
+        const label = formatQualityButtonLabel(group.title || group.quality, 'Play Movie');
+        rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });
+      } else if (isPackGroup && dLinks.length > 0) {
+        // SERIES PACK
         for (const pack of dLinks) {
-          const cleanBase = cleanMediaTitle(meta?.title || item.title);
+          const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
           const seasonNum = extractActualSeason(pack.title) || extractActualSeason(item.title);
           const sStr = seasonNum ? `S${seasonNum} ` : '';
           const pTitle = `${cleanBase} • ${sStr}Season Pack`;
@@ -2157,8 +2186,8 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
           rowBatch.push({ text: pLabel, callback_data: `resopt:${pStoreId}` });
         }
       } else if (dLinks.length > 1) {
-        // Group contains multiple single episodes
-        const cleanBase = cleanMediaTitle(meta?.title || item.title);
+        // SERIES: Multiple episodes in season
+        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
         const seasonNum = extractActualSeason(group.title) || extractActualSeason(item.title);
         const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
         const groupStoredTitle = `${cleanBase} • ${sStr}`;
@@ -2170,9 +2199,9 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
         }, groupStoredTitle);
         const label = formatEpisodeButtonLabel(group.title, dLinks.length, group.quality, startIndex + i, group.dub || group.language || '');
         rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
-      } else if (group.episodesLink && meta?.type !== 'movie' && dLinks[0]?.type !== 'movie') {
-        // External episodes index link (e.g. Vega nexdrive.beer / AnimeSalt)
-        const cleanBase = cleanMediaTitle(meta?.title || item.title);
+      } else if (group.episodesLink) {
+        // SERIES: External episodes index link
+        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
         const seasonNum = extractActualSeason(group.title) || extractActualSeason(item.title);
         const sStr = seasonNum ? `Season ${seasonNum}` : (group.title || 'Episodes');
         const groupStoredTitle = `${cleanBase} • ${sStr}`;
@@ -2185,13 +2214,12 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
         const label = formatEpisodeButtonLabel(group.title, 0, group.quality, startIndex + i, group.dub || group.language || '');
         rowBatch.push({ text: label, callback_data: `eps:${epGroupStoreId}` });
       } else {
-        const targetLink = dLinks[0]?.link || actualLink;
-        const cleanBase = cleanMediaTitle(meta?.title || item.title);
+        const targetLink = dLinks[0]?.link || group.link || actualLink;
+        const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
         const resLabel = extractCleanResolution(group.title || group.quality);
         const qTitle = resLabel ? `${cleanBase} [${resLabel}]` : cleanBase;
         const qStoreId = await storeLink(db, item.provider, targetLink, qTitle);
-        const defaultFallbackName = meta?.type === 'movie' || dLinks[0]?.type === 'movie' ? '🎬 Play Movie' : `Quality ${startIndex + i + 1}`;
-        const label = formatQualityButtonLabel(group.title || group.quality, defaultFallbackName);
+        const label = formatQualityButtonLabel(group.title || group.quality, `Quality ${startIndex + i + 1}`);
         rowBatch.push({ text: label, callback_data: `resopt:${qStoreId}` });
       }
     }
@@ -2202,23 +2230,23 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
 
     if (totalPages > 1) {
       const navRow = [];
-      if (currentPage > 1) navRow.push({ text: '⬅️ Prev', callback_data: `qpage:${itemStoreId}:${currentPage - 1}` });
+      if (currentPage > 1) navRow.push({ text: 'Prev', callback_data: `qpage:${itemStoreId}:${currentPage - 1}` });
       navRow.push({ text: `Page ${currentPage}/${totalPages}`, callback_data: 'noop' });
-      if (currentPage < totalPages) navRow.push({ text: 'Next ➡️', callback_data: `qpage:${itemStoreId}:${currentPage + 1}` });
+      if (currentPage < totalPages) navRow.push({ text: 'Next', callback_data: `qpage:${itemStoreId}:${currentPage + 1}` });
       keyboard.push(navRow);
     }
   } else {
-    const cleanBase = cleanMediaTitle(meta?.title || item.title);
+    const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
     const storeId = await storeLink(db, item.provider, actualLink, cleanBase);
-    keyboard.push([{ text: `▶️ Watch Now / Play`, callback_data: `resopt:${storeId}` }]);
+    keyboard.push([{ text: `Play ${cleanBase.slice(0, 24)}`, callback_data: `resopt:${storeId}` }]);
   }
 
   keyboard.push([
-    { text: '⚙️ Extension Settings', callback_data: 'bot_settings' },
-    { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+    { text: 'Settings', callback_data: 'bot_settings' },
+    { text: 'Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
   ]);
   keyboard.push([
-    { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL }
+    { text: 'Cinema Web', url: DEFAULT_WEB_URL }
   ]);
 
   // If editing an existing message (e.g. Next / Prev page pagination on poster card)
@@ -2239,9 +2267,17 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
     });
     if (capRes?.ok) return capRes;
 
-    return tgCall(token, 'editMessageText', {
+    const textRes = await tgCall(token, 'editMessageText', {
       chat_id: chatId,
       message_id: messageId,
+      text: itemText,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: keyboard }
+    });
+    if (textRes?.ok) return textRes;
+
+    return tgCall(token, 'sendMessage', {
+      chat_id: chatId,
       text: itemText,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard }
