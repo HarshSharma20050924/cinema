@@ -1,3 +1,5 @@
+import { getBalancedRenderCluster } from "./_cluster.js";
+
 /**
  * Cloudflare Pages Function: /api/proxy
  * Runs on Cloudflare Edge — proxies video/audio streams with correct CORS + Referer headers.
@@ -126,6 +128,12 @@ export async function onRequest(context) {
           const backendUrl = await env.CINEMA_KV.get('BACKEND_URL').catch?.(() => null);
           if (backendUrl && !candidates.includes(backendUrl)) candidates.push(backendUrl);
         } catch (_) {}
+      }
+
+      // Add balanced 5-node Render cluster fallbacks
+      const renderNodes = getBalancedRenderCluster();
+      for (const node of renderNodes) {
+        if (!candidates.includes(node)) candidates.push(node);
       }
 
       let lastDebug = '';

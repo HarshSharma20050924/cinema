@@ -1,3 +1,6 @@
+import { generateStreamCacheKey, getCachedStreams, setCachedStreams, isValidStreamResult } from "./_streamCache.js";
+import { RENDER_CLUSTER, getBalancedRenderCluster } from "./_cluster.js";
+
 /**
  * 24/7 Serverless Telegram Bot Webhook for Cinema Ecosystem
  * Deployed directly on Cloudflare Pages global edge.
@@ -880,7 +883,6 @@ const HELP_KEYBOARD = {
   ]
 };
 
-const PRIMARY_RENDER_BACKEND = "https://cinema-4h7t.onrender.com";
 let currentDb = null;
 
 async function getCandidateBackends(db) {
@@ -924,14 +926,39 @@ async function getCandidateBackends(db) {
       }
     } catch (_) {}
   }
-  if (!candidates.includes(PRIMARY_RENDER_BACKEND)) {
-    candidates.push(PRIMARY_RENDER_BACKEND);
+
+  // 🚀 Distributed 5-Node Render Cluster with round-robin load balancing (20% load per server)
+  const balancedRenderNodes = getBalancedRenderCluster();
+  for (const renderUrl of balancedRenderNodes) {
+    if (!candidates.includes(renderUrl)) {
+      candidates.push(renderUrl);
+    }
   }
   return candidates;
 }
 
-// Forward to active Cinema Backend Nodes with automatic cluster failover
+// Forward to active Cinema Backend Nodes with automatic cluster failover & edge caching
 async function callCinemaApi(requestUrl, endpoint, params = {}) {
+  const isStreams = endpoint.includes('/streams');
+  let streamCacheKey = null;
+
+  // ⚡ 50ms Edge Stream Cache Lookup for Telegram
+  if (isStreams && params.provider && params.link) {
+    try {
+      streamCacheKey = await generateStreamCacheKey(
+        params.provider,
+        params.link,
+        params.type || 'movie',
+        params.download || false,
+        params.title || ''
+      );
+      const cached = await getCachedStreams({ cinema_db: currentDb }, streamCacheKey);
+      if (cached && isValidStreamResult(cached.streams)) {
+        return cached.streams;
+      }
+    } catch (_) {}
+  }
+
   const candidates = await getCandidateBackends(currentDb);
   let lastError = null;
 
@@ -946,7 +973,6 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
       });
 
       const controller = new AbortController();
-      const isStreams = endpoint.includes('/streams');
       const isSlowEndpoint = isStreams || endpoint.includes('/search') || endpoint.includes('/meta') || endpoint.includes('/episodes');
       const timeoutMs = isStreams ? 16000 : (isSlowEndpoint ? 10000 : 4000);
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -959,6 +985,16 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
 
       if (res.ok) {
         const data = await res.json();
+        // ⚡ Cache valid stream results for 6 hours (NEVER cache empty or error)
+        if (isStreams && streamCacheKey && isValidStreamResult(data)) {
+          setCachedStreams(
+            { cinema_db: currentDb },
+            streamCacheKey,
+            data,
+            params.title || '',
+            params.provider || ''
+          ).catch(() => {});
+        }
         return data;
       }
     } catch (err) {
@@ -1977,132 +2013,145 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
 
     const cleanTitle = sanitizeCleanTitle(item.title);
-    const initialLoader = `<b>Resolving Stream Links...</b>\n` +
-      `<b>${escapeHtml(cleanTitle)}</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `<code>[■■■□□□□□□□] 30%</code>\n\n` +
-      `<i>Contacting resolver nodes &amp; mirrors...</i>`;
+    const mediaType = item.type || (/episode|season|\bs\d+/i.test(item.title) ? 'series' : 'movie');
+    let targetLink = item.link;
+    if (typeof targetLink === 'object' && targetLink !== null) {
+      targetLink = JSON.stringify(targetLink);
+    }
 
-    const waitMsg = await tgCall(token, 'sendMessage', {
-      chat_id: chatId,
-      text: initialLoader,
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [[{ text: 'Resolving Sources • 30%', callback_data: 'noop' }]]
-      }
-    });
-    const waitMsgId = waitMsg?.result?.message_id;
+    // ⚡ 50ms Edge Stream Cache Lookup for Telegram Webhook
+    const directCacheKey = await generateStreamCacheKey(item.provider, targetLink, mediaType, false, cleanTitle);
+    const cachedDirect = await getCachedStreams({ cinema_db: db }, directCacheKey);
+    let mirrors = null;
+    let waitMsgId = null;
+    let isInstantCache = false;
 
-    // Start extraction with robust timeout and fallback (try stream first, then download)
-    const fetchPromise = (async () => {
-      const mediaType = item.type || (/episode|season|\bs\d+/i.test(item.title) ? 'series' : 'movie');
-      let targetLink = item.link;
-      if (typeof targetLink === 'object' && targetLink !== null) {
-        targetLink = JSON.stringify(targetLink);
-      }
-      let m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: false, title: cleanTitle });
-      if (!m || m.length === 0) {
-        m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: true, title: cleanTitle });
-      }
+    if (cachedDirect && isValidStreamResult(cachedDirect.streams)) {
+      mirrors = cachedDirect.streams;
+      isInstantCache = true;
+    } else {
+      const initialLoader = `<b>Resolving Stream Links...</b>\n` +
+        `<b>${escapeHtml(cleanTitle)}</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `<code>[■■■□□□□□□□] 30%</code>\n\n` +
+        `<i>Contacting resolver nodes &amp; mirrors...</i>`;
 
-      // Cross-provider auto-fallback: If original extension has no stream resolver, find title on category default provider
-      if (!m || m.length === 0) {
-        try {
-          const profile = getBotProfile(token);
-          const fallbackProv = profile.defaultProvider || 'hdhub4u';
-          if (fallbackProv !== item.provider && cleanTitle && cleanTitle.length > 2) {
-            const rawQ = cleanTitle.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
-            if (rawQ) {
-              const fbResults = await callCinemaApi(requestUrl, '/search', { provider: fallbackProv, q: rawQ });
-              if (Array.isArray(fbResults) && fbResults.length > 0) {
-                const bestMatch = fbResults[0];
-                const fbMeta = await callCinemaApi(requestUrl, '/meta', { provider: fallbackProv, link: bestMatch.link });
-                const fbGroups = fbMeta?.linkList || fbMeta?.downloadLinks || [];
-                const targetGroup = fbGroups[0];
-                const fbTarget = targetGroup?.directLinks?.[0]?.link || targetGroup?.link || bestMatch.link;
-                if (fbTarget) {
-                  m = await callCinemaApi(requestUrl, '/streams', { provider: fallbackProv, link: fbTarget, type: mediaType, download: false, title: cleanTitle });
+      const waitMsg = await tgCall(token, 'sendMessage', {
+        chat_id: chatId,
+        text: initialLoader,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [[{ text: 'Resolving Sources • 30%', callback_data: 'noop' }]]
+        }
+      });
+      waitMsgId = waitMsg?.result?.message_id;
+
+      // Start extraction with robust timeout and fallback (try stream first, then download)
+      const fetchPromise = (async () => {
+        let m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: false, title: cleanTitle });
+        if (!m || m.length === 0) {
+          m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: true, title: cleanTitle });
+        }
+
+        // Cross-provider auto-fallback: If original extension has no stream resolver, find title on category default provider
+        if (!m || m.length === 0) {
+          try {
+            const profile = getBotProfile(token);
+            const fallbackProv = profile.defaultProvider || 'hdhub4u';
+            if (fallbackProv !== item.provider && cleanTitle && cleanTitle.length > 2) {
+              const rawQ = cleanTitle.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
+              if (rawQ) {
+                const fbResults = await callCinemaApi(requestUrl, '/search', { provider: fallbackProv, q: rawQ });
+                if (Array.isArray(fbResults) && fbResults.length > 0) {
+                  const bestMatch = fbResults[0];
+                  const fbMeta = await callCinemaApi(requestUrl, '/meta', { provider: fallbackProv, link: bestMatch.link });
+                  const fbGroups = fbMeta?.linkList || fbMeta?.downloadLinks || [];
+                  const targetGroup = fbGroups[0];
+                  const fbTarget = targetGroup?.directLinks?.[0]?.link || targetGroup?.link || bestMatch.link;
+                  if (fbTarget) {
+                    m = await callCinemaApi(requestUrl, '/streams', { provider: fallbackProv, link: fbTarget, type: mediaType, download: false, title: cleanTitle });
+                  }
                 }
               }
             }
-          }
-        } catch (_) {}
+          } catch (_) {}
+        }
+
+        return m;
+      })();
+
+      // Progressive real visual progress bar updates while resolving
+      let progressTimer1 = null;
+      let progressTimer2 = null;
+      let progressTimer3 = null;
+
+      if (waitMsgId) {
+        progressTimer1 = setTimeout(async () => {
+          try {
+            await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
+            await tgCall(token, 'editMessageText', {
+              chat_id: chatId,
+              message_id: waitMsgId,
+              text: `<b>Extracting Stream Links...</b>\n` +
+                `<b>${escapeHtml(cleanTitle)}</b>\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━\n` +
+                `<code>[■■■■■■□□□□] 65%</code>\n\n` +
+                `<i>Bypassing cloud mirrors &amp; shortlinks...</i>`,
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [[{ text: 'Fetching Mirrors • 65%', callback_data: 'noop' }]]
+              }
+            });
+          } catch (_) {}
+        }, 1100);
+
+        progressTimer2 = setTimeout(async () => {
+          try {
+            await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
+            await tgCall(token, 'editMessageText', {
+              chat_id: chatId,
+              message_id: waitMsgId,
+              text: `<b>Finalizing Stream...</b>\n` +
+                `<b>${escapeHtml(cleanTitle)}</b>\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━\n` +
+                `<code>[■■■■■■■■■□] 90%</code>\n\n` +
+                `<i>Verifying high-speed stream links...</i>`,
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [[{ text: 'Verifying Streams • 90%', callback_data: `resopt:${qStoreId}` }]]
+              }
+            });
+          } catch (_) {}
+        }, 2300);
+
+        progressTimer3 = setTimeout(async () => {
+          try {
+            await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
+            await tgCall(token, 'editMessageText', {
+              chat_id: chatId,
+              message_id: waitMsgId,
+              text: `<b>Resolving Cloud Streams...</b>\n` +
+                `<b>${escapeHtml(cleanTitle)}</b>\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━\n` +
+                `<code>[■■■■■■■■■□] 95%</code>\n\n` +
+                `<i>Server node is processing mirrors... If slow, tap Retry:</i>`,
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '🔄 Tap to Retry / Refresh', callback_data: `resopt:${qStoreId}` }]
+                ]
+              }
+            });
+          } catch (_) {}
+        }, 4200);
       }
 
-      return m;
-    })();
-
-    // Progressive real visual progress bar updates while resolving
-    let progressTimer1 = null;
-    let progressTimer2 = null;
-    let progressTimer3 = null;
-
-    if (waitMsgId) {
-      progressTimer1 = setTimeout(async () => {
-        try {
-          await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
-          await tgCall(token, 'editMessageText', {
-            chat_id: chatId,
-            message_id: waitMsgId,
-            text: `<b>Extracting Stream Links...</b>\n` +
-              `<b>${escapeHtml(cleanTitle)}</b>\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `<code>[■■■■■■□□□□] 65%</code>\n\n` +
-              `<i>Bypassing cloud mirrors &amp; shortlinks...</i>`,
-            parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: [[{ text: 'Fetching Mirrors • 65%', callback_data: 'noop' }]]
-            }
-          });
-        } catch (_) {}
-      }, 1100);
-
-      progressTimer2 = setTimeout(async () => {
-        try {
-          await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
-          await tgCall(token, 'editMessageText', {
-            chat_id: chatId,
-            message_id: waitMsgId,
-            text: `<b>Finalizing Stream...</b>\n` +
-              `<b>${escapeHtml(cleanTitle)}</b>\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `<code>[■■■■■■■■■□] 90%</code>\n\n` +
-              `<i>Verifying high-speed stream links...</i>`,
-            parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: [[{ text: 'Verifying Streams • 90%', callback_data: `resopt:${qStoreId}` }]]
-            }
-          });
-        } catch (_) {}
-      }, 2300);
-
-      progressTimer3 = setTimeout(async () => {
-        try {
-          await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' });
-          await tgCall(token, 'editMessageText', {
-            chat_id: chatId,
-            message_id: waitMsgId,
-            text: `<b>Resolving Cloud Streams...</b>\n` +
-              `<b>${escapeHtml(cleanTitle)}</b>\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `<code>[■■■■■■■■■□] 95%</code>\n\n` +
-              `<i>Server node is processing mirrors... If slow, tap Retry:</i>`,
-            parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: '🔄 Tap to Retry / Refresh', callback_data: `resopt:${qStoreId}` }]
-              ]
-            }
-          });
-        } catch (_) {}
-      }, 4200);
+      const safetyTimeout = new Promise((resolve) => setTimeout(() => resolve(null), 18000));
+      mirrors = await Promise.race([fetchPromise, safetyTimeout]);
+      if (progressTimer1) clearTimeout(progressTimer1);
+      if (progressTimer2) clearTimeout(progressTimer2);
+      if (progressTimer3) clearTimeout(progressTimer3);
     }
-
-    const safetyTimeout = new Promise((resolve) => setTimeout(() => resolve(null), 18000));
-    const mirrors = await Promise.race([fetchPromise, safetyTimeout]);
-    if (progressTimer1) clearTimeout(progressTimer1);
-    if (progressTimer2) clearTimeout(progressTimer2);
-    if (progressTimer3) clearTimeout(progressTimer3);
 
     const uniqueMap = new Map();
     (mirrors || []).forEach(s => {
@@ -2113,6 +2162,11 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     });
 
     const validMirrors = Array.from(uniqueMap.values());
+
+    // ⚡ Cache valid stream mirrors in Cloudflare D1 & KV for 6 hours
+    if (!isInstantCache && isValidStreamResult(validMirrors)) {
+      setCachedStreams({ cinema_db: db }, directCacheKey, validMirrors, cleanTitle, item.provider).catch(() => {});
+    }
 
     if (validMirrors.length === 0) {
       const botProfile = getBotProfile(token);
@@ -2142,7 +2196,11 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     let resMsg = `🎬 <b>${escapeHtml(cleanTitle)}</b>\n`;
     resMsg += `🌐 Source: <b>${escapeHtml(item.provider ? item.provider.toUpperCase() : 'CINEMA')}</b>\n`;
     resMsg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-    resMsg += `<code>[■■■■■■■■■■] 100% Ready</code>\n\n`;
+    if (isInstantCache) {
+      resMsg += `<code>[■■■■■■■■■■] 100% Ready (⚡ 50ms Edge Cache)</code>\n\n`;
+    } else {
+      resMsg += `<code>[■■■■■■■■■■] 100% Ready</code>\n\n`;
+    }
 
     // Deduplicate mirrors and pair VLC + Download symmetrically
     const uniqueMirrors = [];

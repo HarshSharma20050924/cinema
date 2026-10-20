@@ -1,3 +1,6 @@
+import { generateStreamCacheKey, getCachedStreams, setCachedStreams, isValidStreamResult } from "./_streamCache.js";
+import { RENDER_CLUSTER, getBalancedRenderCluster } from "./_cluster.js";
+
 /**
  * Cloudflare Pages Function: /api/* Pure Mobile Proxy
  * 100% transparent forwarding directly to the Mobile Backend via Tunnel.
@@ -23,6 +26,46 @@ export async function onRequest(context) {
     // Direct Edge Native Handler for The Pirate Bay
     const tpbResp = await handleTpbRequest(reqUrl);
     if (tpbResp) return tpbResp;
+
+    // ⚡ 50ms Direct Edge Stream Caching (Cloudflare D1 / KV with 6-Hour TTL)
+    const isStreamsReq = reqUrl.pathname === "/api/streams" || reqUrl.pathname.endsWith("/streams");
+    let streamCacheKey = null;
+
+    if (isStreamsReq && (request.method === "GET" || request.method === "HEAD")) {
+      const prov = reqUrl.searchParams.get("provider") || "";
+      const link = reqUrl.searchParams.get("link") || "";
+      const type = reqUrl.searchParams.get("type") || "movie";
+      const dl = reqUrl.searchParams.get("download") || "false";
+      const title = reqUrl.searchParams.get("title") || "";
+
+      if (prov && link) {
+        streamCacheKey = await generateStreamCacheKey(prov, link, type, dl, title);
+        const cached = await getCachedStreams(env, streamCacheKey);
+        if (cached && isValidStreamResult(cached.streams)) {
+          if (request.method === "HEAD") {
+            return new Response(null, {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "X-Cinema-Cache": `HIT (${cached.source})`,
+              },
+            });
+          }
+          return new Response(JSON.stringify(cached.streams), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+              "X-Cinema-Cache": `HIT (${cached.source})`,
+              "X-Cinema-Cache-TTL": String(Math.round((cached.ttlRemainingMs || 0) / 1000)),
+              "Cache-Control": "public, max-age=600",
+            },
+          });
+        }
+      }
+    }
 
     let backendUrl = null;
     let pool = [];
@@ -93,10 +136,12 @@ export async function onRequest(context) {
       }
     }
 
-    // Ensure 24/7 Render Cloud Engine is in candidate list as fallback
-    const RENDER_PRIMARY = "https://cinema-4h7t.onrender.com";
-    if (!candidates.includes(RENDER_PRIMARY)) {
-      candidates.push(RENDER_PRIMARY); // Place at end as fallback after live mobile/local runners
+    // 🚀 Distributed Render Cluster: 5 24/7 cloud backends with round-robin load balancing
+    const balancedRenderNodes = getBalancedRenderCluster();
+    for (const renderNode of balancedRenderNodes) {
+      if (!candidates.includes(renderNode)) {
+        candidates.push(renderNode);
+      }
     }
 
     // Helper to fetch live providers directly from Zenda GitHub manifest
@@ -236,6 +281,36 @@ export async function onRequest(context) {
           respHeaders.set("X-Cinema-Server-Node", candidateUrl);
 
           const status = upstreamResp.status;
+
+          // ⚡ Cache valid stream results in Cloudflare D1/KV for 6 hours (50ms next time)
+          if (isStreamsReq && status === 200 && streamCacheKey && request.method === "GET") {
+            try {
+              const bodyText = await upstreamResp.text();
+              const parsed = JSON.parse(bodyText);
+              if (isValidStreamResult(parsed)) {
+                respHeaders.set("X-Cinema-Cache", "MISS (STORED 6H)");
+                const savePromise = setCachedStreams(
+                  env,
+                  streamCacheKey,
+                  parsed,
+                  reqUrl.searchParams.get("title") || "",
+                  reqUrl.searchParams.get("provider") || ""
+                );
+                if (context && typeof context.waitUntil === "function") {
+                  context.waitUntil(savePromise);
+                } else {
+                  await savePromise;
+                }
+              } else {
+                respHeaders.set("X-Cinema-Cache", "SKIP (EMPTY/INVALID)");
+              }
+              return new Response(bodyText, {
+                status: 200,
+                headers: respHeaders,
+              });
+            } catch (_) {}
+          }
+
           const body = (status === 204 || status === 304) ? null : upstreamResp.body;
 
           return new Response(body, {

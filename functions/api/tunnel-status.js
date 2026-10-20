@@ -1,3 +1,5 @@
+import { RENDER_CLUSTER, getBalancedRenderCluster } from "./_cluster.js";
+
 export async function onRequestGet(context) {
   const { env } = context;
   try {
@@ -39,9 +41,12 @@ export async function onRequestGet(context) {
     const freshPool = (pool || []).filter(p => now - (p.lastSeen || 0) < 180000);
     const freshRelays = (relayPool || []).filter(p => now - (p.lastSeen || 0) < 180000);
 
+    const fallbackBackend = getBalancedRenderCluster()[0] || "https://cinema-4h7t.onrender.com";
+
     return new Response(JSON.stringify({
       ok: Boolean(backendUrl || freshPool.length > 0 || freshRelays.length > 0),
-      backendUrl: backendUrl || (freshPool[0]?.url || "https://cinema-4h7t.onrender.com"),
+      backendUrl: backendUrl || (freshPool[0]?.url || fallbackBackend),
+      cluster: RENDER_CLUSTER,
       pool: freshPool,
       relays: freshRelays
     }), {

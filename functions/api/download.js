@@ -1,3 +1,5 @@
+import { getBalancedRenderCluster } from "./_cluster.js";
+
 /**
  * Cloudflare Pages Function: /api/download
  * Proxies file downloads with proper disposition and headers.
@@ -117,6 +119,13 @@ export async function onRequest(context) {
       const clean = backendUrl.replace(/\/+$/, '');
       if (!candidates.includes(clean)) candidates.push(clean);
     }
+
+    // Add balanced 5-node Render cluster fallbacks
+    const renderNodes = getBalancedRenderCluster();
+    for (const node of renderNodes) {
+      if (!candidates.includes(node)) candidates.push(node);
+    }
+
     return candidates;
   }
 
