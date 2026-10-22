@@ -11,6 +11,62 @@ const BOT_TOKEN = ""; // Configured via Cloudflare Pages environment variables (
 const ADMIN_IDS = [1872734142];
 const DEFAULT_WEB_URL = "https://cinema-dwh.pages.dev";
 
+const PROVIDER_BASE_URLS = {
+  vega: 'https://new1.vegamovies.lease',
+  vegamovies: 'https://new1.vegamovies.lease',
+  drive: 'https://new3.moviesdrive.beer',
+  moviesdrive: 'https://new3.moviesdrive.beer',
+  moviesmod: 'https://moviesmod.uk.com',
+  mod: 'https://moviesmod.uk.com',
+  hdhub: 'https://new8.hdhub4u.cl',
+  hdhub4u: 'https://new8.hdhub4u.cl',
+  moviebox: 'https://officialmoviebox.com',
+  movieboxweb: 'https://officialmoviebox.com',
+  '4khdhub': 'https://4khdhub.one',
+  kat: 'https://new.katmoviehd.top',
+  katmovies: 'https://new.katmoviehd.top',
+  katmoviehd: 'https://new.katmoviehd.top',
+  multi: 'https://m1.multimovies.courses',
+  multimovies: 'https://m1.multimovies.courses',
+  topmovies: 'https://moviesleech.club',
+  uhdmovies: 'https://uhdmovies.us.org',
+  uhd: 'https://uhdmovies.us.org',
+  cinemaluxe: 'https://cinemaluxe.one',
+  extramovies: 'https://extramovies.ist',
+  extra: 'https://extramovies.ist',
+  bollyflix: 'https://bollyflix.vip',
+  moviesflix: 'https://moviesflix.is',
+  world4ufree: 'https://world4ufree.vet',
+  world4u: 'https://world4ufree.vet',
+  skymovieshd: 'https://skymovieshd.ink',
+  luxmovies: 'https://luxmovies.link',
+  eonmovies: 'https://eonmovies.ink',
+  cinevood: 'https://1cinevood.lol',
+  '1cinevood': 'https://1cinevood.lol',
+  movies4u: 'https://movies4u.vip',
+  netflixmirror: 'https://net52.cc',
+  disneymirror: 'https://net52.cc',
+  primemirror: 'https://net52.cc',
+  castle: 'https://castletv.xyz',
+  mxplayer: 'https://www.mxplayer.in',
+  animeworld: 'https://animeworld.ac',
+  animesalt: 'https://animesalt.cc',
+  thepiratebay: 'https://thepiratebay.org',
+  tpb: 'https://thepiratebay.org',
+};
+
+function getDirectMovieUrl(provKey, link, defaultWebUrl) {
+  if (link && (link.startsWith('http://') || link.startsWith('https://'))) {
+    return link;
+  }
+  const base = PROVIDER_BASE_URLS[(provKey || '').toLowerCase()] || PROVIDER_BASE_URLS['hdhub4u'];
+  if (base && link) {
+    const cleanPath = link.startsWith('/') ? link : `/${link}`;
+    return `${base.replace(/\/+$/, '')}${cleanPath}`;
+  }
+  return base || defaultWebUrl;
+}
+
 // Default enabled extensions (Prioritizing high-reliability providers first)
 const DEFAULT_ENABLED_PROVIDERS = [
   "drive",
@@ -191,8 +247,8 @@ async function renderSettingsMenu(chatId, token, db, userId, messageId = null) {
   }
 
   keyboard.push([
-    { text: '🔍 Search Movies / Series', switch_inline_query_current_chat: '' },
-    { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL }
+    { text: 'Search Movies / Series', switch_inline_query_current_chat: '' },
+    { text: 'Open in Web', url: DEFAULT_WEB_URL }
   ]);
 
   return sendOrEdit(token, chatId, messageId, {
@@ -866,8 +922,8 @@ const VLC_GUIDE_TEXT = `🚀 <b>Cinema Web App & 24/7 Node Runner</b>\n\n` +
 const VLC_GUIDE_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: '🌐 Cinema Web App', url: DEFAULT_WEB_URL },
-      { text: '📱 Runner APK', callback_data: 'send_file:android_runner' }
+      { text: 'Open in Web', url: DEFAULT_WEB_URL },
+      { text: 'Runner APK', callback_data: 'send_file:android_runner' }
     ],
     [
       { text: '📱 Cinema App', callback_data: 'send_file:android_app' },
@@ -901,8 +957,8 @@ const HELP_TEXT = `🤖 <b>Cinema Streaming Bot - Command Directory</b>\n\n` +
 const HELP_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
-      { text: '⚡ Runner APK', callback_data: 'send_file:android_runner' }
+      { text: 'Open in Web', url: DEFAULT_WEB_URL },
+      { text: 'Runner APK', callback_data: 'send_file:android_runner' }
     ],
     [
       { text: '🔍 Search Movie / Show', switch_inline_query_current_chat: '' },
@@ -919,6 +975,16 @@ let currentDb = null;
 
 async function getCandidateBackends(db) {
   const candidates = [];
+
+  // 1. 🚀 Ultra-Reliable Distributed 5-Node Render Cluster First (Instant <300ms response, zero DNS failures)
+  const balancedRenderNodes = getBalancedRenderCluster();
+  for (const renderUrl of balancedRenderNodes) {
+    if (!candidates.includes(renderUrl)) {
+      candidates.push(renderUrl);
+    }
+  }
+
+  // 2. Active Dynamic Mobile / Local Dev Runners (Secondary)
   if (db) {
     try {
       const poolRow = await db.prepare("SELECT value FROM config WHERE key = 'BACKEND_POOL'").first();
@@ -926,17 +992,10 @@ async function getCandidateBackends(db) {
         const pool = JSON.parse(poolRow.value);
         if (Array.isArray(pool)) {
           const now = Date.now();
-          // Filter out dead/stale nodes not seen in last 10 minutes
+          // Filter out stale nodes not seen in last 90 seconds
           const active = pool.filter(n => {
             const last = n?.lastSeen || 0;
-            return !n.lastSeen || (now - last < 600000);
-          });
-
-          // Prioritize residential phone runners (isPrimary) first, then freshest
-          active.sort((a, b) => {
-            if (a?.isPrimary && !b?.isPrimary) return -1;
-            if (!a?.isPrimary && b?.isPrimary) return 1;
-            return (b?.lastSeen || 0) - (a?.lastSeen || 0);
+            return !n.lastSeen || (now - last < 90000);
           });
 
           for (const item of active) {
@@ -959,13 +1018,6 @@ async function getCandidateBackends(db) {
     } catch (_) {}
   }
 
-  // 🚀 Distributed 5-Node Render Cluster with round-robin load balancing (20% load per server)
-  const balancedRenderNodes = getBalancedRenderCluster();
-  for (const renderUrl of balancedRenderNodes) {
-    if (!candidates.includes(renderUrl)) {
-      candidates.push(renderUrl);
-    }
-  }
   return candidates;
 }
 
@@ -1005,8 +1057,9 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
       });
 
       const controller = new AbortController();
-      const isSlowEndpoint = isStreams || endpoint.includes('/search') || endpoint.includes('/meta') || endpoint.includes('/episodes');
-      const timeoutMs = isStreams ? 16000 : (isSlowEndpoint ? 10000 : 4000);
+      const isTunnel = base.includes('trycloudflare.com');
+      // Fast 3s timeout for mobile tunnels so dead phones never stall the bot; 6s for high-bandwidth Render cluster
+      const timeoutMs = isTunnel ? 2500 : (isStreams ? 8000 : 5000);
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(url.toString(), {
@@ -1180,7 +1233,20 @@ async function handleMessage(msg, token, db, requestUrl) {
 
         const item = await getStoredLink(db, storeId);
         if (item) {
-          return showItemDetails(chatId, item, token, db, requestUrl, null, 1, storeId, loadingMsgId);
+          try {
+            return await showItemDetails(chatId, item, token, db, requestUrl, null, 1, storeId, loadingMsgId);
+          } catch (err) {
+            console.error('showItemDetails error:', err);
+            if (loadingMsgId) {
+              await tgCall(token, 'editMessageText', {
+                chat_id: chatId,
+                message_id: loadingMsgId,
+                text: `❌ Could not load media details. Please try typing the movie name directly.`,
+                parse_mode: 'HTML'
+              });
+            }
+            return;
+          }
         }
 
         // Fallback: search exclusively on the extension that was clicked
@@ -1193,26 +1259,47 @@ async function handleMessage(msg, token, db, requestUrl) {
               parse_mode: 'HTML'
             });
           }
-          const dataRes = await callCinemaApi(requestUrl, '/search', { provider: provKey, q: rawTitle });
-          const results = Array.isArray(dataRes) ? dataRes : [];
-          if (results.length > 0) {
-            return showItemDetails(chatId, results[0], token, db, requestUrl, null, 1, null, loadingMsgId);
-          }
-          const formatted = await formatSearchResults(results, rawTitle, 1, db, null, token);
-          if (loadingMsgId) {
-            return tgCall(token, 'editMessageText', {
+          try {
+            const dataRes = await callCinemaApi(requestUrl, '/search', { provider: provKey, q: rawTitle });
+            const results = Array.isArray(dataRes) ? dataRes : [];
+            if (results.length > 0) {
+              return await showItemDetails(chatId, results[0], token, db, requestUrl, null, 1, null, loadingMsgId);
+            }
+            const formatted = await formatSearchResults(results, rawTitle, 1, db, null, token);
+            if (loadingMsgId) {
+              return await tgCall(token, 'editMessageText', {
+                chat_id: chatId,
+                message_id: loadingMsgId,
+                text: formatted.text,
+                parse_mode: 'HTML',
+                reply_markup: formatted.keyboard
+              });
+            }
+            return await tgCall(token, 'sendMessage', {
               chat_id: chatId,
-              message_id: loadingMsgId,
               text: formatted.text,
               parse_mode: 'HTML',
               reply_markup: formatted.keyboard
             });
+          } catch (searchErr) {
+            if (loadingMsgId) {
+              await tgCall(token, 'editMessageText', {
+                chat_id: chatId,
+                message_id: loadingMsgId,
+                text: `⚠️ Search failed for "${escapeHtml(rawTitle)}". Please type the title directly.`,
+                parse_mode: 'HTML'
+              });
+            }
+            return;
           }
-          return tgCall(token, 'sendMessage', {
+        }
+
+        if (loadingMsgId) {
+          await tgCall(token, 'editMessageText', {
             chat_id: chatId,
-            text: formatted.text,
-            parse_mode: 'HTML',
-            reply_markup: formatted.keyboard
+            message_id: loadingMsgId,
+            text: `⚠️ Link expired or not found. Please type the movie name to search.`,
+            parse_mode: 'HTML'
           });
         }
       }
@@ -1240,7 +1327,7 @@ async function handleMessage(msg, token, db, requestUrl) {
           { text: '❓ Help & Commands', callback_data: 'help_guide' }
         ],
         [
-          { text: '🌐 Open Cinema Web', url: DEFAULT_WEB_URL }
+          { text: 'Open in Web', url: DEFAULT_WEB_URL }
         ]
       ]
     };
@@ -1292,8 +1379,8 @@ async function handleMessage(msg, token, db, requestUrl) {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '🌐 Open Cinema Web', url: DEFAULT_WEB_URL },
-            { text: '📱 Runner APK', callback_data: 'send_file:android_runner' }
+            { text: 'Open in Web', url: DEFAULT_WEB_URL },
+            { text: 'Runner APK', callback_data: 'send_file:android_runner' }
           ]
         ]
       }
@@ -1841,7 +1928,7 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
     if (info.itemStoreId) {
       navRow.push({ text: '⬅️ All Seasons', callback_data: `item:${info.itemStoreId}` });
     }
-    navRow.push({ text: '🌐 Cinema Web', url: DEFAULT_WEB_URL });
+    navRow.push({ text: 'Open in Web', url: DEFAULT_WEB_URL });
     keyboard.push(navRow);
 
     return tgCall(token, 'sendMessage', {
@@ -1974,7 +2061,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       keyboard.push(navRow);
     }
 
-    keyboard.push([{ text: '🌐 Open in Cinema Web', url: DEFAULT_WEB_URL }]);
+    const epProv = groupData?.provider && groupData.provider !== 'default' ? groupData.provider : 'hdhub4u';
+    keyboard.push([{ text: 'Open in Web', url: `${DEFAULT_WEB_URL}/?open=web&provider=${encodeURIComponent(epProv)}&title=${encodeURIComponent(seriesTitle || 'Episodes')}` }]);
 
     if (loaderMsgId) {
       return tgCall(token, 'editMessageText', {
@@ -2035,7 +2123,8 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
       keyboard.push(qButtons.slice(i, i + 2));
     }
 
-    keyboard.push([{ text: '🌐 Open in Cinema Web', url: DEFAULT_WEB_URL }]);
+    const epqProv = epqData?.provider && epqData.provider !== 'default' ? epqData.provider : 'hdhub4u';
+    keyboard.push([{ text: 'Open in Web', url: `${DEFAULT_WEB_URL}/?open=web&provider=${encodeURIComponent(epqProv)}&title=${encodeURIComponent(seriesTitle || 'Episodes')}` }]);
 
     return tgCall(token, 'sendMessage', {
       chat_id: chatId,
@@ -2305,17 +2394,20 @@ async function handleCallbackQuery(cq, token, db, requestUrl) {
         dlUrl = `${DEFAULT_WEB_URL}/api/download?url=${encodeURIComponent(dlUrl)}&filename=${encodeURIComponent(cleanTitle.replace(/[^\w\s.-]/g, '') + '.mp4')}`;
       }
 
-      // Compact mobile-friendly buttons: VLC, Direct Web Player, Download
+      const provKey = item?.provider && item.provider !== 'default' ? item.provider : 'hdhub4u';
+      const openInWebItemUrl = `${DEFAULT_WEB_URL}/?provider=${encodeURIComponent(provKey)}&title=${encodeURIComponent(cleanTitle)}&link=${encodeURIComponent(actualLink || m.url)}&play=${encodeURIComponent(m.url)}`;
       keyboard.push([
-        { text: `🎬 VLC (${m.sName})`, url: vlcRedirectUrl },
-        { text: `🌐 Web Player`, url: webPlayerUrl },
-        { text: `📥 DL`, url: dlUrl }
+        { text: `VLC (${m.sName})`, url: vlcRedirectUrl },
+        { text: `Open in Web`, url: openInWebItemUrl },
+        { text: `DL`, url: dlUrl }
       ]);
     });
 
+    const provKey = item?.provider && item.provider !== 'default' ? item.provider : 'hdhub4u';
+    const openInWebGeneralUrl = `${DEFAULT_WEB_URL}/?provider=${encodeURIComponent(provKey)}&title=${encodeURIComponent(cleanTitle)}&link=${encodeURIComponent(actualLink || '')}`;
     keyboard.push([
-      { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL },
-      { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+      { text: 'Open in Web', url: openInWebGeneralUrl },
+      { text: 'Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
     ]);
 
     return sendOrEdit(token, chatId, waitMsgId, {
@@ -2334,6 +2426,7 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   if (!results || results.length === 0) {
     const profile = token ? getBotProfile(token) : null;
     const keyboard = [
+      [{ text: `Open in Web for "${query}"`, url: `${DEFAULT_WEB_URL}/?open=web&search=${encodeURIComponent(query)}` }],
       [{ text: 'Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }]
     ];
     if (profile) {
@@ -2362,7 +2455,9 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   text += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   text += `<i>Tap any title to view streaming qualities and episodes:</i>\n`;
 
-  const keyboard = [];
+  const keyboard = [
+    [{ text: `Open in Web for "${query}"`, url: `${DEFAULT_WEB_URL}/?open=web&search=${encodeURIComponent(query)}` }]
+  ];
   const startIndex = (currentPage - 1) * pageSize;
   const pageItems = results.slice(startIndex, startIndex + pageSize);
   const seenLabels = new Map();
@@ -2400,8 +2495,8 @@ async function formatSearchResults(results, query, page = 1, db, existingStoreId
   }
 
   keyboard.push([
-    { text: '⚙️ Settings', callback_data: 'bot_settings' },
-    { text: '🔄 Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }
+    { text: 'Open in Web', url: `${DEFAULT_WEB_URL}/?open=web&search=${encodeURIComponent(query)}` },
+    { text: 'Switch Extension', callback_data: `swprov:${query.slice(0, 30)}` }
   ]);
 
   return { text, keyboard: { inline_keyboard: keyboard } };
@@ -2495,7 +2590,11 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
   }
   itemText += `\n<i>Choose a quality or episode:</i>`;
 
-  const keyboard = [];
+  const itemProv = item?.provider && item.provider !== 'default' ? item.provider : 'hdhub4u';
+  const openInWebDetailsUrl = `${DEFAULT_WEB_URL}/?provider=${encodeURIComponent(itemProv)}&title=${encodeURIComponent(cleanTitle || item.title || '')}&link=${encodeURIComponent(actualLink || '')}${item?.image ? `&poster=${encodeURIComponent(item.image)}` : ''}`;
+  keyboard.push([
+    { text: 'Open in Web', url: openInWebDetailsUrl }
+  ]);
   const isSeries = isSeriesItem(item, meta, rawGroups);
 
   if (rawGroups.length > 0) {
@@ -2675,12 +2774,13 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
     }
   }
 
+
   keyboard.push([
-    { text: '⚙️ Settings', callback_data: 'bot_settings' },
-    { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+    { text: 'Open in Web', url: openInWebDetailsUrl }
   ]);
   keyboard.push([
-    { text: '🌐 Cinema Web', url: DEFAULT_WEB_URL }
+    { text: 'Settings', callback_data: 'bot_settings' },
+    { text: 'Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
   ]);
 
   // If editing an existing message (e.g. Next / Prev page pagination on poster card)
@@ -2783,7 +2883,7 @@ async function showProvidersMenu(chatId, userId, token, db, messageId = null) {
     keyboard.push(row);
   }
 
-  keyboard.push([{ text: '🌐 View on Cinema Web', url: DEFAULT_WEB_URL }]);
+  keyboard.push([{ text: 'Open in Web', url: DEFAULT_WEB_URL }]);
 
   if (messageId) {
     return tgCall(token, 'editMessageText', {

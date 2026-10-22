@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useProviders } from "./hooks/useProviders";
+import { useProviders, matchProvider } from "./hooks/useProviders";
 import { useCatalog } from "./hooks/useCatalog";
 import { useMediaPosts } from "./hooks/useMediaPosts";
 import { useSettings, launchExternalPlayer } from "./hooks/useSettings";
@@ -62,7 +62,7 @@ export function cleanSearchQuery(raw: string): string {
 
 function getInitialRouteState(saved: NavigationState | null) {
   const urlParams = new URLSearchParams(window.location.search);
-  const q = urlParams.get("q");
+  const q = urlParams.get("q") || urlParams.get("search") || urlParams.get("query");
   const isGlobal = urlParams.get("global") === "1";
   const filter = urlParams.get("filter");
   const title = urlParams.get("title");
@@ -302,11 +302,41 @@ function getInitialRouteState(saved: NavigationState | null) {
 const initialRoute = getInitialRouteState(initialNavState);
 
 export default function App() {
+  // Clear any leftover CNO experiment state and handle direct "Open in Web" URL redirect
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("cinema_ui_mode");
+        const params = new URLSearchParams(window.location.search);
+        let changed = false;
+        if (params.has("ui")) {
+          params.delete("ui");
+          changed = true;
+        }
+
+        // Direct external video stream redirection (only if no title and starts with http)
+        const linkParam = params.get("link") || params.get("stream");
+        if (linkParam && (linkParam.startsWith("http://") || linkParam.startsWith("https://")) && !params.get("title") && !params.get("provider")) {
+          window.location.replace(linkParam);
+          return;
+        }
+
+        if (changed) {
+          const newUrl = window.location.pathname + (params.toString() ? `?${params.toString()}` : "") + window.location.hash;
+          window.history.replaceState({}, "", newUrl);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState(initialRoute.searchQuery);
   const [isGlobalSearch, setIsGlobalSearch] = useState(initialRoute.isGlobalSearch);
   const [page, setPage] = useState(initialRoute.page);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"home" | "movies" | "tv" | "categories" | "extensions">("home");
+
 
   // Browse by Category page view state (shows colorful category cards)
   const [isBrowsingCategories, setIsBrowsingCategories] = useState(initialRoute.isBrowsingCategories);
@@ -364,36 +394,37 @@ export default function App() {
     toggleExtension,
   } = useSettings();
 
-  // 2. Providers Hook (restores saved provider on reload)
+  // 2. Providers Hook (restores saved provider on reload, prioritizes URL query param)
+  const urlProvider = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("provider") : null;
   const {
     providers: allProviders,
     activeProvider,
     setActiveProvider,
     loading: loadingProviders,
-  } = useProviders(initialNavState?.activeProviderValue);
+  } = useProviders(urlProvider || initialNavState?.activeProviderValue);
 
-  // Ensure activeProvider stays in sync with installedProviders
-  const installedProviders = allProviders.filter((p) => {
-    if (p.disabled) return false;
-    const installed = settings.installedExtensions;
-    if (installed && installed.length > 0) {
-      return (
-        installed.includes(p.value) ||
-        (installed.includes('movieBox') && p.value === 'movieBoxWeb')
-      );
+  // All active enabled providers in the system
+  const installedProviders = allProviders.filter((p) => !p.disabled);
+
+  // Sync activeProvider when providers finish loading or when URL has ?provider=
+  useEffect(() => {
+    if (installedProviders.length === 0) return;
+    const p = new URLSearchParams(window.location.search);
+    const urlProv = p.get("provider");
+    if (urlProv && urlProv !== "default") {
+      const matched = matchProvider(installedProviders, urlProv);
+      if (matched && (!activeProvider || activeProvider.value !== matched.value)) {
+        setActiveProvider(matched);
+        return;
+      }
     }
-    return p.value.toLowerCase() === 'hdhub4u';
-  });
-
-  // Sync activeProvider if current activeProvider is not in installed list
-  if (installedProviders.length > 0 && activeProvider) {
-    const isInstalled = installedProviders.some((p) => p.value === activeProvider.value);
-    if (!isInstalled) {
+    if (!activeProvider) {
       const preferred =
-        installedProviders.find((p) => p.value === "hdhub4u") || installedProviders[0];
+        installedProviders.find((p) => p.value.toLowerCase() === "hdhub4u") ||
+        installedProviders[0];
       setActiveProvider(preferred);
     }
-  }
+  }, [installedProviders, activeProvider, setActiveProvider]);
 
   // 3. Catalog Filters Hook
   const {
@@ -423,9 +454,24 @@ export default function App() {
   );
 
   // Selected Item State for Details & Streams
-  const [selectedPost, setSelectedPost] = useState<Post | null>(
-    initialNavState?.selectedPost || null
-  );
+  const [selectedPost, setSelectedPost] = useState<Post | null>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const title = p.get("title");
+      const link = p.get("link") || p.get("movie") || p.get("item");
+      const prov = p.get("provider");
+      const poster = p.get("poster") || p.get("image") || "";
+      if (title || link) {
+        return {
+          title: title || "Movie Details",
+          link: link || "",
+          provider: prov || "hdhub4u",
+          image: poster,
+        };
+      }
+    }
+    return initialNavState?.selectedPost || null;
+  });
   const [details, setDetails] = useState<MediaDetails | null>(
     initialNavState?.details || null
   );
@@ -464,6 +510,7 @@ export default function App() {
     return null;
   });
   const [downloadManagerOpen, setDownloadManagerOpen] = useState(false);
+
 
   // Cast / Person Details State & URL Hash Synchronization (e.g. #!/person/3223)
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
@@ -554,31 +601,46 @@ export default function App() {
   // Synchronize browser URL query parameters so page reload retains exact view, filter and niche
   useEffect(() => {
     const params = new URLSearchParams();
-    if (activeCustomPage) {
-      params.set("tab", activeCustomPage);
-    } else if (searchQuery) {
-      params.set("q", searchQuery);
-      if (isGlobalSearch) params.set("global", "1");
-    } else if (isBrowsingCategories) {
-      params.set("tab", "categories");
-    } else if (viewAllCategory) {
-      const tab = activeNavTab === "tv" ? "tv" : "movies";
-      params.set("tab", tab);
-      if (viewAllCategory.filter) params.set("filter", viewAllCategory.filter);
-      if (viewAllCategory.title) params.set("title", viewAllCategory.title);
-    } else if (activeNavTab && activeNavTab !== "home") {
-      params.set("tab", activeNavTab);
+    if (selectedPost) {
+      params.set("title", selectedPost.title);
+      if (selectedPost.link) params.set("link", selectedPost.link);
+      if (selectedPost.provider) params.set("provider", selectedPost.provider);
+      if (selectedPost.image) params.set("poster", selectedPost.image);
     } else {
-      if (selectedNicheId) {
-        params.set("tab", "home");
+      const curParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const urlProv = curParams?.get("provider");
+      if (urlProv) {
+        params.set("provider", urlProv);
+      } else if (activeProvider && activeProvider.value.toLowerCase() !== "hdhub4u") {
+        params.set("provider", activeProvider.value);
       }
-    }
 
-    if (selectedNicheId) {
-      params.set("niche", selectedNicheId);
-    }
-    if (page > 1) {
-      params.set("page", String(page));
+      if (activeCustomPage) {
+        params.set("tab", activeCustomPage);
+      } else if (searchQuery) {
+        params.set("q", searchQuery);
+        if (isGlobalSearch) params.set("global", "1");
+      } else if (isBrowsingCategories) {
+        params.set("tab", "categories");
+      } else if (viewAllCategory) {
+        const tab = activeNavTab === "tv" ? "tv" : "movies";
+        params.set("tab", tab);
+        if (viewAllCategory.filter) params.set("filter", viewAllCategory.filter);
+        if (viewAllCategory.title) params.set("title", viewAllCategory.title);
+      } else if (activeNavTab && activeNavTab !== "home") {
+        params.set("tab", activeNavTab);
+      } else {
+        if (selectedNicheId) {
+          params.set("tab", "home");
+        }
+      }
+
+      if (selectedNicheId) {
+        params.set("niche", selectedNicheId);
+      }
+      if (page > 1) {
+        params.set("page", String(page));
+      }
     }
 
     const newSearch = params.toString() ? `?${params.toString()}` : "";
@@ -588,6 +650,8 @@ export default function App() {
       window.history.replaceState(null, "", newUrl);
     }
   }, [
+    selectedPost,
+    activeProvider?.value,
     activeCustomPage,
     searchQuery,
     isGlobalSearch,
@@ -718,12 +782,10 @@ export default function App() {
 
     try {
       let activeLink = post.link;
-      const isDirectIdOrTitle =
-        !activeLink ||
-        activeLink.startsWith("tt") ||
-        (!activeLink.startsWith("http") && !activeLink.startsWith("/"));
+      // Only treat as fallback search if no link provided or link is a pure IMDb ID (e.g. tt1234567)
+      const isImdbOrMissing = !activeLink || (activeLink.startsWith("tt") && !activeLink.includes("/"));
 
-      if (isDirectIdOrTitle) {
+      if (isImdbOrMissing) {
         try {
           const cleanTitle = post.title.replace(/\s*\(\d{4}\)$/, "").trim();
           const searchResults = await api.search(targetProviderKey, cleanTitle);
@@ -758,7 +820,7 @@ export default function App() {
       }
 
       let meta: MediaDetails | null = null;
-      if (activeLink && (activeLink.startsWith("http") || activeLink.startsWith("/"))) {
+      if (activeLink) {
         try {
           meta = await api.getMeta(targetProviderKey, activeLink);
         } catch (e) {
@@ -771,7 +833,7 @@ export default function App() {
 
       // If no release list exists (e.g. embed/single stream provider like AutoEmbed, KissKh), resolve direct stream
       if (!meta?.linkList || meta.linkList.length === 0) {
-        if (activeLink && (activeLink.startsWith("http") || activeLink.startsWith("/"))) {
+        if (activeLink) {
           const resolved = await api.getStreams(targetProviderKey, activeLink, meta?.type || "movie");
           setStreams(Array.isArray(resolved) ? resolved : []);
         }
@@ -783,6 +845,15 @@ export default function App() {
       setLoadingStreams(false);
     }
   };
+
+  // Automatically fetch details & streams when selectedPost is initialized from URL deep link
+  const initialDeepLinkPostLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!initialDeepLinkPostLoadedRef.current && selectedPost && !details) {
+      initialDeepLinkPostLoadedRef.current = true;
+      handleSelectPost(selectedPost, true);
+    }
+  }, [selectedPost, details]);
 
   const handleCloseDetails = (triggerHistoryBack = false) => {
     if (detailsHistoryStackRef.current.length > 0) {
@@ -1178,6 +1249,7 @@ export default function App() {
       return;
     }
   };
+
 
   return (
     <div

@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { Globe } from "lucide-react";
 import { StarIcon, FilmIcon } from "../../icons";
 import type { Post } from "../../types";
-
-interface MediaCardProps {
-  post: Post;
-  onClick: (post: Post) => void;
-  hideProviderBadge?: boolean;
-}
 
 const posterCache = new Map<string, string>();
 
@@ -55,6 +50,7 @@ interface MediaCardProps {
   onClick: (post: Post) => void;
   hideProviderBadge?: boolean;
   priority?: boolean;
+  onOpenInWeb?: (post: Post) => void;
 }
 
 export const MediaCard: React.FC<MediaCardProps> = ({
@@ -62,6 +58,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   onClick,
   hideProviderBadge = false,
   priority = false,
+  onOpenInWeb,
 }) => {
   const imgRef = React.useRef<HTMLImageElement>(null);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -248,7 +245,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           background: "#0c0c0c",
           transform: isHovered ? "translateY(-6px)" : "translateY(0)",
           boxShadow: isHovered
-            ? "0 18px 36px rgba(0, 0, 0, 0.8), 0 0 24px rgba(229, 9, 20, 0.2)"
+            ? "0 18px 36px rgba(0, 0, 0, 0.9)"
             : "0 4px 14px rgba(0, 0, 0, 0.5)",
           transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
         }}

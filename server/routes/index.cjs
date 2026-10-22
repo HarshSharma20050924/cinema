@@ -13,6 +13,10 @@ const { getImdbFilms } = require("../controllers/imdbController.cjs");
 
 const router = express.Router();
 
+router.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "Cinema Cloud Engine", timestamp: Date.now(), uptime: process.uptime() });
+});
+
 router.get("/providers", getProviders);
 router.get("/catalog", getCatalog);
 router.get("/posts", getPosts);

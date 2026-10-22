@@ -21,6 +21,8 @@ app.use(cors());
 app.use(express.json());
 
 // Mount Modular API Routes
+app.get('/health', (req, res) => res.json({ status: 'ok', service: 'Cinema Cloud Engine', timestamp: Date.now(), uptime: process.uptime() }));
+app.get('/', (req, res) => res.json({ status: 'ok', service: 'Cinema Cloud Engine', timestamp: Date.now(), uptime: process.uptime() }));
 app.use('/api', apiRoutes);
 
 // Global Error Handler
@@ -50,6 +52,14 @@ async function startServer() {
       } catch (err) {
         console.warn('AutoPoster startup notice:', err.message);
       }
+    }
+
+    // 🛡️ 24/7 Render Cluster Mutual Keep-Alive (Prevents idle sleep across all 5 nodes)
+    try {
+      const { startRenderKeepAlive } = require('./services/renderKeepAlive.cjs');
+      startRenderKeepAlive();
+    } catch (err) {
+      console.warn('Render keepalive notice:', err.message);
     }
   });
 }

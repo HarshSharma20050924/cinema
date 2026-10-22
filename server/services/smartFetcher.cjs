@@ -76,7 +76,10 @@ const RESIDENTIAL_PREFERRED_DOMAINS = [
   'moviesmod',
   'topmovies',
   'katmovie',
-  'bollyflix'
+  'bollyflix',
+  'net52.cc',
+  'netmirror',
+  'userver'
 ];
 
 function isResidentialPreferred(url) {
@@ -188,11 +191,14 @@ async function smartRequest(rawConfig) {
     } catch (_) {}
   }
 
-  const method = (cfg.method || 'GET').toLowerCase();
+  const isNetMirror = targetUrl.includes('net52.cc') || targetUrl.includes('userver.') || targetUrl.includes('netmirror');
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'User-Agent': isNetMirror
+      ? 'Mozilla/5.0 (Linux; Android 13; Pixel 5 Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.132 Safari/537.36 /OS.Gatu v3.0'
+      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Accept-Language': 'en-US,en;q=0.9',
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    ...(isNetMirror ? { 'X-Requested-With': 'com.netmirror.app' } : {}),
     ...(cfg.headers || {})
   };
   cfg.headers = headers;

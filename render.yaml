@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: cinema-server
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: ENABLE_WARP
+        value: "true"
+      - key: ENABLE_AUTO_POSTER
+        value: "true"
+      - key: ENABLE_CLUSTER_SYNC
+        value: "true"
+      - key: WEB_URL
+        value: "https://cinema-dwh.pages.dev"

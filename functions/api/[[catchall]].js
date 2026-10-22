@@ -103,14 +103,25 @@ export async function onRequest(context) {
       }
     };
 
-    // Build candidate URL list: live pool nodes first, then fallback
+    // Build candidate URL list: 24/7 Render cloud cluster first for lightning fast response
     const candidates = [];
     const now = Date.now();
     const isRelayOnlyRoute = reqUrl.pathname === "/api/fetch" || reqUrl.pathname === "/fetch";
 
+    // 🚀 1. Distributed Render Cluster First: 5 24/7 cloud backends with round-robin load balancing
+    if (!isRelayOnlyRoute) {
+      const balancedRenderNodes = getBalancedRenderCluster();
+      for (const renderNode of balancedRenderNodes) {
+        if (!candidates.includes(renderNode)) {
+          candidates.push(renderNode);
+        }
+      }
+    }
+
+    // 2. Dynamic mobile / local dev runner nodes
     if (Array.isArray(pool)) {
       for (const item of pool) {
-        const isFresh = !item.lastSeen || (now - item.lastSeen < 180000);
+        const isFresh = !item.lastSeen || (now - item.lastSeen < 90000);
         const u = typeof item === "string" ? item : item?.url;
         const isRelay = (typeof item === "object") && (
           item?.role === "residential_relay" ||
@@ -136,11 +147,12 @@ export async function onRequest(context) {
       }
     }
 
-    // 🚀 Distributed Render Cluster: 5 24/7 cloud backends with round-robin load balancing
-    const balancedRenderNodes = getBalancedRenderCluster();
-    for (const renderNode of balancedRenderNodes) {
-      if (!candidates.includes(renderNode)) {
-        candidates.push(renderNode);
+    if (isRelayOnlyRoute) {
+      const balancedRenderNodes = getBalancedRenderCluster();
+      for (const renderNode of balancedRenderNodes) {
+        if (!candidates.includes(renderNode)) {
+          candidates.push(renderNode);
+        }
       }
     }
 
@@ -244,8 +256,9 @@ export async function onRequest(context) {
 
       try {
         const controller = new AbortController();
+        const isTunnel = candidateUrl.includes("trycloudflare.com");
         const isLongReq = reqUrl.pathname.includes("/streams") || reqUrl.pathname.includes("/download") || reqUrl.pathname.includes("/meta");
-        const timeoutMs = isLongReq ? 25000 : 8000;
+        const timeoutMs = isTunnel ? 2500 : (isLongReq ? 20000 : 5000);
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const reqHeaders = {

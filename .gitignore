@@ -62,6 +62,7 @@ server.log
 *.session-journal
 telegram_session*
 server/config/*.json
+!server/config/ott_catalog_seed.json
 .gramcinema_token
 telegram-bot/bot_settings.json
 telegram-bot/.env
@@ -91,5 +92,6 @@ telegram-bot/posted_history.json
 # Scratch root images
 /image.png
 /download-Photoroom.png
+src_backup_production/
 
 

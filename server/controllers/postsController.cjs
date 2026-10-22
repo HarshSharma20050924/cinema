@@ -1,6 +1,25 @@
+const path = require("path");
+const fs = require("fs");
 const zendaEngine = require("../services/zendaEngine.cjs");
 const manifestService = require("../services/manifestService.cjs");
 const serverCache = require("../services/cacheService.cjs");
+
+let ottSeedCache = null;
+function getOttSeedPosts(provider, filter) {
+  try {
+    if (!ottSeedCache) {
+      const seedPath = path.resolve(__dirname, "../config/ott_catalog_seed.json");
+      if (fs.existsSync(seedPath)) {
+        ottSeedCache = JSON.parse(fs.readFileSync(seedPath, "utf8"));
+      }
+    }
+    if (ottSeedCache && ottSeedCache[provider]) {
+      const list = ottSeedCache[provider];
+      return Array.isArray(list) ? list : [];
+    }
+  } catch (_) {}
+  return [];
+}
 
 async function getPosts(req, res) {
   const { provider = "autoEmbed", filter = "", page = 1, tab = "", niche = "" } = req.query;
@@ -18,7 +37,7 @@ async function getPosts(req, res) {
     }
 
     const context = zendaEngine.getProviderContext(provider);
-    const posts = await mod.getPosts({
+    const fetchPromise = mod.getPosts({
       filter: activeFilter,
       page: parseInt(page, 10),
       providerValue: provider,
@@ -27,13 +46,65 @@ async function getPosts(req, res) {
       signal: new AbortController().signal,
     });
 
+    let posts = [];
+    if (["netflixMirror", "disneyMirror", "primeMirror"].includes(provider)) {
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3500));
+      const fastResult = await Promise.race([fetchPromise, timeoutPromise]);
+      if (fastResult && Array.isArray(fastResult) && fastResult.length > 0) {
+        posts = fastResult;
+      } else {
+        // Cold start or session unlock in progress: serve seed catalog immediately & cache background result
+        fetchPromise
+          .then((bgPosts) => {
+            if (Array.isArray(bgPosts) && bgPosts.length > 0) {
+              serverCache.set(cacheKey, bgPosts, 15 * 60 * 1000);
+              serverCache.set(`posts:${provider}:default`, bgPosts, 24 * 60 * 60 * 1000);
+            }
+          })
+          .catch(() => {});
+        const seeded = getOttSeedPosts(provider, filter);
+        if (seeded.length > 0) {
+          return res.json(seeded);
+        }
+      }
+    } else {
+      posts = await fetchPromise;
+    }
+
     const result = Array.isArray(posts) ? posts : [];
     if (result.length > 0) {
       serverCache.set(cacheKey, result, 15 * 60 * 1000);
+      serverCache.set(`posts:${provider}:default`, result, 24 * 60 * 60 * 1000);
+      return res.json(result);
+    }
+
+    // Fallback for OTT providers if live fetch returned empty
+    if (["netflixMirror", "disneyMirror", "primeMirror"].includes(provider)) {
+      const cachedDefault = serverCache.get(`posts:${provider}:default`);
+      if (Array.isArray(cachedDefault) && cachedDefault.length > 0) {
+        return res.json(cachedDefault);
+      }
+      const seeded = getOttSeedPosts(provider, filter);
+      if (seeded.length > 0) {
+        serverCache.set(cacheKey, seeded, 10 * 60 * 1000);
+        return res.json(seeded);
+      }
     }
     return res.json(result);
   } catch (err) {
     console.error(`Posts error for provider ${provider}:`, err.message);
+
+    if (["netflixMirror", "disneyMirror", "primeMirror"].includes(provider)) {
+      const cachedDefault = serverCache.get(`posts:${provider}:default`);
+      if (Array.isArray(cachedDefault) && cachedDefault.length > 0) {
+        return res.json(cachedDefault);
+      }
+      const seeded = getOttSeedPosts(provider, filter);
+      if (seeded.length > 0) {
+        return res.json(seeded);
+      }
+    }
+
     // Smart fallback: If category URL failed (e.g. 404 on /category/action), search by clean keyword
     try {
       const cleanQ = (filter || "")
@@ -105,7 +176,17 @@ async function searchPosts(req, res) {
         }))
       : [];
     
-    result = rankSearchResults(result, q);
+    if (result.length === 0 && ["netflixMirror", "disneyMirror", "primeMirror"].includes(provider)) {
+      const seeded = getOttSeedPosts(provider);
+      const matched = seeded.filter((p) => (p.title || "").toLowerCase().includes(normQ));
+      if (matched.length > 0) {
+        result = matched.map((item) => ({
+          ...item,
+          provider,
+          providerName: provDisplayName,
+        }));
+      }
+    }
 
     if (result.length > 0) {
       serverCache.set(cacheKey, result, 10 * 60 * 1000);
@@ -113,6 +194,19 @@ async function searchPosts(req, res) {
     res.json(result);
   } catch (err) {
     console.error(`Search error for provider ${provider}:`, err.message);
+    if (["netflixMirror", "disneyMirror", "primeMirror"].includes(provider)) {
+      const seeded = getOttSeedPosts(provider);
+      const matched = seeded.filter((p) => (p.title || "").toLowerCase().includes(normQ));
+      if (matched.length > 0) {
+        return res.json(
+          matched.map((item) => ({
+            ...item,
+            provider,
+            providerName: provider,
+          }))
+        );
+      }
+    }
     res.json([]);
   }
 }
