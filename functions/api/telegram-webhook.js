@@ -27,20 +27,12 @@ export async function onRequestPost(context) {
 
     // 1. Handle Messages
     if (update.message) {
-      if (context && typeof context.waitUntil === 'function') {
-        context.waitUntil(handleMessage(update.message, token, db, request.url));
-      } else {
-        await handleMessage(update.message, token, db, request.url);
-      }
+      await handleMessage(update.message, token, db, request.url);
     }
 
     // 2. Handle Callback Queries (Button clicks)
     if (update.callback_query) {
-      if (context && typeof context.waitUntil === 'function') {
-        context.waitUntil(handleCallbackQuery(update.callback_query, token, db, request.url));
-      } else {
-        await handleCallbackQuery(update.callback_query, token, db, request.url);
-      }
+      await handleCallbackQuery(update.callback_query, token, db, request.url);
     }
 
     return new Response(JSON.stringify({ ok: true }), {

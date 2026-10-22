@@ -178,19 +178,17 @@ async function postToDedicatedChannel(item, provKey, channelId) {
     `⚡ <b>Quality:</b> Cloud Streaming &amp; Direct Downloads\n\n` +
     `👇 <i>Tap below to stream or download in VLC / Web Player:</i>`;
 
+  const posterUrl = item.image || item.poster || null;
+  const openInWebUrl = `${WEB_URL}/?provider=${encodeURIComponent(provKey)}&title=${encodeURIComponent(cleanDisplayTitle(item.title) || item.title || '')}&link=${encodeURIComponent(item.link || '')}${posterUrl ? `&poster=${encodeURIComponent(posterUrl)}` : ''}`;
+
   // Stacked buttons: 100% full width on mobile, perfectly fit without splitting or overflowing
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '🎬 Stream & Download', url: `https://t.me/${bot.username}?start=${directStartParam}` },
-      ],
-      [
-        { text: '🌐 Watch on Cinema Web', url: `${WEB_URL}` },
+        { text: 'Stream & Download', url: `https://t.me/${bot.username}?start=${directStartParam}` },
       ],
     ],
   };
-
-  const posterUrl = item.image || item.poster || null;
 
   if (posterUrl && (posterUrl.startsWith('http://') || posterUrl.startsWith('https://'))) {
     const photoRes = await tgCall(bot.token, 'sendPhoto', {

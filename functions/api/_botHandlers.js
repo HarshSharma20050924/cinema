@@ -165,7 +165,24 @@ export async function handleMessage(msg, token, db, requestUrl) {
           }
           try {
             const dataRes = await callCinemaApi(requestUrl, '/search', { provider: provKey, q: rawTitle }, db);
-            const results = Array.isArray(dataRes) ? dataRes : [];
+            let results = Array.isArray(dataRes) ? dataRes : [];
+
+            // If primary provider returned empty, fallback search across other extensions in bot profile
+            if (results.length === 0) {
+              const profile = getBotProfile(token);
+              for (const ext of profile.extensions) {
+                if (ext.value.toLowerCase() !== provKey.toLowerCase()) {
+                  try {
+                    const fallbackRes = await callCinemaApi(requestUrl, '/search', { provider: ext.value, q: rawTitle }, db);
+                    if (Array.isArray(fallbackRes) && fallbackRes.length > 0) {
+                      results = fallbackRes;
+                      break;
+                    }
+                  } catch (_) {}
+                }
+              }
+            }
+
             if (results.length > 0) {
               try {
                 return await showItemDetails(chatId, results[0], token, db, requestUrl, null, 1, null, loadingMsgId);
@@ -394,6 +411,21 @@ export async function handleMessage(msg, token, db, requestUrl) {
       const data = await callCinemaApi(requestUrl, '/search', { provider: prov, q: query }, db);
       if (Array.isArray(data)) results = data;
     } catch (_) {}
+
+    // If active single extension returned 0 results, check other extensions in this bot profile!
+    if (results.length === 0 && profile.extensions.length > 1) {
+      for (const ext of profile.extensions) {
+        if (ext.value.toLowerCase() !== (prov || '').toLowerCase()) {
+          try {
+            const fallbackData = await callCinemaApi(requestUrl, '/search', { provider: ext.value, q: query }, db);
+            if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+              results = fallbackData;
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+    }
   } else {
     const searches = profile.extensions.map(ext =>
       callCinemaApi(requestUrl, '/search', { provider: ext.value, q: query }, db)

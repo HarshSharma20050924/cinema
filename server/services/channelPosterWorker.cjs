@@ -192,16 +192,16 @@ async function postCardToChannel(item, providerKey) {
   text += `⚡ <b>Fast Streaming:</b> <code>VLC & Direct Web-Player</code>\n\n`;
   text += `👇 <i>Tap below to choose Quality, Episodes & Stream:</i>`;
 
+  const posterUrl = item.image || item.poster || null;
+  const openInWebUrl = `${WEB_URL}/?provider=${encodeURIComponent(providerKey)}&title=${encodeURIComponent(cleanTitle || item.title || '')}&link=${encodeURIComponent(item.link || '')}${posterUrl ? `&poster=${encodeURIComponent(posterUrl)}` : ''}`;
+
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '▶️ Stream & Download', url: botDeepLink },
-        { text: '🌐 Watch on Web', url: `${WEB_URL}/?search=${encodeURIComponent(cleanTitle || item.title)}` }
+        { text: 'Stream & Download', url: botDeepLink },
       ]
     ]
   };
-
-  const posterUrl = item.image || item.poster || null;
 
   if (posterUrl && (posterUrl.startsWith('http://') || posterUrl.startsWith('https://'))) {
     return tgCall('sendPhoto', {

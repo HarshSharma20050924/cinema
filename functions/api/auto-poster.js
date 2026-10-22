@@ -17,6 +17,58 @@ const DEFAULT_POSTER_PROVIDERS = [
   "autoEmbed"
 ];
 
+const PROVIDER_BASE_URLS = {
+  vega: 'https://new1.vegamovies.lease',
+  vegamovies: 'https://new1.vegamovies.lease',
+  drive: 'https://new3.moviesdrive.beer',
+  moviesdrive: 'https://new3.moviesdrive.beer',
+  moviesmod: 'https://moviesmod.uk.com',
+  mod: 'https://moviesmod.uk.com',
+  hdhub: 'https://new8.hdhub4u.cl',
+  hdhub4u: 'https://new8.hdhub4u.cl',
+  moviebox: 'https://officialmoviebox.com',
+  movieboxweb: 'https://officialmoviebox.com',
+  '4khdhub': 'https://4khdhub.one',
+  kat: 'https://new.katmoviehd.top',
+  katmovies: 'https://new.katmoviehd.top',
+  katmoviehd: 'https://new.katmoviehd.top',
+  multi: 'https://m1.multimovies.courses',
+  multimovies: 'https://m1.multimovies.courses',
+  topmovies: 'https://moviesleech.club',
+  uhdmovies: 'https://uhdmovies.us.org',
+  uhd: 'https://uhdmovies.us.org',
+  cinemaluxe: 'https://cinemaluxe.one',
+  extramovies: 'https://extramovies.ist',
+  extra: 'https://extramovies.ist',
+  bollyflix: 'https://bollyflix.vip',
+  moviesflix: 'https://moviesflix.is',
+  world4ufree: 'https://world4ufree.vet',
+  world4u: 'https://world4ufree.vet',
+  skymovieshd: 'https://skymovieshd.ink',
+  luxmovies: 'https://luxmovies.link',
+  eonmovies: 'https://eonmovies.ink',
+  cinevood: 'https://1cinevood.lol',
+  '1cinevood': 'https://1cinevood.lol',
+  movies4u: 'https://movies4u.vip',
+  netflixmirror: 'https://net52.cc',
+  disneymirror: 'https://net52.cc',
+  primemirror: 'https://net52.cc',
+  castle: 'https://castletv.xyz',
+  mxplayer: 'https://www.mxplayer.in',
+};
+
+function getDirectMovieUrl(provKey, link, defaultWebUrl) {
+  if (link && (link.startsWith('http://') || link.startsWith('https://'))) {
+    return link;
+  }
+  const base = PROVIDER_BASE_URLS[(provKey || '').toLowerCase()] || PROVIDER_BASE_URLS['hdhub4u'];
+  if (base && link) {
+    const cleanPath = link.startsWith('/') ? link : `/${link}`;
+    return `${base.replace(/\/+$/, '')}${cleanPath}`;
+  }
+  return base || defaultWebUrl;
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -267,15 +319,16 @@ export async function runAutoPoster(env, requestUrl, force = false) {
       caption += `🌐 <b>Source:</b> <b>${escapeHtml(provDisplayName)}</b> • 🔊 <b>${escapeHtml(audio)}</b>\n`;
       caption += `💿 <b>Available:</b> <code>${escapeHtml(resolutions)}</code>\n\n`;
       if (synopsis) {
-        caption += `📝 <i>${escapeHtml(synopsis)}</i>\n\n`;
+        caption += `<i>${escapeHtml(synopsis)}</i>\n\n`;
       }
-      caption += `✨ <b>100% Ad-Free • 1-Click Stream & Download</b>`;
+      caption += `<b>100% Ad-Free • 1-Click Stream &amp; Download</b>`;
 
+      const openInWebPostUrl = `${DEFAULT_WEB_URL}/?provider=${encodeURIComponent(provKey)}&title=${encodeURIComponent(title || candidatePost.title)}&link=${encodeURIComponent(candidatePost.link || '')}&poster=${encodeURIComponent(poster || '')}`;
       const keyboard = {
         inline_keyboard: [
           [
             {
-              text: `⚡ Stream & Download [${escapeHtml(provDisplayName)}]`,
+              text: `Stream & Download`,
               url: `https://t.me/cinemaisherebtw_bot?start=${directStartParam}`
             }
           ]

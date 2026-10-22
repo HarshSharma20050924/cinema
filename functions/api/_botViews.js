@@ -114,30 +114,32 @@ export async function showItemDetails(chatId, item, token, db, requestUrl, messa
 
   let rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
 
-  // SMART FALLBACK: If rawGroups is empty, try quick search on category default provider
+  // SMART FALLBACK: If rawGroups is empty, try quick search on category extensions
   if (!rawGroups || rawGroups.length === 0) {
     const rawSearchTitle = sanitizeCleanTitle(item.title || meta?.title || '');
     if (rawSearchTitle && rawSearchTitle.length > 2) {
       const profile = getBotProfile(token);
-      const fallbackProv = profile.defaultProvider || 'hdhub4u';
-      if (fallbackProv !== item.provider) {
-        try {
-          const sRes = await callCinemaApi(requestUrl, '/search', { provider: fallbackProv, q: rawSearchTitle }, db);
-          if (Array.isArray(sRes) && sRes.length > 0) {
-            const best = sRes[0];
-            const bLink = typeof best.link === 'string' ? best.link : best.link?.url;
-            if (bLink) {
-              const mRes = await callCinemaApi(requestUrl, '/meta', { provider: fallbackProv, link: bLink }, db);
-              const mGroups = mRes?.linkList || mRes?.downloadLinks || mRes?.episodes || [];
-              if (Array.isArray(mGroups) && mGroups.length > 0) {
-                meta = mRes;
-                rawGroups = mGroups;
-                item.provider = fallbackProv;
-                actualLink = bLink;
+      for (const ext of profile.extensions) {
+        if (ext.value.toLowerCase() !== (item.provider || '').toLowerCase()) {
+          try {
+            const sRes = await callCinemaApi(requestUrl, '/search', { provider: ext.value, q: rawSearchTitle }, db);
+            if (Array.isArray(sRes) && sRes.length > 0) {
+              const best = sRes[0];
+              const bLink = typeof best.link === 'string' ? best.link : best.link?.url;
+              if (bLink) {
+                const mRes = await callCinemaApi(requestUrl, '/meta', { provider: ext.value, link: bLink }, db);
+                const mGroups = mRes?.linkList || mRes?.downloadLinks || mRes?.episodes || [];
+                if (Array.isArray(mGroups) && mGroups.length > 0) {
+                  meta = mRes;
+                  rawGroups = mGroups;
+                  item.provider = ext.value;
+                  actualLink = bLink;
+                  break;
+                }
               }
             }
-          }
-        } catch (_) {}
+          } catch (_) {}
+        }
       }
     }
   }
@@ -394,22 +396,40 @@ export async function showItemDetails(chatId, item, token, db, requestUrl, messa
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard }
     });
-    if (photoRes?.ok) sendRes = photoRes;
+    if (photoRes?.ok) {
+      sendRes = photoRes;
+      if (loadMsgId) {
+        await tgCall(token, 'deleteMessage', { chat_id: chatId, message_id: loadMsgId }).catch(() => {});
+      }
+    }
   }
 
-  // Fallback to text message
+  // If photo card was not sent (or if no poster / photo failed), edit existing loadMsgId directly!
   if (!sendRes) {
-    sendRes = await tgCall(token, 'sendMessage', {
-      chat_id: chatId,
-      text: itemText,
-      parse_mode: 'HTML',
-      reply_markup: { inline_keyboard: keyboard }
-    });
-  }
+    if (loadMsgId) {
+      const editRes = await tgCall(token, 'editMessageText', {
+        chat_id: chatId,
+        message_id: loadMsgId,
+        text: itemText,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+      if (editRes?.ok) {
+        sendRes = editRes;
+      }
+    }
 
-  // Delete the temporary loader message now that the poster card has arrived
-  if (loadMsgId) {
-    await tgCall(token, 'deleteMessage', { chat_id: chatId, message_id: loadMsgId }).catch(() => {});
+    if (!sendRes) {
+      sendRes = await tgCall(token, 'sendMessage', {
+        chat_id: chatId,
+        text: itemText,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: keyboard }
+      });
+      if (loadMsgId) {
+        await tgCall(token, 'deleteMessage', { chat_id: chatId, message_id: loadMsgId }).catch(() => {});
+      }
+    }
   }
 
   return sendRes;

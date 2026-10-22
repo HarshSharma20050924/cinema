@@ -16,6 +16,7 @@ let lastUpdateId = 0;
 
 // Shared persistent cache for links across bot and autoPoster
 const { storeLink, getStoredLink } = require('./linkStore.cjs');
+const domainResolver = require('../server/services/domainResolver.cjs');
 
 // Telegram API Helper
 async function tgCall(method, data) {
@@ -276,8 +277,7 @@ async function showItemDetails(chatId, item, page = 1, messageId = null) {
     }
 
     keyboard.push([
-      { text: '🌐 Cinema Web', url: `${loadConfig().WEB_URL}` },
-      { text: '🔄 Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` }
+      { text: 'Switch Extension', callback_data: `swprov:${item.title.slice(0, 30)}` }
     ]);
 
     if (messageId) {
@@ -392,7 +392,7 @@ function formatSearchResults(results, query, providerName = 'All Enabled', page 
   }
 
   keyboard.push([
-    { text: '🔄 Search on Another Extension', callback_data: `swprov:${query.slice(0, 30)}` }
+    { text: 'Search on Another Extension', callback_data: `swprov:${query.slice(0, 30)}` }
   ]);
 
   return { text, keyboard: { inline_keyboard: keyboard } };
@@ -941,9 +941,7 @@ async function handleCallbackQuery(cq) {
       keyboard.push(navRow);
     }
 
-    keyboard.push([
-      { text: '🌐 Cinema Web', url: `${loadConfig().WEB_URL}` }
-    ]);
+
 
     if (messageId && data.startsWith('epage:')) {
       return tgCall('editMessageText', {
@@ -985,7 +983,7 @@ async function handleCallbackQuery(cq) {
       keyboard.push(qButtons.slice(i, i + 2));
     }
 
-    keyboard.push([{ text: '🌐 Open in Cinema Web', url: `${loadConfig().WEB_URL}` }]);
+
 
     return sendMessage(chatId, qText, { reply_markup: { inline_keyboard: keyboard } });
   }
@@ -1046,8 +1044,7 @@ async function handleCallbackQuery(cq) {
     });
 
     keyboard.push([
-      { text: '🔄 Switch Provider', callback_data: `swprov:${item.title.slice(0, 30)}` },
-      { text: '🌐 View on Web', url: `${loadConfig().WEB_URL}` }
+      { text: 'Switch Provider', callback_data: `swprov:${item.title.slice(0, 30)}` }
     ]);
 
     return sendMessage(chatId, resMsg, { reply_markup: { inline_keyboard: keyboard } });

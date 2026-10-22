@@ -149,7 +149,7 @@ function cleanDisplayTitle(rawTitle) {
     .trim();
 }
 
-async function postToDedicatedChannel(item, provKey, channelId) {
+async function postToDedicatedChannel(item, provKey, channelId, options = {}) {
   const bot = getBotForExtension(provKey);
   const displayTitle = escapeHtml(cleanDisplayTitle(item.title));
   const targetChatId = channelId.startsWith('-100') ? channelId : `-100${channelId}`;
@@ -165,22 +165,31 @@ async function postToDedicatedChannel(item, provKey, channelId) {
   const storeId = hashString(`${provKey}:${item.link || ''}`);
   const directStartParam = `p_${storeId}_${provKey}_${cleanTitleParam}`;
 
-  // Sync to D1 bot_links BEFORE posting for instant opening and distributed cluster deduplication
-  let alreadyPostedInCluster = false;
-  try {
-    const storeRes = await axios.post(`${WEB_URL}/api/store-link`, {
+  // Sync to D1 bot_links BEFORE posting for instant opening
+  if (!options.force) {
+    let alreadyPostedInCluster = false;
+    try {
+      const storeRes = await axios.post(`${WEB_URL}/api/store-link`, {
+        id: storeId,
+        provider: provKey,
+        link: item.link || '',
+        title: item.title || '',
+      }, { timeout: 4000 });
+      if (storeRes.data?.alreadyPosted) {
+        alreadyPostedInCluster = true;
+      }
+    } catch (_) {}
+
+    if (alreadyPostedInCluster) {
+      return { ok: false, duplicate: true };
+    }
+  } else {
+    axios.post(`${WEB_URL}/api/store-link`, {
       id: storeId,
       provider: provKey,
       link: item.link || '',
       title: item.title || '',
-    }, { timeout: 4000 });
-    if (storeRes.data?.alreadyPosted) {
-      alreadyPostedInCluster = true;
-    }
-  } catch (_) {}
-
-  if (alreadyPostedInCluster) {
-    return { ok: false, duplicate: true };
+    }, { timeout: 4000 }).catch(() => {});
   }
 
   const text = `<b>${displayTitle}</b>\n\n` +
@@ -188,19 +197,18 @@ async function postToDedicatedChannel(item, provKey, channelId) {
     `Quality: High Speed Streaming &amp; Downloads\n\n` +
     `<i>Tap below to stream or download in VLC / Web Player:</i>`;
 
+  const posterUrl = item.image || item.poster || null;
+
+  const openInWebUrl = `${WEB_URL}/?provider=${encodeURIComponent(provKey)}&title=${encodeURIComponent(cleanDisplayTitle(item.title) || item.title || '')}&link=${encodeURIComponent(item.link || '')}${posterUrl ? `&poster=${encodeURIComponent(posterUrl)}` : ''}`;
+
   // Stacked buttons: 100% full width on mobile, perfectly fit without splitting or overflowing
   const keyboard = {
     inline_keyboard: [
       [
         { text: 'Stream & Download', url: `https://t.me/${bot.username}?start=${directStartParam}` },
       ],
-      [
-        { text: 'Watch on Cinema Web', url: `${WEB_URL}` },
-      ],
     ],
   };
-
-  const posterUrl = item.image || item.poster || null;
 
   if (posterUrl && (posterUrl.startsWith('http://') || posterUrl.startsWith('https://'))) {
     const photoRes = await tgCall(bot.token, 'sendPhoto', {

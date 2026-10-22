@@ -150,8 +150,8 @@ export async function callCinemaApi(requestUrl, endpoint, params = {}, db = null
 
       const controller = new AbortController();
       const isTunnel = base.includes('trycloudflare.com');
-      // 12s timeout for Render scrapers (providers like hdhub4u/vega need 6-8s); 2.5s for residential phone tunnels
-      const timeoutMs = isTunnel ? 2500 : 12000;
+      // 8s timeout for Render scrapers (providers like hdhub4u/vega need 3-5s); 2.5s for residential phone tunnels
+      const timeoutMs = isTunnel ? 2500 : 8000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(url.toString(), {

@@ -4,6 +4,7 @@ const axios = require('axios');
 const { loadConfig } = require('./config.cjs');
 const { getLatestProviderPosts, getMeta, getAllProviders } = require('./cinemaApi.cjs');
 const { storeLink } = require('./linkStore.cjs');
+const domainResolver = require('../server/services/domainResolver.cjs');
 
 const HISTORY_FILE = path.join(__dirname, 'posted_history.json');
 
@@ -76,13 +77,15 @@ async function postExtensionCardToChannel(post, provInfo) {
   if (rating && rating !== 'N/A') caption += `⭐ <b>Rating:</b> ${escapeHtml(rating)}/10\n`;
   if (genres) caption += `🎭 <b>Genre:</b> ${escapeHtml(genres)}\n\n`;
   if (synopsis) caption += `📝 <i>${escapeHtml(synopsis)}</i>\n\n`;
-  caption += `✨ <b>100% Ad-Free • 1-Click Stream & Download</b>`;
+  caption += `<b>100% Ad-Free • 1-Click Stream &amp; Download</b>`;
+
+  const openInWebPostUrl = `${cfg.WEB_URL}/?provider=${encodeURIComponent(provKey)}&title=${encodeURIComponent(post.title || '')}&link=${encodeURIComponent(post.link || '')}${posterUrl ? `&poster=${encodeURIComponent(posterUrl)}` : ''}`;
 
   const inlineKeyboard = {
     inline_keyboard: [
       [
         {
-          text: `⚡ Stream & Download [${escapeHtml(provDisplayName)}]`,
+          text: `Stream & Download`,
           url: `https://t.me/cinemaisherebtw_bot?start=${directStartParam}`
         }
       ]
