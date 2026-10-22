@@ -1,5 +1,6 @@
 import { generateStreamCacheKey, getCachedStreams, setCachedStreams, isValidStreamResult } from "./_streamCache.js";
 import { RENDER_CLUSTER, getBalancedRenderCluster } from "./_cluster.js";
+import { OTT_CATALOG_SEED } from "./_ottSeed.js";
 
 /**
  * Cloudflare Pages Function: /api/* Pure Mobile Proxy
@@ -324,6 +325,27 @@ export async function onRequest(context) {
             } catch (_) {}
           }
 
+          const isPostsReq = reqUrl.pathname === "/api/posts" || reqUrl.pathname.endsWith("/posts");
+          if (isPostsReq && status === 200 && request.method === "GET") {
+            const provider = reqUrl.searchParams.get("provider") || "";
+            if (["netflixMirror", "disneyMirror", "primeMirror"].includes(provider)) {
+              try {
+                const bodyText = await upstreamResp.text();
+                const parsed = JSON.parse(bodyText);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  return new Response(bodyText, { status: 200, headers: respHeaders });
+                }
+                if (OTT_CATALOG_SEED && OTT_CATALOG_SEED[provider]) {
+                  respHeaders.set("X-Cinema-Edge-Seed", "HIT");
+                  return new Response(JSON.stringify(OTT_CATALOG_SEED[provider]), {
+                    status: 200,
+                    headers: respHeaders,
+                  });
+                }
+              } catch (_) {}
+            }
+          }
+
           const body = (status === 204 || status === 304) ? null : upstreamResp.body;
 
           return new Response(body, {
@@ -339,6 +361,21 @@ export async function onRequest(context) {
     if (isProvidersReq) {
       const direct = await getDirectProviders();
       if (direct) return direct;
+    }
+
+    const isPostsReq = reqUrl.pathname === "/api/posts" || reqUrl.pathname.endsWith("/posts");
+    if (isPostsReq) {
+      const provider = reqUrl.searchParams.get("provider") || "";
+      if (["netflixMirror", "disneyMirror", "primeMirror"].includes(provider) && OTT_CATALOG_SEED && OTT_CATALOG_SEED[provider]) {
+        return new Response(JSON.stringify(OTT_CATALOG_SEED[provider]), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "X-Cinema-Edge-Seed": "FALLBACK-EDGE",
+          },
+        });
+      }
     }
 
     return new Response(

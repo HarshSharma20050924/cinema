@@ -1,0 +1,328 @@
+export const OTT_CATALOG_SEED = {
+  "netflixMirror": [
+    {
+      "title": "The Great Indian Kapil Show",
+      "link": "81737430||The%20Great%20Indian%20Kapil%20Show",
+      "image": "https://imgcdn.kim/nf/oon/81737430.jpg?27664"
+    },
+    {
+      "title": "Money Trap",
+      "link": "82047949||Money%20Trap",
+      "image": "https://imgcdn.kim/nf/oon/82047949.jpg?27664"
+    },
+    {
+      "title": "Doctor X: Mafia in White",
+      "link": "82682379||Doctor%20X%3A%20Mafia%20in%20White",
+      "image": "https://imgcdn.kim/nf/oon/82682379.jpg?27664"
+    },
+    {
+      "title": "The Diplomat",
+      "link": "81288983||The%20Diplomat",
+      "image": "https://imgcdn.kim/nf/oon/81288983.jpg?27664"
+    },
+    {
+      "title": "STEEL BALL RUN JoJo’s Bizarre Adventure",
+      "link": "82116553||STEEL%20BALL%20RUN%20JoJo%E2%80%99s%20Bizarre%20Adventure",
+      "image": "https://imgcdn.kim/nf/oon/82116553.jpg?27664"
+    },
+    {
+      "title": "The Night Agent",
+      "link": "81450827||The%20Night%20Agent",
+      "image": "https://imgcdn.kim/nf/oon/81450827.jpg?27664"
+    },
+    {
+      "title": "Khakee: The Bihar Chapter",
+      "link": "81290872||Khakee%3A%20The%20Bihar%20Chapter",
+      "image": "https://imgcdn.kim/nf/oon/81290872.jpg?27664"
+    },
+    {
+      "title": "Taskaree: The Smuggler's Web",
+      "link": "81406373||Taskaree%3A%20The%20Smuggler's%20Web",
+      "image": "https://imgcdn.kim/nf/oon/81406373.jpg?27664"
+    },
+    {
+      "title": "Ranma1/2",
+      "link": "81171925||Ranma1%2F2",
+      "image": "https://imgcdn.kim/nf/oon/81171925.jpg?27664"
+    },
+    {
+      "title": "Love Is Blind",
+      "link": "80996601||Love%20Is%20Blind",
+      "image": "https://imgcdn.kim/nf/oon/80996601.jpg?27664"
+    },
+    {
+      "title": "Musafir Cafe",
+      "link": "82023964||Musafir%20Cafe",
+      "image": "https://imgcdn.kim/nf/oon/82023964.jpg?27664"
+    },
+    {
+      "title": "Avatar The Last Airbender",
+      "link": "80237957||Avatar%20The%20Last%20Airbender",
+      "image": "https://imgcdn.kim/nf/oon/80237957.jpg?27664"
+    },
+    {
+      "title": "BAKI-DOU: The Invincible Samurai",
+      "link": "81922765||BAKI-DOU%3A%20The%20Invincible%20Samurai",
+      "image": "https://imgcdn.kim/nf/oon/81922765.jpg?27664"
+    },
+    {
+      "title": "ONE PIECE",
+      "link": "80217863||ONE%20PIECE",
+      "image": "https://imgcdn.kim/nf/oon/80217863.jpg?27664"
+    },
+    {
+      "title": "Love is Blind: Netherlands",
+      "link": "81977426||Love%20is%20Blind%3A%20Netherlands",
+      "image": "https://imgcdn.kim/nf/oon/81977426.jpg?27664"
+    },
+    {
+      "title": "Unicorn Academy: Secrets Revealed",
+      "link": "82705687||Unicorn%20Academy%3A%20Secrets%20Revealed",
+      "image": "https://imgcdn.kim/nf/oon/82705687.jpg?27664"
+    },
+    {
+      "title": "Bloodhounds",
+      "link": "81444051||Bloodhounds",
+      "image": "https://imgcdn.kim/nf/oon/81444051.jpg?27664"
+    },
+    {
+      "title": "Maamla Legal Hai",
+      "link": "81480217||Maamla%20Legal%20Hai",
+      "image": "https://imgcdn.kim/nf/oon/81480217.jpg?27664"
+    },
+    {
+      "title": "The Gentlemen",
+      "link": "81437051||The%20Gentlemen",
+      "image": "https://imgcdn.kim/nf/oon/81437051.jpg?27664"
+    },
+    {
+      "title": "Operation Safed Sagar: The Untold Story of the Kargil War",
+      "link": "81616273||Operation%20Safed%20Sagar%3A%20The%20Untold%20Story%20of%20the%20Kargil%20War",
+      "image": "https://imgcdn.kim/nf/oon/81616273.jpg?27664"
+    }
+  ],
+  "disneyMirror": [
+    {
+      "title": "The Lion King",
+      "link": "1660000046|hs|The%20Lion%20King",
+      "image": "https://imgcdn.kim/hs/v/166/1660000046.jpg"
+    },
+    {
+      "title": "Hercules",
+      "link": "1260018298|hs|Hercules",
+      "image": "https://imgcdn.kim/hs/v/166/1260018298.jpg"
+    },
+    {
+      "title": "Cinderella",
+      "link": "1260018163|hs|Cinderella",
+      "image": "https://imgcdn.kim/hs/v/166/1260018163.jpg"
+    },
+    {
+      "title": "Aladdin",
+      "link": "1660000031|hs|Aladdin",
+      "image": "https://imgcdn.kim/hs/v/166/1660000031.jpg"
+    },
+    {
+      "title": "The Little Mermaid",
+      "link": "1660010306|hs|The%20Little%20Mermaid",
+      "image": "https://imgcdn.kim/hs/v/166/1660010306.jpg"
+    },
+    {
+      "title": "Beauty And The Beast",
+      "link": "1260018151|hs|Beauty%20And%20The%20Beast",
+      "image": "https://imgcdn.kim/hs/v/166/1260018151.jpg"
+    },
+    {
+      "title": "Sleeping Beauty",
+      "link": "1260018161|hs|Sleeping%20Beauty",
+      "image": "https://imgcdn.kim/hs/v/166/1260018161.jpg"
+    },
+    {
+      "title": "101 Dalmatians",
+      "link": "1260018112|hs|101%20Dalmatians",
+      "image": "https://imgcdn.kim/hs/v/166/1260018112.jpg"
+    },
+    {
+      "title": "Disney's Ducktales",
+      "link": "1260038187|hs|Disney's%20Ducktales",
+      "image": "https://imgcdn.kim/hs/v/166/1260038187.jpg"
+    },
+    {
+      "title": "The Jungle Book",
+      "link": "1260018026|hs|The%20Jungle%20Book",
+      "image": "https://imgcdn.kim/hs/v/166/1260018026.jpg"
+    },
+    {
+      "title": "Pinocchio",
+      "link": "1260018337|hs|Pinocchio",
+      "image": "https://imgcdn.kim/hs/v/166/1260018337.jpg"
+    },
+    {
+      "title": "Lady And The Tramp",
+      "link": "1260018311|hs|Lady%20And%20The%20Tramp",
+      "image": "https://imgcdn.kim/hs/v/166/1260018311.jpg"
+    },
+    {
+      "title": "Snow White And The Seven Dwarfs",
+      "link": "1260017758|hs|Snow%20White%20And%20The%20Seven%20Dwarfs",
+      "image": "https://imgcdn.kim/hs/v/166/1260017758.jpg"
+    },
+    {
+      "title": "Bambi",
+      "link": "1260018149|hs|Bambi",
+      "image": "https://imgcdn.kim/hs/v/166/1260018149.jpg"
+    },
+    {
+      "title": "Alice In Wonderland",
+      "link": "1260018139|hs|Alice%20In%20Wonderland",
+      "image": "https://imgcdn.kim/hs/v/166/1260018139.jpg"
+    },
+    {
+      "title": "Dumbo",
+      "link": "1260018063|hs|Dumbo",
+      "image": "https://imgcdn.kim/hs/v/166/1260018063.jpg"
+    },
+    {
+      "title": "Pocahontas",
+      "link": "1260018346|hs|Pocahontas",
+      "image": "https://imgcdn.kim/hs/v/166/1260018346.jpg"
+    },
+    {
+      "title": "The Aristocats",
+      "link": "1260018144|hs|The%20Aristocats",
+      "image": "https://imgcdn.kim/hs/v/166/1260018144.jpg"
+    },
+    {
+      "title": "Peter Pan",
+      "link": "1260018323|hs|Peter%20Pan",
+      "image": "https://imgcdn.kim/hs/v/166/1260018323.jpg"
+    },
+    {
+      "title": "One Hundred And One Dalmatians",
+      "link": "1260027508|hs|One%20Hundred%20And%20One%20Dalmatians",
+      "image": "https://imgcdn.kim/hs/v/166/1260027508.jpg"
+    }
+  ],
+  "primeMirror": [
+    {
+      "title": "Jodhaa Akbar",
+      "link": "0F5T3KUXG6AGX9FPK41IXXH54G|pv|Jodhaa%20Akbar",
+      "image": "https://imgcdn.kim/pv/341/0F5T3KUXG6AGX9FPK41IXXH54G.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Border",
+      "link": "0P77A1EBLX1EO5J3V77GGE7BMW|pv|Border",
+      "image": "https://imgcdn.kim/pv/341/0P77A1EBLX1EO5J3V77GGE7BMW.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Troy",
+      "link": "0N8VNX138FWG8S5AC7C58T1HY1|pv|Troy",
+      "image": "https://imgcdn.kim/pv/341/0N8VNX138FWG8S5AC7C58T1HY1.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Welcome 2 Karachi",
+      "link": "0G3YHHQ6XNETBNISC8FJCQ0QTB|pv|Welcome%202%20Karachi",
+      "image": "https://imgcdn.kim/pv/341/0G3YHHQ6XNETBNISC8FJCQ0QTB.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Napoleon",
+      "link": "0GKJ06SJM9QAGM8UCSBTK6N4BH|pv|Napoleon",
+      "image": "https://imgcdn.kim/pv/341/0GKJ06SJM9QAGM8UCSBTK6N4BH.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Shershaah",
+      "link": "0J3P7DO2UHT2IGF8UY24C2I94C|pv|Shershaah",
+      "image": "https://imgcdn.kim/pv/341/0J3P7DO2UHT2IGF8UY24C2I94C.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "LOC: Kargil",
+      "link": "0MJIEFCOPZCU6W2V35IXTBO9OK|pv|LOC%3A%20Kargil",
+      "image": "https://imgcdn.kim/pv/341/0MJIEFCOPZCU6W2V35IXTBO9OK.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Samrat Prithviraj",
+      "link": "0MFQX55JQ5IJSLCU0WT0E2INJM|pv|Samrat%20Prithviraj",
+      "image": "https://imgcdn.kim/pv/341/0MFQX55JQ5IJSLCU0WT0E2INJM.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Nuremberg",
+      "link": "0TPNKAFRNNT7PORKEFPYJWJA6I|pv|Nuremberg",
+      "image": "https://imgcdn.kim/pv/341/0TPNKAFRNNT7PORKEFPYJWJA6I.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Ikkis",
+      "link": "0OS0JV3U21FHV9P6N2DQK7CFLJ|pv|Ikkis",
+      "image": "https://imgcdn.kim/pv/341/0OS0JV3U21FHV9P6N2DQK7CFLJ.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Chandu Champion",
+      "link": "0MARCAWG5VJK4GIDNLXR1CR0ON|pv|Chandu%20Champion",
+      "image": "https://imgcdn.kim/pv/341/0MARCAWG5VJK4GIDNLXR1CR0ON.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Veer",
+      "link": "0OSFGLE8C0QZXH8MJLJWLHLF13|pv|Veer",
+      "image": "https://imgcdn.kim/pv/341/0OSFGLE8C0QZXH8MJLJWLHLF13.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Kesari",
+      "link": "0JCB3275HAX276B62XF6FP79F2|pv|Kesari",
+      "image": "https://imgcdn.kim/pv/341/0JCB3275HAX276B62XF6FP79F2.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "The Tomorrow War",
+      "link": "0L8V88NU7CFYRKM857QDN2O5B4|pv|The%20Tomorrow%20War",
+      "image": "https://imgcdn.kim/pv/341/0L8V88NU7CFYRKM857QDN2O5B4.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Inglourious Basterds",
+      "link": "0O6ZA9LHCCLMFD248B9IE6UAYA|pv|Inglourious%20Basterds",
+      "image": "https://imgcdn.kim/pv/341/0O6ZA9LHCCLMFD248B9IE6UAYA.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "American Sniper",
+      "link": "0U43X4LV410LB13DAAZQ76057Y|pv|American%20Sniper",
+      "image": "https://imgcdn.kim/pv/341/0U43X4LV410LB13DAAZQ76057Y.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "300: Rise of an Empire",
+      "link": "0JC7Q531WUCX6LDLC6AS2WPE2I|pv|300%3A%20Rise%20of%20an%20Empire",
+      "image": "https://imgcdn.kim/pv/341/0JC7Q531WUCX6LDLC6AS2WPE2I.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Napoleon: The Director’s Cut",
+      "link": "0K79XW2FG7JLYR45G7OUFCON8S|pv|Napoleon%3A%20The%20Director%E2%80%99s%20Cut",
+      "image": "https://imgcdn.kim/pv/341/0K79XW2FG7JLYR45G7OUFCON8S.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Kandhan Karunai",
+      "link": "0G59EZ0YN9LU8GXX5NK402MZVG|pv|Kandhan%20Karunai",
+      "image": "https://imgcdn.kim/pv/341/0G59EZ0YN9LU8GXX5NK402MZVG.jpg",
+      "aspectRatio": 1.7777777777777777
+    },
+    {
+      "title": "Bridge of Spies",
+      "link": "0N1GN5PXX7C1GKA3QWNRQR4CC7|pv|Bridge%20of%20Spies",
+      "image": "https://imgcdn.kim/pv/341/0N1GN5PXX7C1GKA3QWNRQR4CC7.jpg",
+      "aspectRatio": 1.7777777777777777
+    }
+  ]
+};
