@@ -167,19 +167,25 @@ export async function handleMessage(msg, token, db, requestUrl) {
             const dataRes = await callCinemaApi(requestUrl, '/search', { provider: provKey, q: rawTitle }, db);
             let results = Array.isArray(dataRes) ? dataRes : [];
 
-            // If primary provider returned empty, fallback search across other extensions in bot profile
+            // If primary provider returned empty, fallback search in parallel across other extensions in bot profile
             if (results.length === 0) {
               const profile = getBotProfile(token);
-              for (const ext of profile.extensions) {
-                if (ext.value.toLowerCase() !== provKey.toLowerCase()) {
-                  try {
-                    const fallbackRes = await callCinemaApi(requestUrl, '/search', { provider: ext.value, q: rawTitle }, db);
-                    if (Array.isArray(fallbackRes) && fallbackRes.length > 0) {
-                      results = fallbackRes;
-                      break;
-                    }
-                  } catch (_) {}
-                }
+              const fallbackExts = profile.extensions.filter(ext => ext.value.toLowerCase() !== provKey.toLowerCase());
+              if (fallbackExts.length > 0) {
+                try {
+                  const fallbackWinner = await Promise.any(
+                    fallbackExts.map(async ext => {
+                      const fallbackRes = await callCinemaApi(requestUrl, '/search', { provider: ext.value, q: rawTitle }, db);
+                      if (Array.isArray(fallbackRes) && fallbackRes.length > 0) {
+                        return fallbackRes;
+                      }
+                      throw new Error('empty');
+                    })
+                  );
+                  if (fallbackWinner && fallbackWinner.length > 0) {
+                    results = fallbackWinner;
+                  }
+                } catch (_) {}
               }
             }
 
@@ -412,18 +418,24 @@ export async function handleMessage(msg, token, db, requestUrl) {
       if (Array.isArray(data)) results = data;
     } catch (_) {}
 
-    // If active single extension returned 0 results, check other extensions in this bot profile!
+    // If active single extension returned 0 results, race other extensions in this bot profile in parallel!
     if (results.length === 0 && profile.extensions.length > 1) {
-      for (const ext of profile.extensions) {
-        if (ext.value.toLowerCase() !== (prov || '').toLowerCase()) {
-          try {
-            const fallbackData = await callCinemaApi(requestUrl, '/search', { provider: ext.value, q: query }, db);
-            if (Array.isArray(fallbackData) && fallbackData.length > 0) {
-              results = fallbackData;
-              break;
-            }
-          } catch (_) {}
-        }
+      const fallbackExts = profile.extensions.filter(ext => ext.value.toLowerCase() !== (prov || '').toLowerCase());
+      if (fallbackExts.length > 0) {
+        try {
+          const fallbackWinner = await Promise.any(
+            fallbackExts.map(async ext => {
+              const fallbackData = await callCinemaApi(requestUrl, '/search', { provider: ext.value, q: query }, db);
+              if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+                return fallbackData;
+              }
+              throw new Error('empty');
+            })
+          );
+          if (fallbackWinner && fallbackWinner.length > 0) {
+            results = fallbackWinner;
+          }
+        } catch (_) {}
       }
     }
   } else {

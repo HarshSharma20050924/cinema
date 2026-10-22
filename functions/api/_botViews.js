@@ -100,6 +100,26 @@ export async function formatSearchResults(results, query, page = 1, db, existing
   return { text, keyboard: { inline_keyboard: keyboard } };
 }
 
+function safeHtmlCaption(text, maxLen = 1024) {
+  if (!text || text.length <= maxLen) return text;
+  let truncated = text.slice(0, maxLen - 10);
+  const lastLt = truncated.lastIndexOf('<');
+  const lastGt = truncated.lastIndexOf('>');
+  if (lastLt > lastGt) {
+    truncated = truncated.slice(0, lastLt);
+  }
+  const openB = (truncated.match(/<b>/g) || []).length;
+  const closeB = (truncated.match(/<\/b>/g) || []).length;
+  if (openB > closeB) truncated += '</b>';
+  const openI = (truncated.match(/<i>/g) || []).length;
+  const closeI = (truncated.match(/<\/i>/g) || []).length;
+  if (openI > closeI) truncated += '</i>';
+  const openC = (truncated.match(/<code>/g) || []).length;
+  const closeC = (truncated.match(/<\/code>/g) || []).length;
+  if (openC > closeC) truncated += '</code>';
+  return truncated;
+}
+
 // Show Movie/Series Details Card with Quality Buttons
 export async function showItemDetails(chatId, item, token, db, requestUrl, messageId = null, page = 1, itemStoreIdParam = null, loadMsgId = null) {
   let meta = null;
@@ -114,31 +134,26 @@ export async function showItemDetails(chatId, item, token, db, requestUrl, messa
 
   let rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
 
-  // Quick fallback if primary returned no groups: try at most 1 alternate provider
+  // Quick recovery if primary returned no groups:
   if (!rawGroups || rawGroups.length === 0) {
     const rawSearchTitle = sanitizeCleanTitle(item.title || meta?.title || '');
     if (rawSearchTitle && rawSearchTitle.length > 2) {
-      const profile = getBotProfile(token);
-      const fallbackExt = profile.extensions.find(e => e.value.toLowerCase() !== (item.provider || '').toLowerCase());
-      if (fallbackExt) {
-        try {
-          const sRes = await callCinemaApi(requestUrl, '/search', { provider: fallbackExt.value, q: rawSearchTitle }, db);
-          if (Array.isArray(sRes) && sRes.length > 0) {
-            const best = sRes[0];
-            const bLink = typeof best.link === 'string' ? best.link : best.link?.url;
-            if (bLink) {
-              const mRes = await callCinemaApi(requestUrl, '/meta', { provider: fallbackExt.value, link: bLink }, db);
-              const mGroups = mRes?.linkList || mRes?.downloadLinks || mRes?.episodes || [];
-              if (Array.isArray(mGroups) && mGroups.length > 0) {
-                meta = mRes;
-                rawGroups = mGroups;
-                item.provider = fallbackExt.value;
-                actualLink = bLink;
-              }
+      try {
+        // 1. Try search on same provider first (post slugs frequently change when updated with clean/v2 versions)
+        const sameRes = await callCinemaApi(requestUrl, '/search', { provider: item.provider, q: rawSearchTitle }, db);
+        if (Array.isArray(sameRes) && sameRes.length > 0) {
+          const bLink = typeof sameRes[0].link === 'string' ? sameRes[0].link : sameRes[0].link?.url;
+          if (bLink && bLink !== actualLink) {
+            const mRes = await callCinemaApi(requestUrl, '/meta', { provider: item.provider, link: bLink }, db);
+            const mGroups = mRes?.linkList || mRes?.downloadLinks || mRes?.episodes || [];
+            if (Array.isArray(mGroups) && mGroups.length > 0) {
+              meta = mRes;
+              rawGroups = mGroups;
+              actualLink = bLink;
             }
           }
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
     }
   }
 
@@ -340,22 +355,24 @@ export async function showItemDetails(chatId, item, token, db, requestUrl, messa
       }
     }
   } else {
-    const cleanBase = sanitizeCleanTitle(meta?.title || item.title);
-    if (isSeries) {
-      itemText += `\n\n⚠️ <i>No streams or episodes currently found on <b>${escapeHtml(provDisplayName)}</b>. Tap below to switch extension:</i>`;
-      keyboard.push([
-        { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
-      ]);
-    } else {
-      const storeId = await storeLink(db, item.provider, actualLink, cleanBase);
-      keyboard.push([{ text: `▶️ Play ${cleanBase.slice(0, 22)}`, callback_data: `resopt:${storeId}` }]);
-    }
+    const profile = getBotProfile(token);
+    itemText += `\n\n⚠️ <i>No streams or download links currently available on <b>${escapeHtml(provDisplayName)}</b>. Tap below to switch extension or search:</i>`;
+    keyboard.push([
+      { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` },
+      { text: `🌐 Search All in ${escapeHtml(profile?.name || 'Category')}`, callback_data: `search_all:${(cleanTitle || '').slice(0, 30)}` }
+    ]);
   }
 
-  keyboard.push([
-    { text: '⚙️ Settings', callback_data: 'bot_settings' },
-    { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
-  ]);
+  if (rawGroups.length > 0) {
+    keyboard.push([
+      { text: '⚙️ Settings', callback_data: 'bot_settings' },
+      { text: '🔄 Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }
+    ]);
+  } else {
+    keyboard.push([
+      { text: '⚙️ Settings', callback_data: 'bot_settings' }
+    ]);
+  }
 
   // If editing an existing message
   if (messageId) {
@@ -369,7 +386,7 @@ export async function showItemDetails(chatId, item, token, db, requestUrl, messa
     const capRes = await tgCall(token, 'editMessageCaption', {
       chat_id: chatId,
       message_id: messageId,
-      caption: itemText.slice(0, 1024),
+      caption: safeHtmlCaption(itemText, 1024),
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard }
     });
@@ -390,7 +407,7 @@ export async function showItemDetails(chatId, item, token, db, requestUrl, messa
     const photoRes = await tgCall(token, 'sendPhoto', {
       chat_id: chatId,
       photo: posterUrl,
-      caption: itemText.slice(0, 1024),
+      caption: safeHtmlCaption(itemText, 1024),
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard }
     });
