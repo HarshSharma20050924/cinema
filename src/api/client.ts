@@ -253,6 +253,28 @@ export const api = {
     }
   },
 
+  async getEpisodes(provider: string, url: string, forceRefresh = false): Promise<any[]> {
+    const cacheKey = `api:episodes:${provider}:${url}`;
+    if (!forceRefresh) {
+      const cached = appCache.get<any[]>(cacheKey);
+      if (cached && cached.length > 0) return cached;
+    }
+    try {
+      const res = await fetchWithTimeout(
+        `${BACKEND_URL}/api/episodes?provider=${encodeURIComponent(provider)}&url=${encodeURIComponent(url)}`
+      );
+      if (!res.ok) return [];
+      const list = await res.json();
+      if (Array.isArray(list) && list.length > 0) {
+        appCache.set(cacheKey, list, TTL.META);
+        return list;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
   async getRatings(imdbId?: string, title?: string): Promise<{ letterboxdRating: string | null; letterboxdUrl: string | null }> {
     if (!imdbId && !title) return { letterboxdRating: null, letterboxdUrl: null };
     const cacheKey = `api:ratings:${imdbId || title}`;

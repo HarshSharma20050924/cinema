@@ -21,7 +21,6 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
   providerValue,
   initialPosts,
   onViewAll,
-  onSelectPost,
 }) => {
   const getCachedPosts = (): Post[] => {
     if (initialPosts && initialPosts.length > 0) return initialPosts;

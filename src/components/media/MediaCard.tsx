@@ -50,7 +50,6 @@ interface MediaCardProps {
   onClick: (post: Post) => void;
   hideProviderBadge?: boolean;
   priority?: boolean;
-  onOpenInWeb?: (post: Post) => void;
 }
 
 export const MediaCard: React.FC<MediaCardProps> = ({
@@ -58,7 +57,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   onClick,
   hideProviderBadge = false,
   priority = false,
-  onOpenInWeb,
 }) => {
   const imgRef = React.useRef<HTMLImageElement>(null);
   const [imgLoaded, setImgLoaded] = useState(false);

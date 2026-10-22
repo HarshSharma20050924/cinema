@@ -35,7 +35,6 @@ export const MediaGrid: React.FC<MediaGridProps> = ({
   isGlobalSearch = false,
   isStreaming = false,
   totalPages = 94,
-  onToggleGlobalSearch,
 }) => {
   const [showSlowLoadHint, setShowSlowLoadHint] = useState(false);
 

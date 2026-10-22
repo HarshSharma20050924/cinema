@@ -1,5 +1,4 @@
 import React from "react";
-import { Globe } from "lucide-react";
 import { StarIcon, PlayIcon, DownloadIcon, FilmIcon } from "../../icons";
 
 export interface DetailsHeroProps {
@@ -34,7 +33,6 @@ export interface DetailsHeroProps {
   activeTab: "stream" | "download" | null;
   onToggleTab: (tab: "stream" | "download") => void;
   activeTrailerEmbed: string | null;
-  onOpenInWeb?: () => void;
   children?: React.ReactNode;
 }
 
@@ -67,7 +65,6 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
   activeTab,
   onToggleTab,
   activeTrailerEmbed,
-  onOpenInWeb,
   children,
 }) => {
   return (

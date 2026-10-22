@@ -1045,8 +1045,15 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
 
   const candidates = await getCandidateBackends(currentDb);
   let lastError = null;
+  let renderAttempts = 0;
 
   for (const base of candidates) {
+    const isRender = base.includes('onrender.com');
+    if (isRender) {
+      if (renderAttempts >= 2) continue;
+      renderAttempts++;
+    }
+
     try {
       const url = new URL(`/api${endpoint}`, base);
       Object.entries(params).forEach(([k, v]) => {
@@ -1058,8 +1065,8 @@ async function callCinemaApi(requestUrl, endpoint, params = {}) {
 
       const controller = new AbortController();
       const isTunnel = base.includes('trycloudflare.com');
-      // Fast 3s timeout for mobile tunnels so dead phones never stall the bot; 6s for high-bandwidth Render cluster
-      const timeoutMs = isTunnel ? 2500 : (isStreams ? 8000 : 5000);
+      // 12s timeout for Render cloud scrapers (providers like hdhub4u/vega need 6-8s); 2.5s for residential phone tunnels
+      const timeoutMs = isTunnel ? 2500 : 12000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(url.toString(), {
@@ -1263,7 +1270,20 @@ async function handleMessage(msg, token, db, requestUrl) {
             const dataRes = await callCinemaApi(requestUrl, '/search', { provider: provKey, q: rawTitle });
             const results = Array.isArray(dataRes) ? dataRes : [];
             if (results.length > 0) {
-              return await showItemDetails(chatId, results[0], token, db, requestUrl, null, 1, null, loadingMsgId);
+              try {
+                return await showItemDetails(chatId, results[0], token, db, requestUrl, null, 1, null, loadingMsgId);
+              } catch (detailErr) {
+                console.error('showItemDetails error:', detailErr);
+                if (loadingMsgId) {
+                  await tgCall(token, 'editMessageText', {
+                    chat_id: chatId,
+                    message_id: loadingMsgId,
+                    text: `⚠️ Could not load item details. Please try typing the title directly.`,
+                    parse_mode: 'HTML'
+                  });
+                }
+                return;
+              }
             }
             const formatted = await formatSearchResults(results, rawTitle, 1, db, null, token);
             if (loadingMsgId) {
@@ -2590,11 +2610,7 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
   }
   itemText += `\n<i>Choose a quality or episode:</i>`;
 
-  const itemProv = item?.provider && item.provider !== 'default' ? item.provider : 'hdhub4u';
-  const openInWebDetailsUrl = `${DEFAULT_WEB_URL}/?provider=${encodeURIComponent(itemProv)}&title=${encodeURIComponent(cleanTitle || item.title || '')}&link=${encodeURIComponent(actualLink || '')}${item?.image ? `&poster=${encodeURIComponent(item.image)}` : ''}`;
-  keyboard.push([
-    { text: 'Open in Web', url: openInWebDetailsUrl }
-  ]);
+  const keyboard = [];
   const isSeries = isSeriesItem(item, meta, rawGroups);
 
   if (rawGroups.length > 0) {
@@ -2775,9 +2791,6 @@ async function showItemDetails(chatId, item, token, db, requestUrl, messageId = 
   }
 
 
-  keyboard.push([
-    { text: 'Open in Web', url: openInWebDetailsUrl }
-  ]);
   keyboard.push([
     { text: 'Settings', callback_data: 'bot_settings' },
     { text: 'Switch Extension', callback_data: `swprov:${(cleanTitle || '').slice(0, 30)}` }

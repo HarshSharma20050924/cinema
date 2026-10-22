@@ -250,8 +250,30 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
   const activeSeason = linkList.length > 0 ? linkList[validSeasonIdx] : null;
 
+  // Dynamic episode fetching for providers with episodesLink (e.g. Netflix, Disney, Prime, Vega, MoviesDrive)
+  const [fetchedEpisodes, setFetchedEpisodes] = useState<Record<string, any[]>>({});
+  const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+
+  useEffect(() => {
+    const epLink = activeSeason?.episodesLink;
+    if (epLink && (!activeSeason.directLinks || activeSeason.directLinks.length === 0)) {
+      if (fetchedEpisodes[epLink]) return;
+      setLoadingEpisodes(true);
+      api
+        .getEpisodes(targetProviderKey, epLink)
+        .then((eps) => {
+          if (Array.isArray(eps) && eps.length > 0) {
+            setFetchedEpisodes((prev) => ({ ...prev, [epLink]: eps }));
+          }
+        })
+        .finally(() => setLoadingEpisodes(false));
+    }
+  }, [activeSeason?.episodesLink, targetProviderKey]);
+
   // Single episodes
-  const episodes = Array.isArray(activeSeason?.directLinks) ? activeSeason.directLinks : [];
+  const episodes = (Array.isArray(activeSeason?.directLinks) && activeSeason.directLinks.length > 0)
+    ? activeSeason.directLinks
+    : (activeSeason?.episodesLink && fetchedEpisodes[activeSeason.episodesLink]) || [];
 
   // Season packs
   const explicitPacks = details?.seasonPacks || [];
