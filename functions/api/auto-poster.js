@@ -331,6 +331,12 @@ export async function runAutoPoster(env, requestUrl, force = false) {
               text: `Stream & Download`,
               url: `https://t.me/cinemaisherebtw_bot?start=${directStartParam}`
             }
+          ],
+          [
+            {
+              text: 'Open in Web',
+              url: openInWebPostUrl
+            }
           ]
         ]
       };

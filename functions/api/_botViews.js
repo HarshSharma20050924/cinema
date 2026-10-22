@@ -114,32 +114,30 @@ export async function showItemDetails(chatId, item, token, db, requestUrl, messa
 
   let rawGroups = meta?.linkList || meta?.downloadLinks || meta?.episodes || [];
 
-  // SMART FALLBACK: If rawGroups is empty, try quick search on category extensions
+  // Quick fallback if primary returned no groups: try at most 1 alternate provider
   if (!rawGroups || rawGroups.length === 0) {
     const rawSearchTitle = sanitizeCleanTitle(item.title || meta?.title || '');
     if (rawSearchTitle && rawSearchTitle.length > 2) {
       const profile = getBotProfile(token);
-      for (const ext of profile.extensions) {
-        if (ext.value.toLowerCase() !== (item.provider || '').toLowerCase()) {
-          try {
-            const sRes = await callCinemaApi(requestUrl, '/search', { provider: ext.value, q: rawSearchTitle }, db);
-            if (Array.isArray(sRes) && sRes.length > 0) {
-              const best = sRes[0];
-              const bLink = typeof best.link === 'string' ? best.link : best.link?.url;
-              if (bLink) {
-                const mRes = await callCinemaApi(requestUrl, '/meta', { provider: ext.value, link: bLink }, db);
-                const mGroups = mRes?.linkList || mRes?.downloadLinks || mRes?.episodes || [];
-                if (Array.isArray(mGroups) && mGroups.length > 0) {
-                  meta = mRes;
-                  rawGroups = mGroups;
-                  item.provider = ext.value;
-                  actualLink = bLink;
-                  break;
-                }
+      const fallbackExt = profile.extensions.find(e => e.value.toLowerCase() !== (item.provider || '').toLowerCase());
+      if (fallbackExt) {
+        try {
+          const sRes = await callCinemaApi(requestUrl, '/search', { provider: fallbackExt.value, q: rawSearchTitle }, db);
+          if (Array.isArray(sRes) && sRes.length > 0) {
+            const best = sRes[0];
+            const bLink = typeof best.link === 'string' ? best.link : best.link?.url;
+            if (bLink) {
+              const mRes = await callCinemaApi(requestUrl, '/meta', { provider: fallbackExt.value, link: bLink }, db);
+              const mGroups = mRes?.linkList || mRes?.downloadLinks || mRes?.episodes || [];
+              if (Array.isArray(mGroups) && mGroups.length > 0) {
+                meta = mRes;
+                rawGroups = mGroups;
+                item.provider = fallbackExt.value;
+                actualLink = bLink;
               }
             }
-          } catch (_) {}
-        }
+          }
+        } catch (_) {}
       }
     }
   }

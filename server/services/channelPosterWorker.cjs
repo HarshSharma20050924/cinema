@@ -199,6 +199,9 @@ async function postCardToChannel(item, providerKey) {
     inline_keyboard: [
       [
         { text: 'Stream & Download', url: botDeepLink },
+      ],
+      [
+        { text: 'Open in Web', url: openInWebUrl },
       ]
     ]
   };

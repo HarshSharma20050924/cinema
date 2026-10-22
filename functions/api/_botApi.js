@@ -135,7 +135,7 @@ export async function callCinemaApi(requestUrl, endpoint, params = {}, db = null
   for (const base of candidates) {
     const isRender = base.includes('onrender.com');
     if (isRender) {
-      if (renderAttempts >= 2) continue; // Maximum 2 Render nodes attempted to prevent timeout cascade
+      if (renderAttempts >= 3) continue; // Try up to 3 Render cluster nodes with fast failover
       renderAttempts++;
     }
 
@@ -150,8 +150,8 @@ export async function callCinemaApi(requestUrl, endpoint, params = {}, db = null
 
       const controller = new AbortController();
       const isTunnel = base.includes('trycloudflare.com');
-      // 8s timeout for Render scrapers (providers like hdhub4u/vega need 3-5s); 2.5s for residential phone tunnels
-      const timeoutMs = isTunnel ? 2500 : 8000;
+      // Fast 5s timeout for Render scrapers (healthy nodes respond in ~300ms); 2.5s for residential tunnels
+      const timeoutMs = isTunnel ? 2500 : 5000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(url.toString(), {

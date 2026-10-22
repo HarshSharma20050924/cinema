@@ -187,6 +187,9 @@ async function postToDedicatedChannel(item, provKey, channelId) {
       [
         { text: 'Stream & Download', url: `https://t.me/${bot.username}?start=${directStartParam}` },
       ],
+      [
+        { text: 'Open in Web', url: openInWebUrl },
+      ],
     ],
   };
 

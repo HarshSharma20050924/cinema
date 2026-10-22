@@ -481,10 +481,10 @@ export async function handleCallbackQuery(cq, token, db, requestUrl) {
     return;
   }
 
-  // Retry debouncing within 45s
+  // Retry debouncing within 2s
   const dedupeKey = `${userId}:${data}:${messageId || ''}`;
   const now = Date.now();
-  if (processedCallbacks.has(dedupeKey) && (now - processedCallbacks.get(dedupeKey) < 45000)) {
+  if (processedCallbacks.has(dedupeKey) && (now - processedCallbacks.get(dedupeKey) < 2000)) {
     return;
   }
   processedCallbacks.set(dedupeKey, now);
@@ -574,43 +574,33 @@ export async function handleCallbackQuery(cq, token, db, requestUrl) {
     return showProvidersMenu(chatId, userId, token, db, messageId, ADMIN_IDS);
   }
 
-  // Movie item clicked from search results -> Open qualities as a NEW MESSAGE below
+  // Movie item clicked from search results -> Open qualities as a NEW photo card below
   if (data.startsWith('item:')) {
     const storeId = data.replace('item:', '');
     const item = await getStoredLink(db, storeId);
     if (!item) {
       return tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: 'Session expired. Search again.', show_alert: true });
     }
+    await tgCall(token, 'answerCallbackQuery', { callback_query_id: cqId, text: '⚡ Loading media details...' });
     await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'upload_photo' });
 
-    const cleanTitle = cleanMediaTitle(item.title);
-    const loadMsg = await tgCall(token, 'sendMessage', {
-      chat_id: chatId,
-      text: `⚡ <b>Fetching Media Details...</b>\n` +
-            `🎬 <b>${escapeHtml(cleanTitle)}</b>\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `⏳ <code>[▰▰▰▰▰▱▱▱▱▱] Loading...</code>\n` +
-            `🔍 <i>Retrieving seasons, episodes & available qualities...</i>`,
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [[{ text: '⏳ Loading media details...', callback_data: 'noop' }]]
-      }
-    });
-    const loadMsgId = loadMsg?.result?.message_id;
-
     try {
-      return await showItemDetails(chatId, item, token, db, requestUrl, null, 1, storeId, loadMsgId);
+      return await showItemDetails(chatId, item, token, db, requestUrl, null, 1, storeId);
     } catch (err) {
       console.error('item click showItemDetails error:', err);
-      if (loadMsgId) {
-        await tgCall(token, 'editMessageText', {
-          chat_id: chatId,
-          message_id: loadMsgId,
-          text: `⚠️ Could not load media details. Please try typing the title directly to search.`,
-          parse_mode: 'HTML'
-        });
-      }
-      return;
+      const cleanTitle = cleanMediaTitle(item.title);
+      return tgCall(token, 'sendMessage', {
+        chat_id: chatId,
+        text: `⚠️ Could not load media details for <b>${escapeHtml(cleanTitle)}</b>.\n\n` +
+              `<i>Tap below to switch extension or retry:</i>`,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔄 Switch Extension', callback_data: `swprov:${cleanTitle.slice(0, 30)}` }],
+            [{ text: '⚙️ Settings', callback_data: 'bot_settings' }]
+          ]
+        }
+      });
     }
   }
 

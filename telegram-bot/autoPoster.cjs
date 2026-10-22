@@ -88,6 +88,12 @@ async function postExtensionCardToChannel(post, provInfo) {
           text: `Stream & Download`,
           url: `https://t.me/cinemaisherebtw_bot?start=${directStartParam}`
         }
+      ],
+      [
+        {
+          text: 'Open in Web',
+          url: openInWebPostUrl
+        }
       ]
     ]
   };
