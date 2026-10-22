@@ -1027,16 +1027,22 @@ export async function handleCallbackQuery(cq, token, db, requestUrl) {
       });
       waitMsgId = waitMsg?.result?.message_id;
 
-      const fetchPromise = (async () => {
-        let m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: false, title: cleanTitle }, db);
-        if (!m || m.length === 0) {
-          m = await callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: true, title: cleanTitle }, db);
+      // 🚀 Fire both stream modes in parallel — merge results, prefer streaming links
+      const [streamRes, dlRes] = await Promise.all([
+        callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: false, title: cleanTitle }, db).catch(() => null),
+        callCinemaApi(requestUrl, '/streams', { provider: item.provider, link: targetLink, type: mediaType, download: true, title: cleanTitle }, db).catch(() => null)
+      ]);
+      const seen = new Set();
+      mirrors = [];
+      for (const list of [streamRes, dlRes]) {
+        for (const m of (list || [])) {
+          const u = m?.link || m?.url;
+          if (u && typeof u === 'string' && u.startsWith('http') && !seen.has(u)) {
+            seen.add(u);
+            mirrors.push(m);
+          }
         }
-        return m;
-      })();
-
-      const safetyTimeout = new Promise((resolve) => setTimeout(() => resolve(null), 18000));
-      mirrors = await Promise.race([fetchPromise, safetyTimeout]);
+      }
     }
 
     const uniqueMap = new Map();
