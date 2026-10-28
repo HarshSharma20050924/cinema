@@ -189,10 +189,14 @@ export const CREATIVE_GENRES = CREATIVE_CATEGORIES.slice(12);
 
 interface BrowseCategoriesGridProps {
   onSelectCategory: (category: CreativeCategory) => void;
+  onOpenRankings?: () => void;
+  onBack?: () => void;
 }
 
 export const BrowseCategoriesGrid: React.FC<BrowseCategoriesGridProps> = ({
   onSelectCategory,
+  onOpenRankings,
+  onBack,
 }) => {
   return (
     <div
@@ -215,6 +219,38 @@ export const BrowseCategoriesGrid: React.FC<BrowseCategoriesGridProps> = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {onBack && (
+            <button
+              onClick={onBack}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 16px",
+                borderRadius: "999px",
+                background: "rgba(255, 255, 255, 0.08)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
+                color: "#ffffff",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+                marginRight: "6px",
+                transition: "all 0.18s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#e50914";
+                e.currentTarget.style.borderColor = "#e50914";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";
+              }}
+            >
+              <span>← Back</span>
+            </button>
+          )}
           <div
             style={{
               width: "4px",

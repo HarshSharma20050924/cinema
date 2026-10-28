@@ -23,27 +23,31 @@ export const CastCard: React.FC<CastCardProps> = ({ actor, onSelectPerson }) => 
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        width: "90px",
+        width: "110px",
         flexShrink: 0,
         textAlign: "center",
         cursor: "pointer",
-        position: "relative",
         userSelect: "none",
+        gap: "10px",
       }}
     >
+      {/* Circular Avatar */}
       <div
         style={{
           position: "relative",
-          width: "86px",
-          height: "86px",
-          borderRadius: "16px",
+          width: "96px",
+          height: "96px",
+          borderRadius: "50%",
           overflow: "hidden",
           backgroundColor: "#161b26",
+          border: isHovered
+            ? "2px solid rgba(255, 255, 255, 0.45)"
+            : "2px solid rgba(255, 255, 255, 0.12)",
           boxShadow: isHovered
-            ? "0 8px 24px rgba(229, 9, 20, 0.4)"
-            : "0 6px 16px rgba(0, 0, 0, 0.6)",
-          transform: isHovered ? "scale(1.08)" : "scale(1)",
-          transition: "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease",
+            ? "0 8px 24px rgba(0, 0, 0, 0.7)"
+            : "0 4px 16px rgba(0, 0, 0, 0.5)",
+          transform: isHovered ? "scale(1.06)" : "scale(1)",
+          transition: "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, box-shadow 0.22s ease",
         }}
       >
         {!imgLoaded && !imgError && actor.profile_path && (
@@ -84,66 +88,47 @@ export const CastCard: React.FC<CastCardProps> = ({ actor, onSelectPerson }) => 
               alignItems: "center",
               justifyContent: "center",
               color: "rgba(255,255,255,0.3)",
-              background: "linear-gradient(145deg, #141414, #080808)",
+              background: "linear-gradient(145deg, #181c26, #0e1118)",
             }}
           >
-            <FilmIcon size={24} />
+            <FilmIcon size={28} />
           </div>
         )}
+      </div>
 
-        {/* Hover Overlay with Actor Name & Character */}
-        <div
+      {/* Name and Character Info */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "100%" }}>
+        <span
           style={{
-            position: "absolute",
-            inset: 0,
-            padding: "6px",
-            background:
-              "linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.75) 60%, rgba(0, 0, 0, 0.35) 100%)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            textAlign: "center",
-            opacity: isHovered ? 1 : 0,
-            transform: isHovered ? "translateY(0)" : "translateY(4px)",
-            transition: "opacity 0.2s ease, transform 0.2s ease",
-            zIndex: 3,
-            pointerEvents: "none",
+            fontSize: "13px",
+            fontWeight: 700,
+            color: isHovered ? "#ffffff" : "#f1f5f9",
+            lineHeight: 1.25,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            transition: "color 0.15s ease",
           }}
         >
+          {actor.name}
+        </span>
+        {actor.character && (
           <span
             style={{
-              fontSize: "11px",
-              fontWeight: 800,
-              color: "#ffffff",
+              fontSize: "11.5px",
+              fontWeight: 500,
+              color: "#94a3b8",
               lineHeight: 1.2,
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              textShadow: "0 1px 3px rgba(0,0,0,0.9)",
             }}
           >
-            {actor.name}
+            {actor.character}
           </span>
-          {actor.character && (
-            <span
-              style={{
-                fontSize: "9px",
-                fontWeight: 600,
-                color: "#e50914",
-                lineHeight: 1.15,
-                marginTop: "2px",
-                display: "-webkit-box",
-                WebkitLineClamp: 1,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {actor.character}
-            </span>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

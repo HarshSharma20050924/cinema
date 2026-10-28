@@ -95,3 +95,8 @@ telegram-bot/posted_history.json
 src_backup_production/
 
 
+
+# Screenshots and screen recordings in src
+src/*.png
+src/*.mp4
+Some/

@@ -359,7 +359,7 @@ export const PersonDetailsModal: React.FC<PersonDetailsModalProps> = ({
                   }}
                 >
                   <img
-                    src={m.poster_path || "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400"}
+                    src={m.poster_path || ""}
                     alt={m.title}
                     style={{
                       width: "100%",
@@ -452,7 +452,7 @@ export const PersonDetailsModal: React.FC<PersonDetailsModalProps> = ({
                   }}
                 >
                   <img
-                    src={t.poster_path || "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400"}
+                    src={t.poster_path || ""}
                     alt={t.title}
                     style={{
                       width: "100%",

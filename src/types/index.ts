@@ -25,6 +25,18 @@ export interface Post {
   tag?: string;
   provider?: string;
   providerName?: string;
+  rating?: string;
+  year?: string;
+  backdropUrl?: string;
+  overview?: string;
+  description?: string;
+  genres?: string;
+  seasons?: string;
+  certification?: string;
+  mediaType?: "movie" | "tv";
+  logoUrl?: string;
+  tmdbId?: number;
+  isDirectDeepLink?: boolean;
 }
 
 export interface DirectLink {

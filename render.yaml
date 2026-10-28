@@ -11,7 +11,7 @@ services:
       - key: ENABLE_WARP
         value: "true"
       - key: ENABLE_AUTO_POSTER
-        value: "true"
+        value: "false"
       - key: ENABLE_CLUSTER_SYNC
         value: "true"
       - key: WEB_URL

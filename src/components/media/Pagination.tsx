@@ -255,8 +255,8 @@ export const Pagination: React.FC<PaginationProps> = ({
             outline: "none",
           }}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = "#e50914";
-            e.currentTarget.style.boxShadow = "0 0 8px rgba(229, 9, 20, 0.4)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+            e.currentTarget.style.boxShadow = "none";
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";

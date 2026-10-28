@@ -1,12 +1,11 @@
 import React, { useState } from "react";
-import { GithubIcon, InstagramIcon } from "../../icons";
 
 interface FooterProps {
   onNavigateTab?: (tab: "movies" | "tv" | "categories" | "downloads" | "terms" | "privacy" | "disclaimer") => void;
   onExploreNiches?: () => void;
 }
 
-const FooterNavFlipButton: React.FC<{ text: string; onClick: () => void }> = ({ text, onClick }) => {
+const FooterNavButton: React.FC<{ text: string; onClick: () => void }> = ({ text, onClick }) => {
   const [isHovered, setIsHovered] = useState(false);
   return (
     <button
@@ -19,54 +18,26 @@ const FooterNavFlipButton: React.FC<{ text: string; onClick: () => void }> = ({ 
       style={{
         background: "none",
         border: "none",
-        padding: "4px 8px",
+        padding: "6px 14px",
         cursor: "pointer",
         position: "relative",
-        overflow: "hidden",
-        height: "22px",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
         outline: "none",
+        transition: "transform 0.2s ease",
+        transform: isHovered ? "translateY(-1px)" : "translateY(0)",
       }}
     >
       <span
         style={{
-          position: "relative",
-          display: "inline-block",
-          overflow: "hidden",
-          height: "20px",
-          lineHeight: "20px",
-          fontSize: "12px",
-          fontWeight: 800,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
+          fontSize: "16px",
+          fontWeight: 600,
+          letterSpacing: "-0.01em",
+          textTransform: "none",
+          color: isHovered ? "#e50914" : "rgba(255, 255, 255, 0.85)",
+          transition: "color 0.2s ease",
+          fontFamily: "var(--font-sans, -apple-system, BlinkMacSystemFont, sans-serif)",
         }}
       >
-        {/* Top Text - rolls up */}
-        <span
-          style={{
-            display: "block",
-            color: "#ffffff",
-            transform: isHovered ? "translateY(-100%)" : "translateY(0%)",
-            transition: "transform 0.45s cubic-bezier(0.76, 0, 0.24, 1)",
-          }}
-        >
-          {text}
-        </span>
-        {/* Bottom Text - rolls in from below in Cinema Red */}
-        <span
-          style={{
-            display: "block",
-            position: "absolute",
-            inset: 0,
-            color: "#e50914",
-            transform: isHovered ? "translateY(0%)" : "translateY(100%)",
-            transition: "transform 0.45s cubic-bezier(0.76, 0, 0.24, 1)",
-          }}
-        >
-          {text}
-        </span>
+        {text}
       </span>
     </button>
   );
@@ -77,370 +48,171 @@ export const Footer: React.FC<FooterProps> = ({ onNavigateTab, onExploreNiches }
     <footer
       style={{
         width: "100%",
-        marginTop: "50px",
+        marginTop: "48px",
         position: "relative",
         zIndex: 10,
-        background: "#000000",
-        overflow: "hidden",
+        background: "transparent",
+        padding: "36px 24px 44px 24px",
+        border: "none",
+        borderTop: "none",
       }}
     >
-      {/* Sleek, Balanced Photo Banner - Perfect Proportional Size */}
       <div
         style={{
-          width: "100%",
-          minHeight: "clamp(460px, 38vw, 520px)",
           position: "relative",
-          backgroundImage: `
-            linear-gradient(to bottom, #000000 0%, rgba(0, 0, 0, 0.25) 20%, rgba(0, 0, 0, 0.4) 75%, #000000 100%),
-            url("https://i.postimg.cc/13xvsztV/cinema.jpg")
-          `,
-          backgroundPosition: "center 32%",
-          backgroundSize: "cover",
-          backgroundRepeat: "no-repeat",
+          zIndex: 1,
+          maxWidth: "1200px",
+          width: "100%",
+          margin: "0 auto",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between",
-          padding: "36px 24px 0 24px",
+          alignItems: "center",
+          gap: "28px",
         }}
       >
-        {/* Top Fade Gradient */}
+        {/* Navigation Links in Normal Case & Larger Font */}
         <div
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: "50px",
-            background: "linear-gradient(to bottom, #000000 0%, transparent 100%)",
-            pointerEvents: "none",
-            zIndex: 1,
-          }}
-        />
-
-        {/* Floating Controls & Info directly over artwork */}
-        <div
-          style={{
-            maxWidth: "1200px",
-            width: "100%",
-            margin: "0 auto",
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
-            gap: "14px",
-            position: "relative",
-            zIndex: 3,
+            gap: "16px",
+            flexWrap: "wrap",
+            justifyContent: "center",
           }}
         >
-          {/* Navigation Pill with Rolling Flip on Hover */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "20px",
-              padding: "4px 8px",
-              background: "transparent",
-              border: "none",
-              boxShadow: "none",
-              flexWrap: "wrap",
-              justifyContent: "center",
-            }}
-          >
-            <FooterNavFlipButton
-              text="Movies"
-              onClick={() => onNavigateTab && onNavigateTab("movies")}
-            />
-            <FooterNavFlipButton
-              text="TV Shows"
-              onClick={() => onNavigateTab && onNavigateTab("tv")}
-            />
-            <FooterNavFlipButton
-              text="Anime"
-              onClick={() => onExploreNiches && onExploreNiches()}
-            />
-            <FooterNavFlipButton
-              text="Categories"
-              onClick={() => onExploreNiches && onExploreNiches()}
-            />
-            <FooterNavFlipButton
-              text="Downloads"
-              onClick={() => onNavigateTab && onNavigateTab("downloads")}
-            />
-          </div>
-
-          {/* Tagline in normal case with original shaded red gradient styling and larger size */}
-          <div
-            style={{
-              fontSize: "clamp(16px, 2.2vw, 22px)",
-              fontWeight: 800,
-              letterSpacing: "0.08em",
-              textTransform: "none",
-              fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-              background: "linear-gradient(90deg, #d6131e 0%, #ff2040 45%, #ff5266 85%, #ff7888 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              filter: "drop-shadow(0 2px 14px rgba(229, 9, 20, 0.6))",
-              textAlign: "center",
-              marginTop: "2px",
-              marginBottom: "8px",
-            }}
-          >
-            Cinema is cheaper than therapy
-          </div>
-
-          {/* Transparent Strip with Original Cinema Logo on left of Harsh Sharma & Legal links */}
-          <div
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: "20px",
-              padding: "4px 8px",
-              background: "transparent",
-              border: "none",
-            }}
-          >
-            {/* Previous Logo + Created by Harsh + Legal Links directly beneath it */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-                alignItems: "flex-start",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  textShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
-                }}
-              >
-                <img
-                  src="/logo.png"
-                  alt="Cinema Logo"
-                  style={{
-                    width: "24px",
-                    height: "24px",
-                    borderRadius: "6px",
-                    objectFit: "cover",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.6)",
-                  }}
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = "none";
-                  }}
-                />
-                <div style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.9)" }}>
-                  Created by{" "}
-                  <strong style={{ color: "#ffffff", fontWeight: 700 }}>Harsh</strong>
-                </div>
-              </div>
-
-              {/* Three Legal and Compliance Links, stacked one below the other */}
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "6px",
-                  alignItems: "flex-start",
-                  paddingLeft: "4px",
-                }}
-              >
-                <button
-                  onClick={() => {
-                    if (onNavigateTab) onNavigateTab("terms");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.7)",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: "0",
-                    transition: "color 0.2s ease",
-                    textAlign: "left",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)")}
-                >
-                  Terms of Service
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (onNavigateTab) onNavigateTab("privacy");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.7)",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: "0",
-                    transition: "color 0.2s ease",
-                    textAlign: "left",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)")}
-                >
-                  Privacy Policy
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (onNavigateTab) onNavigateTab("disclaimer");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.7)",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: "0",
-                    transition: "color 0.2s ease",
-                    textAlign: "left",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)")}
-                >
-                  DMCA Disclaimer
-                </button>
-              </div>
-            </div>
-
-            {/* Email & Social Icons */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <a
-                href="mailto:harsh20050924@gmail.com"
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.8)",
-                  textDecoration: "none",
-                  fontWeight: 500,
-                  padding: "4px 10px",
-                  borderRadius: "999px",
-                  background: "rgba(0, 0, 0, 0.45)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  transition: "all 0.2s ease",
-                  textShadow: "0 1px 4px rgba(0, 0, 0, 0.8)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "#ffffff";
-                  e.currentTarget.style.background = "rgba(0, 0, 0, 0.7)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.8)";
-                  e.currentTarget.style.background = "rgba(0, 0, 0, 0.45)";
-                }}
-              >
-                harsh20050924@gmail.com
-              </a>
-
-              <a
-                href="https://github.com/HarshSharma20050924"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="GitHub"
-                title="GitHub"
-                style={{
-                  width: "30px",
-                  height: "30px",
-                  borderRadius: "50%",
-                  background: "rgba(0, 0, 0, 0.45)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#ffffff",
-                  transition: "all 0.2s ease",
-                  textDecoration: "none",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(0, 0, 0, 0.45)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <GithubIcon size={14} />
-              </a>
-
-              <a
-                href="https://www.instagram.com/harshsharma200509/"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                title="Instagram"
-                style={{
-                  width: "30px",
-                  height: "30px",
-                  borderRadius: "50%",
-                  background: "rgba(0, 0, 0, 0.45)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#ffffff",
-                  transition: "all 0.2s ease",
-                  textDecoration: "none",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background =
-                    "linear-gradient(135deg, rgba(225, 48, 108, 0.5), rgba(131, 58, 180, 0.5))";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(0, 0, 0, 0.45)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <InstagramIcon size={14} />
-              </a>
-            </div>
-          </div>
+          <FooterNavButton
+            text="Movies"
+            onClick={() => onNavigateTab && onNavigateTab("movies")}
+          />
+          <FooterNavButton
+            text="TV Shows"
+            onClick={() => onNavigateTab && onNavigateTab("tv")}
+          />
+          <FooterNavButton
+            text="Anime"
+            onClick={() => onNavigateTab && onNavigateTab("anime")}
+          />
+          <FooterNavButton
+            text="Categories"
+            onClick={() => onExploreNiches && onExploreNiches()}
+          />
+          <FooterNavButton
+            text="Downloads"
+            onClick={() => onNavigateTab && onNavigateTab("downloads")}
+          />
         </div>
 
-        {/* Compact Typographic Cinema Watermark */}
+        {/* Tagline */}
         <div
           style={{
-            width: "100%",
+            fontSize: "clamp(15px, 1.8vw, 18px)",
+            fontWeight: 700,
+            letterSpacing: "0.02em",
+            textTransform: "none",
+            color: "rgba(255, 255, 255, 0.55)",
+            textAlign: "center",
+          }}
+        >
+          Cinema is cheaper than therapy
+        </div>
+
+        {/* Legal Links */}
+        <div
+          style={{
             display: "flex",
+            alignItems: "center",
+            gap: "20px",
+            flexWrap: "wrap",
             justifyContent: "center",
-            alignItems: "flex-end",
-            marginTop: "10px",
-            overflow: "hidden",
+          }}
+        >
+          <button
+            onClick={() => {
+              if (onNavigateTab) onNavigateTab("terms");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255, 255, 255, 0.5)",
+              fontSize: "13px",
+              fontWeight: 500,
+              cursor: "pointer",
+              padding: "0",
+              transition: "color 0.2s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.5)")}
+          >
+            Terms of Service
+          </button>
+
+          <span style={{ color: "rgba(255, 255, 255, 0.2)" }}>•</span>
+
+          <button
+            onClick={() => {
+              if (onNavigateTab) onNavigateTab("privacy");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255, 255, 255, 0.5)",
+              fontSize: "13px",
+              fontWeight: 500,
+              cursor: "pointer",
+              padding: "0",
+              transition: "color 0.2s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.5)")}
+          >
+            Privacy Policy
+          </button>
+
+          <span style={{ color: "rgba(255, 255, 255, 0.2)" }}>•</span>
+
+          <button
+            onClick={() => {
+              if (onNavigateTab) onNavigateTab("disclaimer");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255, 255, 255, 0.5)",
+              fontSize: "13px",
+              fontWeight: 500,
+              cursor: "pointer",
+              padding: "0",
+              transition: "color 0.2s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.5)")}
+          >
+            DMCA Disclaimer
+          </button>
+        </div>
+
+        {/* Brand Watermark in Sleek Dark Metallic Gradient */}
+        <div
+          style={{
             userSelect: "none",
             pointerEvents: "none",
-            position: "relative",
-            zIndex: 2,
+            marginTop: "10px",
           }}
         >
           <span
             style={{
-              fontSize: "clamp(68px, 14vw, 175px)",
+              fontSize: "clamp(48px, 10vw, 110px)",
               fontWeight: 900,
               letterSpacing: "-0.04em",
-              lineHeight: 0.85,
-              fontFamily: "Inter, Montserrat, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-              background: "linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, #e50914 45%, #99000a 100%)",
+              lineHeight: 1,
+              fontFamily: "Inter, Montserrat, -apple-system, BlinkMacSystemFont, sans-serif",
+              background: "linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(229, 9, 20, 0.35) 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               display: "inline-block",
-              transform: "translateY(8%)",
-              filter: "drop-shadow(0 12px 35px rgba(229, 9, 20, 0.45))",
             }}
           >
             Cinema

@@ -22,16 +22,27 @@ export default defineConfig({
         configure: (proxy) => {
           proxy.on("error", (err, _req, res: any) => {
             console.warn("[Vite Proxy Warning]:", err.message);
-            try {
-              if (res && !res.headersSent && typeof res.writeHead === "function") {
-                res.writeHead(500, { "Content-Type": "text/plain" });
+            if (res) {
+              if (typeof res.on === "function") res.on("error", () => {});
+              try {
+                if (!res.headersSent && typeof res.writeHead === "function") {
+                  res.writeHead(502, { "Content-Type": "text/plain" });
+                }
+                if (!res.writableEnded && typeof res.end === "function") {
+                  res.end();
+                }
+              } catch {
+                // Ignore
               }
-              if (res && typeof res.end === "function") {
-                res.end();
-              }
-            } catch {
-              // Ignore
             }
+          });
+          proxy.on("proxyRes", (proxyRes, _req, res: any) => {
+            if (res && typeof res.on === "function") res.on("error", () => {});
+            if (proxyRes && typeof proxyRes.on === "function") proxyRes.on("error", () => {});
+          });
+          proxy.on("proxyReq", (proxyReq, _req, res: any) => {
+            if (res && typeof res.on === "function") res.on("error", () => {});
+            if (proxyReq && typeof proxyReq.on === "function") proxyReq.on("error", () => {});
           });
         },
       },

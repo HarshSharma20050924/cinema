@@ -108,25 +108,27 @@ export const GlobalSearchShelf: React.FC<GlobalSearchShelfProps> = ({
               width: "40px",
               height: "40px",
               borderRadius: "50%",
-              background: "rgba(18, 20, 29, 0.88)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
+              background: "rgba(255, 255, 255, 0.10)",
+              backdropFilter: "blur(18px)",
+              border: "1px solid rgba(255, 255, 255, 0.20)",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
               zIndex: 10,
-              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.8)",
-              transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s",
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.6)",
+              transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s, border-color 0.2s",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-50%) scale(1.1)";
+              e.currentTarget.style.transform = "translateY(-50%) scale(1.12)";
               e.currentTarget.style.background = "#e50914";
+              e.currentTarget.style.borderColor = "#e50914";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateY(-50%) scale(1)";
-              e.currentTarget.style.background = "rgba(18, 20, 29, 0.88)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.20)";
             }}
           >
             <ChevronLeftIcon size={20} />
@@ -146,25 +148,27 @@ export const GlobalSearchShelf: React.FC<GlobalSearchShelfProps> = ({
               width: "40px",
               height: "40px",
               borderRadius: "50%",
-              background: "rgba(18, 20, 29, 0.88)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
+              background: "rgba(255, 255, 255, 0.10)",
+              backdropFilter: "blur(18px)",
+              border: "1px solid rgba(255, 255, 255, 0.20)",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
               zIndex: 10,
-              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.8)",
-              transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s",
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.6)",
+              transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s, border-color 0.2s",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-50%) scale(1.1)";
+              e.currentTarget.style.transform = "translateY(-50%) scale(1.12)";
               e.currentTarget.style.background = "#e50914";
+              e.currentTarget.style.borderColor = "#e50914";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateY(-50%) scale(1)";
-              e.currentTarget.style.background = "rgba(18, 20, 29, 0.88)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.20)";
             }}
           >
             <ChevronRightIcon size={20} />

@@ -1154,7 +1154,7 @@ export async function handleCallbackQuery(cq, token, db, requestUrl) {
       if (dlUrl.includes('pixeldrain.dev/api/file/') || dlUrl.includes('pixeldrain.com/api/file/')) {
         const t = dlUrl.split('/file/')[1]?.split('?')[0];
         if (t) dlUrl = `https://pixeldrain.com/u/${t}`;
-      } else if (/(hakunaymatata\.com|moviebox|inmoviebox|aoneroom|sssrr\.org)/i.test(dlUrl)) {
+      } else if (/(hakunaymatata\.com|moviebox|inmoviebox|aoneroom|sssrr\.org|net52\.cc|freecdn|\.m3u8)/i.test(dlUrl)) {
         dlUrl = `${DEFAULT_WEB_URL}/api/download?url=${encodeURIComponent(dlUrl)}&filename=${encodeURIComponent(cleanTitle.replace(/[^\w\s.-]/g, '') + '.mp4')}`;
       }
 

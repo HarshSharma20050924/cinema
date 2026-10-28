@@ -52,7 +52,7 @@ export const DownloadManagerModal: React.FC<DownloadManagerModalProps> = ({ isOp
           background: "#0d0e15",
           border: "1px solid rgba(255, 255, 255, 0.12)",
           borderRadius: "20px",
-          boxShadow: "0 25px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(229, 9, 20, 0.15)",
+          boxShadow: "0 25px 60px rgba(0, 0, 0, 0.95)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",

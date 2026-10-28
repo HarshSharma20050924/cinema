@@ -151,38 +151,7 @@ export function RankingPoster({
           </span>
         )}
 
-        {/* Themed Auto-reloading Spinner Pill: Yellow on IMDb, Green on Letterboxd */}
-        {attemptsRef.current < 4 ? (
-          <div
-            style={{
-              marginTop: "4px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              padding: "3px 9px",
-              borderRadius: "999px",
-              background: pillBg,
-              border: "none",
-              color: "#000000",
-              fontSize: "9.5px",
-              fontWeight: 800,
-              boxShadow: pillShadow,
-              letterSpacing: "0.01em",
-            }}
-          >
-            <div
-              style={{
-                width: "7px",
-                height: "7px",
-                borderRadius: "50%",
-                border: "2px solid rgba(0, 0, 0, 0.25)",
-                borderTopColor: "#000000",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
-            <span>Auto-reloading...</span>
-          </div>
-        ) : null}
+
       </div>
     );
   }

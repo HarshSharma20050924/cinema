@@ -104,29 +104,29 @@ export const SeasonDropdown: React.FC<SeasonDropdownProps> = ({
           height: "36px",
           padding: "0 14px",
           borderRadius: "999px",
-          background: isOpen ? "rgba(255, 255, 255, 0.12)" : "rgba(14, 14, 14, 0.90)",
+          background: isOpen ? "rgba(255, 255, 255, 0.14)" : "rgba(14, 16, 22, 0.78)",
           border: isOpen
             ? "1px solid rgba(255, 255, 255, 0.28)"
-            : "1px solid rgba(255, 255, 255, 0.14)",
+            : "1px solid rgba(255, 255, 255, 0.16)",
           color: "#ffffff",
           fontSize: "13px",
           fontWeight: 700,
           cursor: "pointer",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           boxShadow: "0 4px 14px rgba(0, 0, 0, 0.5)",
           transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         onMouseEnter={(e) => {
           if (!isOpen) {
-            e.currentTarget.style.background = "rgba(24, 24, 24, 0.95)";
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
             e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.25)";
           }
         }}
         onMouseLeave={(e) => {
           if (!isOpen) {
-            e.currentTarget.style.background = "rgba(14, 14, 14, 0.90)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)";
+            e.currentTarget.style.background = "rgba(14, 16, 22, 0.78)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";
           }
         }}
       >
@@ -194,12 +194,12 @@ export const SeasonDropdown: React.FC<SeasonDropdownProps> = ({
             right: 0,
             width: "300px",
             maxHeight: "380px",
-            background: "#0a0a0a",
-            backdropFilter: "blur(28px)",
-            WebkitBackdropFilter: "blur(28px)",
-            border: "1px solid rgba(255, 255, 255, 0.15)",
+            background: "rgba(14, 17, 24, 0.82)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid rgba(255, 255, 255, 0.16)",
             borderRadius: "18px",
-            boxShadow: "0 24px 70px rgba(0, 0, 0, 0.98)",
+            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.85)",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",

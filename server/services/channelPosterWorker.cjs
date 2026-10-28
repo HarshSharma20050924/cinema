@@ -351,6 +351,10 @@ async function processBulkBatch() {
 let workerStarted = false;
 
 function start247AutoPoster() {
+  if (process.env.ENABLE_AUTO_POSTER !== 'true') {
+    console.log('⏸️ [AutoPoster 24/7] Auto-poster is disabled (ENABLE_AUTO_POSTER !== "true")');
+    return;
+  }
   if (workerStarted) return;
   workerStarted = true;
 
@@ -375,8 +379,10 @@ function start247AutoPoster() {
   })();
 }
 
-// Auto-start worker daemon safely (idempotent guard inside prevents duplicates)
-start247AutoPoster();
+// Auto-start worker daemon safely (only if explicitly enabled)
+if (process.env.ENABLE_AUTO_POSTER === 'true') {
+  start247AutoPoster();
+}
 
 module.exports = {
   start247AutoPoster,

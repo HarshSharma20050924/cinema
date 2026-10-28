@@ -45,7 +45,7 @@ async function startServer() {
     });
 
     // 24/7 Dedicated Multi-Channel Poster (Runs on all servers with cluster deduplication)
-    if (process.env.ENABLE_AUTO_POSTER !== 'false') {
+    if (process.env.ENABLE_AUTO_POSTER === 'true') {
       try {
         const { startMultiChannelPoster } = require('./services/multiChannelPoster.cjs');
         startMultiChannelPoster();

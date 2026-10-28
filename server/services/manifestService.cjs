@@ -1,6 +1,36 @@
 const axios = require('axios');
 const { ZENDA_RAW } = require('../config/constants.cjs');
 
+const ACTIVE_TELEGRAM_EXTENSIONS = new Set([
+  'movies4u',
+  'moviesmod',
+  '4khdhub',
+  'drive',
+  'movieboxweb',
+  'moviebox',
+  'tpb',
+  'multi',
+  'castle',
+  'vega',
+  'hdhub4u',
+  'primemirror',
+  'disneymirror',
+  'netflixmirror',
+  'uhd',
+  'dramacool',
+  'animesalt',
+  'anikoto',
+  'animeworld',
+  'hianime',
+  'flixhq',
+  'showbox',
+  'mxplayer',
+  'zeefliz',
+  'moviezwap',
+  'filmyfly',
+  'topmovies',
+]);
+
 const LOCAL_PROVIDERS = [
   {
     name: 'ThePirateBay',
@@ -16,7 +46,7 @@ const LOCAL_PROVIDERS = [
     version: '1.0.0',
     type: 'hindi',
     icon: '🎬',
-    disabled: false,
+    disabled: true,
   },
 ];
 
@@ -37,39 +67,18 @@ class ManifestService {
     try {
       const res = await axios.get(`${ZENDA_RAW}/manifest.json`, { timeout: 8000 });
       if (Array.isArray(res.data)) {
-        const UNSUPPORTED = new Set([
-          'katmoviehd', 'bollyflix', 'moviesflix', 'extramovies', 'world4ufree',
-          'skymovieshd', 'cinevood', 'luxmovies', 'eonmovies', 'cinemaluxe',
-          'gokuhd', 'ridomovies', 'protonmovies', 'kisskh', 'gogoanime',
-          'animerulz', 'yts', '1337x', 'moviesapi', 'kartoons', 'cinefreak',
-          'everything', 'uniquestream', 'moviebox', 'skymoviehd'
-        ]);
-
-        const FORCE_ENABLED = new Set([
-          'multi', 'movieBoxWeb', 'netflixMirror', 'disneyMirror', 'primeMirror',
-          'castle', 'mxplayer', 'animesalt', 'animeworld', 'hiAnime', '4khdhub',
-          'hdhub4u', 'vega', 'drive', 'moviesmod', 'mod', 'uhd', 'movies4u', 'topmovies',
-          'tpb', 'gramcinema', 'olamovies', 'showbox', 'flixhq', 'dramacool', 'filmyfly',
-          'moviezwap', 'zeefliz', 'torrentio', 'autoEmbed', 'anikoto'
-        ]);
-
         remoteList = res.data.map((p) => {
           const valLower = (p.value || '').toLowerCase();
-          const isLegacyMovieBoxApp = p.value === 'movieBox';
           const isMovieBoxWeb = p.value === 'movieBoxWeb';
-          const isUnsupported = UNSUPPORTED.has(valLower);
-          const isForceEnabled = FORCE_ENABLED.has(valLower) || FORCE_ENABLED.has(p.value);
-
-          let isDisabled = Boolean(p.disabled) || isLegacyMovieBoxApp || isUnsupported;
-          if (isForceEnabled) isDisabled = false;
+          const isActive = ACTIVE_TELEGRAM_EXTENSIONS.has(valLower) || ACTIVE_TELEGRAM_EXTENSIONS.has(p.value);
 
           return {
-            name: isMovieBoxWeb ? 'MovieBox' : p.display_name,
+            name: isMovieBoxWeb ? 'MovieBox' : (p.display_name || p.name),
             value: p.value,
             version: p.version,
             icon: p.icon || '',
             type: p.type || 'global',
-            disabled: isDisabled,
+            disabled: !isActive,
           };
         });
       }
@@ -86,6 +95,7 @@ class ManifestService {
       }
     }
 
+    // Filter to ensure only active ones are prioritized and disabled status is preserved
     this.cachedProviders = merged;
     this.lastFetched = now;
     return this.cachedProviders;

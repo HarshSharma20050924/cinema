@@ -1,9 +1,72 @@
 import React, { useState, useEffect } from "react";
 import { Globe } from "lucide-react";
 import { StarIcon, FilmIcon } from "../../icons";
+import { fetchTMDBDetails } from "../../api/tmdb";
 import type { Post } from "../../types";
 
-const posterCache = new Map<string, string>();
+export const posterCache = new Map<string, string>();
+
+const BACKDROP_CACHE_STORAGE_KEY = "cinema_backdrop_cache";
+
+const initBackdropCache = (): Map<string, string> => {
+  const map = new Map<string, string>();
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(BACKDROP_CACHE_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        for (const [k, v] of Object.entries(parsed)) {
+          if (typeof v === "string" && v) map.set(k.toLowerCase().trim(), v);
+        }
+      }
+    } catch (_) {}
+  }
+  return map;
+};
+
+export const backdropCache = initBackdropCache();
+
+export const persistBackdrop = (key: string, url: string) => {
+  if (!key || !url) return;
+  const k = key.toLowerCase().trim();
+  backdropCache.set(k, url);
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(BACKDROP_CACHE_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      parsed[k] = url;
+      const keys = Object.keys(parsed);
+      if (keys.length > 350) {
+        delete parsed[keys[0]];
+      }
+      localStorage.setItem(BACKDROP_CACHE_STORAGE_KEY, JSON.stringify(parsed));
+    } catch (_) {}
+  }
+};
+
+export const genreCache = new Map<string, string>();
+export const logoCache = new Map<string, string>();
+export const trailerCache = new Map<string, string>();
+export const ratingCache = new Map<string, string>();
+
+const getProxiedUrl = (url: string | null, step: number): string | null => {
+  if (!url) return null;
+  const cleanUrl = url.replace(/^http:\/\//i, "https://");
+  if (
+    cleanUrl.startsWith("/api/proxy") ||
+    cleanUrl.startsWith("/api/image-proxy") ||
+    cleanUrl.startsWith("data:")
+  ) {
+    return cleanUrl;
+  }
+  if (step === 1) {
+    return `/api/proxy?url=${encodeURIComponent(cleanUrl)}`;
+  }
+  if (step >= 2) {
+    return `https://cinema-dwh.pages.dev/api/proxy?url=${encodeURIComponent(cleanUrl)}`;
+  }
+  return cleanUrl;
+};
 
 export function parseTitleAndYear(raw: string) {
   if (!raw) return { title: "", year: "", language: "" };
@@ -50,6 +113,9 @@ interface MediaCardProps {
   onClick: (post: Post) => void;
   hideProviderBadge?: boolean;
   priority?: boolean;
+  layout?: "landscape" | "portrait";
+  rank?: number;
+  badge?: string;
 }
 
 export const MediaCard: React.FC<MediaCardProps> = ({
@@ -57,19 +123,97 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   onClick,
   hideProviderBadge = false,
   priority = false,
+  layout = "portrait",
+  rank,
+  badge,
 }) => {
+  const isLandscape = layout === "landscape";
   const imgRef = React.useRef<HTMLImageElement>(null);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [useProxy, setUseProxy] = useState(false);
+  const [proxyStep, setProxyStep] = useState(0);
+  const [logoProxyStep, setLogoProxyStep] = useState(0);
+  const [logoFailed, setLogoFailed] = useState(false);
   const [cinemetaPoster, setCinemetaPoster] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const rafRef = React.useRef<number | null>(null);
+  const hoverTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const hasAttemptedFallbackRef = React.useRef(false);
 
   const { title: cleanTitle, year: extractedYear, language: extractedLang } = parseTitleAndYear(post.title);
 
-  // Synchronous direct poster from post prop (enforce https to prevent mixed content)
+  const [trailerKey, setTrailerKey] = useState<string | null>(() => {
+    if (!cleanTitle) return null;
+    return trailerCache.get(cleanTitle.toLowerCase()) || null;
+  });
+  const [showHoverTrailer, setShowHoverTrailer] = useState(false);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    if (isLandscape) {
+      hoverTimerRef.current = setTimeout(() => {
+        setShowHoverTrailer(true);
+      }, 3500);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const maxTilt = isLandscape ? 10 : 8;
+    const rotateX = ((y - centerY) / centerY) * -maxTilt;
+    const rotateY = ((x - centerX) / centerX) * maxTilt;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      setTilt({ x: rotateX, y: rotateY });
+    });
+  };
+
+  const handleMouseLeave = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    setIsHovered(false);
+    setShowHoverTrailer(false);
+    setTilt({ x: 0, y: 0 });
+  };
+
+  // Extract initial genre from post, genres field, or cache (NEVER fake "Action")
+  const getInitialGenre = (): string => {
+    if (post.genres) {
+      const first = post.genres.split(/[,/|•]/)[0].trim();
+      if (first) return first;
+    }
+    if ((post as any).genre) {
+      const first = String((post as any).genre).split(/[,/|•]/)[0].trim();
+      if (first) return first;
+    }
+    if (cleanTitle && genreCache.has(cleanTitle.toLowerCase())) {
+      return genreCache.get(cleanTitle.toLowerCase()) || "";
+    }
+    return "";
+  };
+
+  const [tmdbBackdrop, setTmdbBackdrop] = useState<string | null>(() => {
+    if (!isLandscape) return null;
+    if (post.backdropUrl) return post.backdropUrl;
+    if (!cleanTitle) return null;
+    return backdropCache.get(cleanTitle.toLowerCase()) || null;
+  });
+  const [tmdbLogo, setTmdbLogo] = useState<string | null>(() => {
+    if (post.logoUrl) return post.logoUrl;
+    if (!cleanTitle) return null;
+    return logoCache.get(cleanTitle.toLowerCase()) || null;
+  });
+  const [cardGenre, setCardGenre] = useState<string>(getInitialGenre);
+
+  // Direct poster from post prop (enforce https to prevent mixed content)
   const rawPoster =
     post.image && typeof post.image === "string" && post.image.trim() !== ""
       ? post.image.trim()
@@ -78,26 +222,98 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     ? rawPoster.replace(/^http:\/\/image\.tmdb\.org\//i, "https://image.tmdb.org/").replace(/^http:\/\//i, "https://")
     : null;
 
-  // Active poster with graceful proxy / Cinemeta resolution
-  const activePoster =
-    cinemetaPoster ||
-    (directPoster
-      ? useProxy
-        ? `/api/image-proxy?url=${encodeURIComponent(directPoster)}`
-        : directPoster
-      : null);
+  const isBogusUrl = (u: string | null | undefined): boolean => {
+    if (!u) return true;
+    return /image\.tmdb\.org\/t\/p\/.*\/([a-z0-9_]{1,6}\.jpg|a0a1a2|b0b1|4u\.jpg|7c\.jpg)/i.test(u);
+  };
+
+  // Multi-tier candidate poster with automatic proxying
+  // For landscape cards, STRICTLY prioritize landscape backdrops so portraits never get cropped
+  const validBackdrop = !isBogusUrl(post.backdropUrl) ? post.backdropUrl : null;
+  const validTmdbBackdrop = !isBogusUrl(tmdbBackdrop) ? tmdbBackdrop : null;
+  const landscapeCandidate = validBackdrop || validTmdbBackdrop;
+  const candidatePoster = isLandscape
+    ? (landscapeCandidate || (post.image && post.image.includes("/background/") && !isBogusUrl(post.image) ? post.image : null) || directPoster)
+    : (cinemetaPoster || directPoster || validBackdrop || (post.image && !isBogusUrl(post.image) ? post.image.replace(/^http:\/\//i, "https://") : null));
+
+  const activePoster = candidatePoster ? getProxiedUrl(candidatePoster, proxyStep) : null;
+
+  // Active extracted logo with proxying
+  const rawLogo = tmdbLogo || post.logoUrl;
+  const activeLogo = rawLogo ? getProxiedUrl(rawLogo, logoProxyStep) : null;
+
+  // Fetch wide backdrop, logo, and accurate genre from TMDB for cards
+  useEffect(() => {
+    if (!cleanTitle) return;
+    const cacheKey = cleanTitle.toLowerCase();
+
+    // Check memory caches first
+    if (genreCache.has(cacheKey)) {
+      const cachedG = genreCache.get(cacheKey);
+      if (cachedG) setCardGenre(cachedG);
+    }
+    // Always resolve backdrop from cache so click opens instant landscape full-screen hero
+    if (backdropCache.has(cacheKey)) {
+      setTmdbBackdrop(backdropCache.get(cacheKey) || null);
+    }
+    if (isLandscape && logoCache.has(cacheKey)) {
+      setTmdbLogo(logoCache.get(cacheKey) || null);
+    }
+
+    const hasBackdrop = backdropCache.has(cacheKey);
+    const hasLogo = logoCache.has(cacheKey);
+    const hasGenre = genreCache.has(cacheKey);
+
+    if (hasBackdrop && hasGenre && (!isLandscape || hasLogo)) {
+      return;
+    }
+
+    const imdbId = (post as any).imdbId || (post as any).imdb_id;
+    fetchTMDBDetails(cleanTitle, imdbId, extractedYear, post.tmdbId)
+      .then((d) => {
+        if (d) {
+          if (d.backdropUrl) {
+            persistBackdrop(cacheKey, d.backdropUrl);
+            setTmdbBackdrop(d.backdropUrl);
+          } else {
+            backdropCache.set(cacheKey, "");
+          }
+          if (d.logoUrl) {
+            logoCache.set(cacheKey, d.logoUrl);
+            if (isLandscape) setTmdbLogo(d.logoUrl);
+          } else {
+            logoCache.set(cacheKey, "");
+          }
+          if (d.genres && d.genres.length > 0) {
+            genreCache.set(cacheKey, d.genres[0]);
+            setCardGenre(d.genres[0]);
+          }
+          if (d.rating) {
+            ratingCache.set(cacheKey, d.rating);
+          }
+          const tKey = d.trailers?.[0]?.key || (d.trailerEmbed?.match(/embed\/([a-zA-Z0-9_-]+)/)?.[1]);
+          if (tKey) {
+            trailerCache.set(cleanTitle.toLowerCase(), tKey);
+            setTrailerKey(tKey);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [isLandscape, cleanTitle, extractedYear, post]);
 
   // Reset state on post change or manual reload
   useEffect(() => {
     setImgLoaded(false);
     setImgError(false);
-    setUseProxy(false);
+    setProxyStep(0);
+    setLogoProxyStep(0);
+    setLogoFailed(false);
     setCinemetaPoster(null);
     setRetryCount(0);
   }, [post.link, post.image, reloadKey]);
 
-  // Cinemeta lookup helper
-  const fetchCinemeta = React.useCallback(async () => {
+  // Ultimate poster lookup helper with multi-tier fallback (TMDB + Cinemeta)
+  const fetchUltimatePoster = React.useCallback(async () => {
     if (!cleanTitle) return;
     const cacheKey = cleanTitle.toLowerCase();
     if (posterCache.has(cacheKey)) {
@@ -105,11 +321,23 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       if (cached) {
         setCinemetaPoster(cached);
         setImgError(false);
-        setImgLoaded(false);
       }
       return;
     }
+
     try {
+      // Tier 1: High-res TMDB details & multi-search
+      const tmdbData = await fetchTMDBDetails(cleanTitle, undefined, extractedYear);
+      if (tmdbData?.posterUrl) {
+        posterCache.set(cacheKey, tmdbData.posterUrl);
+        setCinemetaPoster(tmdbData.posterUrl);
+        setImgError(false);
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      // Tier 2: /api/poster (Backend Cinemeta)
       const res = await fetch(`/api/poster?query=${encodeURIComponent(cleanTitle)}`);
       if (res.ok) {
         const data = await res.json();
@@ -117,33 +345,50 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           posterCache.set(cacheKey, data.poster);
           setCinemetaPoster(data.poster);
           setImgError(false);
-          setImgLoaded(false);
+          return;
         }
       }
     } catch (_) {}
-  }, [cleanTitle]);
+
+    try {
+      // Tier 3: Direct Cinemeta catalog
+      const cineRes = await fetch(
+        `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(cleanTitle)}.json`
+      );
+      if (cineRes.ok) {
+        const json = await cineRes.json();
+        const poster = json?.metas?.[0]?.poster;
+        if (poster) {
+          posterCache.set(cacheKey, poster);
+          setCinemetaPoster(poster);
+          setImgError(false);
+          return;
+        }
+      }
+    } catch (_) {}
+  }, [cleanTitle, extractedYear]);
 
   // Auto-reload failed images automatically up to 4 times
   useEffect(() => {
     if (imgError && retryCount < 4) {
-      const delay = Math.min(1200 * Math.pow(1.4, retryCount), 4000);
+      const delay = Math.min(1000 * Math.pow(1.3, retryCount), 3000);
       const timer = setTimeout(() => {
         setRetryCount((c) => c + 1);
         setImgError(false);
         setImgLoaded(false);
         setReloadKey((k) => k + 1);
-        fetchCinemeta();
+        fetchUltimatePoster();
       }, delay);
       return () => clearTimeout(timer);
     }
-  }, [imgError, retryCount, fetchCinemeta]);
+  }, [imgError, retryCount, fetchUltimatePoster]);
 
-  // Initial Cinemeta fetch only if post has no image
+  // Initial poster fetch only if post has no image
   useEffect(() => {
     if (!directPoster) {
-      fetchCinemeta();
+      fetchUltimatePoster();
     }
-  }, [directPoster, fetchCinemeta]);
+  }, [directPoster, fetchUltimatePoster]);
 
   const handleImageSuccess = () => {
     setImgLoaded(true);
@@ -151,17 +396,23 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   };
 
   const handleImageFailure = () => {
-    // Stage 1: Try backend image proxy for scraper domains blocked by browser shields
-    if (directPoster && !useProxy) {
-      setUseProxy(true);
-      setImgLoaded(false);
+    // Stage 1: Try local backend/vite proxy (bypasses ISP blocks and CORS)
+    if (proxyStep === 0) {
+      setProxyStep(1);
       return;
     }
-    // Stage 2: Try Cinemeta if not tried yet
-    if (!cinemetaPoster) {
-      fetchCinemeta();
+    // Stage 2: Try Cloudflare Pages edge proxy
+    if (proxyStep === 1) {
+      setProxyStep(2);
+      return;
     }
-    // Stage 3: Dismiss skeleton and reveal clean title card fallback
+    // Stage 3: Try ultimate poster source (TMDB + Cinemeta) once only
+    if (!cinemetaPoster && !hasAttemptedFallbackRef.current) {
+      hasAttemptedFallbackRef.current = true;
+      fetchUltimatePoster();
+      return;
+    }
+    // Stage 4: Terminate retries and mark clean fallback
     setImgError(true);
     setImgLoaded(true);
   };
@@ -186,7 +437,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       return;
     }
 
-    // Hard safety guard: Never stay as an infinite skeleton past 2.8s
+    // Safety guard: Allow up to 6.5s before fallback so slow networks never glitch reload
     const timer = setTimeout(() => {
       if (!imgLoaded) {
         if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
@@ -195,20 +446,27 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           handleImageFailure();
         }
       }
-    }, 2800);
+    }, 6500);
 
     return () => clearTimeout(timer);
-  }, [activePoster, useProxy, cinemetaPoster, imgLoaded]);
+  }, [activePoster, proxyStep, cinemetaPoster, imgLoaded]);
 
   // Extract season if present (e.g. S8, Season 7)
   const seasonMatch = post.title?.match(/\b(?:season\s*|s0*)(\d+)\b/i);
   const seasonTag = seasonMatch ? `S${seasonMatch[1]}` : null;
 
-  // Extract rating from post.tag if numeric, e.g. "8.4" or "★ 8.4"
+  // Extract rating from post.tag if numeric, e.g. "8.4" or "★ 8.4", or fallback to TMDB/cache
   const rawTag = post.tag ? post.tag.replace(/[★⭐]/g, "").trim() : "";
-  const isNumericRating = /^\d+(\.\d+)?$/.test(rawTag);
-  const rating = isNumericRating ? rawTag : null;
-  const badgeTag = !isNumericRating && rawTag ? rawTag : null;
+  const isNumericRating = /^(?:10(?:\.0)?|[1-9](?:\.\d)?)$/.test(rawTag);
+  const postRatingVal = (post as any).rating || (post as any).vote_average || (post as any).imdbRating;
+  const rating = isNumericRating
+    ? rawTag
+    : (postRatingVal && Number(postRatingVal) > 0
+        ? Number(postRatingVal).toFixed(1)
+        : (cleanTitle ? ratingCache.get(cleanTitle.toLowerCase()) : null));
+  // Never show dates as right-hand red pills; only true technical quality tags (CAM, 4K, etc.)
+  const isDateTag = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})\b/i.test(rawTag);
+  const badgeTag = (!badge && !isNumericRating && rawTag && !isDateTag) ? rawTag : null;
 
   // Language tag detection (e.g. Hindi, Dual Audio, Tamil)
   const detectedLang =
@@ -216,20 +474,44 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     extractedLang ||
     null;
 
+  // Handler that passes resolved backdrop and logo to ensure instant seamless full-screen hero transition
+  const handleCardClick = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const resolvedBackdrop =
+      post.backdropUrl ||
+      tmdbBackdrop ||
+      (cleanTitle ? backdropCache.get(cleanTitle.toLowerCase()) : undefined) ||
+      undefined;
+    const resolvedLogo =
+      post.logoUrl ||
+      tmdbLogo ||
+      (cleanTitle ? logoCache.get(cleanTitle.toLowerCase()) : undefined) ||
+      undefined;
+    const augmented: Post = {
+      ...post,
+      backdropUrl: resolvedBackdrop,
+      logoUrl: resolvedLogo,
+    };
+    onClick(augmented);
+  };
+
   return (
     <div
-      onClick={() => onClick(post)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onClick={handleCardClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       style={{
         cursor: "pointer",
         display: "flex",
         flexDirection: "column",
         width: "100%",
-        maxWidth: "160px",
+        maxWidth: "100%",
         margin: "0 auto",
         position: "relative",
         userSelect: "none",
+        perspective: "1000px",
+        zIndex: isHovered ? 12 : 1,
       }}
     >
       <div
@@ -237,31 +519,161 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         style={{
           position: "relative",
           width: "100%",
-          aspectRatio: "2/3",
+          aspectRatio: isLandscape ? "16/9" : "2/3",
           borderRadius: "14px",
           overflow: "hidden",
           background: "#0c0c0c",
-          transform: isHovered ? "translateY(-6px)" : "translateY(0)",
+          transform: isHovered
+            ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${isLandscape ? 1.045 : 1.035}, ${isLandscape ? 1.045 : 1.035}, ${isLandscape ? 1.045 : 1.035})`
+            : "rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)",
+          transformStyle: "preserve-3d",
           boxShadow: isHovered
-            ? "0 18px 36px rgba(0, 0, 0, 0.9)"
+            ? isLandscape
+              ? "0 22px 44px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0,0,0,0.5)"
+              : "0 18px 36px rgba(0, 0, 0, 0.9)"
             : "0 4px 14px rgba(0, 0, 0, 0.5)",
-          transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+          transition: isHovered
+            ? "transform 0.08s ease-out, box-shadow 0.25s ease"
+            : "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease",
         }}
       >
-        {/* Skeleton Shimmer: ONLY shown while an active poster URL is currently pending */}
-        {!imgLoaded && !imgError && activePoster && (
+        {/* Top 10 Big Bold Rank Number */}
+        {typeof rank === "number" && (
+          <div
+            style={{
+              position: "absolute",
+              top: "8px",
+              left: "10px",
+              zIndex: 4,
+              minWidth: "28px",
+              height: "28px",
+              padding: "0 7px",
+              borderRadius: "8px",
+              background: "rgba(8, 10, 16, 0.82)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "13.5px",
+              fontWeight: 900,
+              lineHeight: 1,
+              color: "#ffffff",
+              fontFamily: "var(--font-display, 'Space Grotesk', -apple-system, sans-serif)",
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.7)",
+              pointerEvents: "none",
+            }}
+          >
+            {rank}
+          </div>
+        )}
+
+        {/* Date / Status Tag (e.g. 'Oct 23' for Coming Soon) styled with Navbar Frosted Glass UI */}
+        {badge && (
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              left: "10px",
+              zIndex: 4,
+              padding: "4px 11px",
+              borderRadius: "999px",
+              background: "rgba(14, 16, 24, 0.65)",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              border: "1px solid rgba(255, 255, 255, 0.18)",
+              fontSize: "11px",
+              fontWeight: 700,
+              color: "#ffffff",
+              letterSpacing: "0.3px",
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.5)",
+              pointerEvents: "none",
+            }}
+          >
+            {badge}
+          </div>
+        )}
+
+        {/* Hover Trailer Teaser (Landscape preview after ~850ms hover) */}
+        {isLandscape && showHoverTrailer && trailerKey && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 3,
+              background: "#000000",
+              overflow: "hidden",
+              borderRadius: "14px",
+              pointerEvents: "none",
+            }}
+          >
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${trailerKey}&start=10&modestbranding=1&rel=0`}
+              title={cleanTitle}
+              allow="autoplay; encrypted-media"
+              style={{
+                width: "100%",
+                height: "100%",
+                border: "none",
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+        )}
+
+        {/* Landscape card: pure artwork with no text overlay */}
+
+        {/* Top-Right 3-Dots Button on Hover matching Reference Image */}
+        {isHovered && (
+          <button
+            onClick={handleCardClick}
+            title="Options"
+            style={{
+              position: "absolute",
+              top: "12px",
+              right: "12px",
+              zIndex: 4,
+              width: "32px",
+              height: "32px",
+              borderRadius: "50%",
+              background: "rgba(28, 30, 36, 0.8)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              border: "1px solid rgba(255, 255, 255, 0.18)",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.5)",
+              transition: "transform 0.2s ease, background 0.2s ease",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="5" cy="12" r="2" />
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="19" cy="12" r="2" />
+            </svg>
+          </button>
+        )}
+        {/* Skeleton Shimmer: Shown normally whenever the image is loading, fetching, or retrying */}
+        {(!imgLoaded || (!activePoster && retryCount < 4)) && (
           <div
             className="skeleton-shimmer"
             style={{
               position: "absolute",
               inset: 0,
               zIndex: 1,
+              background: "linear-gradient(110deg, #14171f 8%, #1f232e 18%, #14171f 33%)",
+              backgroundSize: "200% 100%",
+              animation: "shimmer 1.5s infinite linear",
             }}
           />
         )}
 
-        {/* Fallback Movie Card UI: Clean, legible title card with 1-click reload */}
-        {(!activePoster || imgError) && (
+        {/* Fallback Movie Card UI: Clean title card only shown if all retries exhausted */}
+        {imgError && retryCount >= 4 && !activePoster && (
           <div
             style={{
               position: "absolute",
@@ -279,8 +691,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           >
             <div
               style={{
-                width: "42px",
-                height: "42px",
+                width: "40px",
+                height: "40px",
                 borderRadius: "50%",
                 background: "rgba(255, 255, 255, 0.06)",
                 display: "flex",
@@ -289,7 +701,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                 color: "rgba(255, 255, 255, 0.4)",
               }}
             >
-              <FilmIcon size={22} />
+              <FilmIcon size={20} />
             </div>
 
             <div
@@ -313,63 +725,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                 {extractedYear}
               </span>
             )}
-
-            {retryCount < 4 ? (
-              <div
-                style={{
-                  marginTop: "6px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "3px 10px",
-                  borderRadius: "999px",
-                  background: "#e50914",
-                  border: "none",
-                  color: "#ffffff",
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  boxShadow: "0 2px 8px rgba(229, 9, 20, 0.4)",
-                }}
-              >
-                <div
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    border: "2px solid rgba(255, 255, 255, 0.35)",
-                    borderTopColor: "#ffffff",
-                    animation: "spin 0.8s linear infinite",
-                  }}
-                />
-                <span>Auto-reloading...</span>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRetryCount(0);
-                  setReloadKey((k) => k + 1);
-                }}
-                style={{
-                  marginTop: "4px",
-                  padding: "4px 12px",
-                  borderRadius: "999px",
-                  background: "#e50914",
-                  border: "none",
-                  color: "#ffffff",
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  boxShadow: "0 2px 8px rgba(229, 9, 20, 0.4)",
-                }}
-              >
-                <span>↻ Reload</span>
-              </button>
-            )}
           </div>
         )}
 
@@ -377,7 +732,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         {!imgError && activePoster && (
           <img
             ref={imgRef}
-            key={activePoster}
             src={activePoster}
             alt={cleanTitle || post.title}
             loading={priority ? "eager" : "lazy"}
@@ -391,13 +745,297 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               objectFit: "cover",
               display: "block",
               opacity: imgLoaded ? 1 : 0,
-              transform: isHovered ? "scale(1.10)" : "scale(1.0)",
-              transition: "opacity 0.25s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+              transform: isHovered
+                ? `scale(1.12) translate3d(${tilt.y * -0.6}px, ${tilt.x * 0.6}px, 0px)`
+                : "scale(1.0) translate3d(0px, 0px, 0px)",
+              transition: isHovered
+                ? "transform 0.08s ease-out, opacity 0.25s ease"
+                : "transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease",
               willChange: "transform, opacity",
             }}
           />
         )}
 
+        {/* Landscape Overlay: Extracted Movie Title Logo (matching banner reference like Whalefall) */}
+        {isLandscape && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              justifyContent: "flex-end",
+              padding: "14px 16px",
+              background:
+                "linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.4) 65%, rgba(0,0,0,0.85) 100%)",
+              pointerEvents: "none",
+              zIndex: 3,
+            }}
+          >
+            {/* Extracted Title Logo from TMDB poster/backdrop images (matching banner reference like Whalefall) */}
+            {activeLogo && !logoFailed ? (
+              <img
+                src={activeLogo}
+                alt={cleanTitle || post.title}
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                style={{
+                  maxHeight: "48px",
+                  maxWidth: "76%",
+                  objectFit: "contain",
+                  objectPosition: "left bottom",
+                  filter: "drop-shadow(0 4px 16px rgba(0, 0, 0, 0.95))",
+                  marginBottom: "6px",
+                  display: "block",
+                  transform: isHovered ? "translateY(-5px) scale(1.08)" : "translateY(0) scale(1)",
+                  transformOrigin: "left bottom",
+                  transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+                onError={() => {
+                  if (logoProxyStep === 0) {
+                    setLogoProxyStep(1);
+                  } else if (logoProxyStep === 1) {
+                    setLogoProxyStep(2);
+                  } else {
+                    setLogoFailed(true);
+                  }
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 900,
+                  color: "#ffffff",
+                  letterSpacing: "0.2px",
+                  textTransform: "uppercase",
+                  textShadow: "0 2px 14px rgba(0, 0, 0, 0.95)",
+                  lineHeight: 1.15,
+                  maxWidth: "85%",
+                  marginBottom: "6px",
+                  transform: isHovered ? "translateY(-4px) scale(1.05)" : "translateY(0) scale(1)",
+                  transformOrigin: "left bottom",
+                  transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+              >
+                {cleanTitle || post.title}
+              </div>
+            )}
+
+            {/* Genre Pill + Year (revealed smoothly on hover) */}
+            {(() => {
+              const displayGenre =
+                cardGenre ||
+                (post.genres ? post.genres.split(/[,/|•]/)[0].trim() : "") ||
+                ((post as any).genre ? String((post as any).genre).split(/[,/|•]/)[0].trim() : "") ||
+                (post.mediaType === "tv" ? "Series" : "");
+
+              return (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    opacity: isHovered ? 1 : 0,
+                    transform: isHovered ? "translateY(0)" : "translateY(4px)",
+                    transition: "opacity 0.25s ease, transform 0.25s ease",
+                  }}
+                >
+                  {displayGenre && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "3px 10px",
+                        borderRadius: "12px",
+                        background: "rgba(255, 255, 255, 0.22)",
+                        backdropFilter: "blur(10px)",
+                        WebkitBackdropFilter: "blur(10px)",
+                        border: "1px solid rgba(255, 255, 255, 0.28)",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: "#ffffff",
+                        textTransform: "capitalize",
+                        letterSpacing: "0.2px",
+                      }}
+                    >
+                      {displayGenre}
+                    </span>
+                  )}
+
+                  {(extractedYear || post.year) && (
+                    <span
+                      style={{
+                        fontSize: "11.5px",
+                        fontWeight: 700,
+                        color: "#ffffff",
+                        letterSpacing: "0.3px",
+                        textShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
+                      }}
+                    >
+                      {extractedYear || post.year}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Portrait Card Overlay on Hover (Matching Toy Story 5 reference image) */}
+        {!isLandscape && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              justifyContent: "flex-end",
+              padding: "16px 14px",
+              background:
+                "linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.5) 65%, rgba(0,0,0,0.92) 100%)",
+              opacity: isHovered ? 1 : 0,
+              transform: isHovered ? "translateY(0)" : "translateY(6px)",
+              transition: "opacity 0.25s ease, transform 0.25s ease",
+              pointerEvents: "none",
+              zIndex: 3,
+            }}
+          >
+            {/* Movie Title */}
+            <div
+              style={{
+                fontSize: "15px",
+                fontWeight: 800,
+                color: "#ffffff",
+                lineHeight: 1.22,
+                marginBottom: "6px",
+                textShadow: "0 2px 10px rgba(0, 0, 0, 0.95)",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+              }}
+            >
+              {cleanTitle || post.title}
+            </div>
+
+            {/* Genre Pill + Year (Matching Reference) */}
+            {(() => {
+              const displayGenre =
+                cardGenre ||
+                (post.genres ? post.genres.split(/[,/|•]/)[0].trim() : "") ||
+                ((post as any).genre ? String((post as any).genre).split(/[,/|•]/)[0].trim() : "") ||
+                (post.mediaType === "tv" ? "Series" : "");
+
+              return (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  {displayGenre && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "3px 10px",
+                        borderRadius: "12px",
+                        background: "rgba(255, 255, 255, 0.22)",
+                        backdropFilter: "blur(10px)",
+                        WebkitBackdropFilter: "blur(10px)",
+                        border: "1px solid rgba(255, 255, 255, 0.28)",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: "#ffffff",
+                        textTransform: "capitalize",
+                        letterSpacing: "0.2px",
+                      }}
+                    >
+                      {displayGenre}
+                    </span>
+                  )}
+
+                  {(extractedYear || post.year) && (
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: "#ffffff",
+                        letterSpacing: "0.3px",
+                        textShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
+                      }}
+                    >
+                      {extractedYear || post.year}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Top 10 Rank Number if present */}
+        {typeof rank === "number" && (
+          <div
+            style={{
+              position: "absolute",
+              top: "8px",
+              left: "10px",
+              zIndex: 4,
+              minWidth: "26px",
+              height: "26px",
+              padding: "0 6px",
+              borderRadius: "7px",
+              background: "rgba(8, 10, 16, 0.82)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "12.5px",
+              fontWeight: 900,
+              lineHeight: 1,
+              color: "#ffffff",
+              fontFamily: "var(--font-display, 'Space Grotesk', -apple-system, sans-serif)",
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.7)",
+              pointerEvents: "none",
+            }}
+          >
+            {rank}
+          </div>
+        )}
+
+        {/* Badge tag (e.g. Diwali 2026, Dec 2025 in Coming Soon) */}
+        {badge && (
+          <div
+            style={{
+              position: "absolute",
+              top: "10px",
+              left: "10px",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              background: "rgba(12, 14, 20, 0.8)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              border: "1px solid rgba(255, 255, 255, 0.25)",
+              color: "#ffffff",
+              fontSize: "11px",
+              fontWeight: 800,
+              letterSpacing: "0.02em",
+              zIndex: 4,
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.6)",
+            }}
+          >
+            {badge}
+          </div>
+        )}
 
         {/* Quality or custom tag if present (e.g. CAM, 4K) */}
         {badgeTag && (
@@ -414,59 +1052,44 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               fontSize: "10px",
               fontWeight: 700,
               letterSpacing: "0.04em",
-              zIndex: 2,
+              zIndex: 4,
             }}
           >
             {badgeTag}
           </div>
         )}
 
-        {/* Card bottom info overlay - visible so titles are easily readable, blooms & details expand on hover */}
-        <div
-          className="media-card-hover-overlay"
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: "42px 12px 12px 12px",
-            background:
-              "linear-gradient(to top, rgba(0, 0, 0, 0.96) 0%, rgba(0, 0, 0, 0.65) 65%, transparent 100%)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "5px",
-            opacity: isHovered ? 1 : 0,
-            transform: isHovered ? "translateY(0)" : "translateY(8px)",
-            transition: "opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
-            zIndex: 3,
-            pointerEvents: "none",
-          }}
-        >
+      </div>
+
+      {/* Title & Metadata below card - only shown for vertical portrait cards (hidden on landscape) */}
+      {!isLandscape && (
+        <div className="media-card-static-info" style={{ marginTop: "8px", padding: "0 2px" }}>
           <div
+            title={cleanTitle || post.title}
             style={{
               fontSize: "13px",
               fontWeight: 700,
               color: "#ffffff",
-              lineHeight: 1.3,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
+              lineHeight: 1.25,
+              whiteSpace: "nowrap",
               overflow: "hidden",
-              textShadow: "0 2px 6px rgba(0,0,0,0.9)",
+              textOverflow: "ellipsis",
             }}
           >
-            {post.title}
+            {cleanTitle || post.title}
           </div>
-
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: "8px",
+              marginTop: "4px",
               fontSize: "11px",
+              color: "rgba(255, 255, 255, 0.6)",
               fontWeight: 600,
             }}
           >
+            {extractedYear && <span>{extractedYear}</span>}
             {rating && (
               <span
                 style={{
@@ -474,62 +1097,16 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                   alignItems: "center",
                   gap: "3px",
                   color: "#ffd700",
+                  fontWeight: 700,
                 }}
               >
-                <StarIcon size={12} fill="#ffd700" color="#ffd700" />
+                <StarIcon size={11} fill="#ffd700" color="#ffd700" />
                 <span>{rating}</span>
               </span>
             )}
-            {extractedYear && (
-              <span style={{ color: "#94a3b8" }}>{extractedYear}</span>
-            )}
           </div>
         </div>
-      </div>
-
-      {/* Title & Metadata below card - directly displays what provider provides */}
-      <div className="media-card-static-info" style={{ marginTop: "7px", padding: "0 2px" }}>
-        <div
-          title={post.title}
-          style={{
-            fontSize: "12px",
-            fontWeight: 700,
-            color: "#f1f5f9",
-            lineHeight: 1.3,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {post.title}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            marginTop: "3px",
-            fontSize: "11px",
-            color: "#94a3b8",
-          }}
-        >
-          {extractedYear && <span>{extractedYear}</span>}
-          {rating && (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "2px",
-                color: "#ffd700",
-                fontWeight: 700,
-              }}
-            >
-              <StarIcon size={10} fill="#ffd700" color="#ffd700" />
-              <span>{rating}</span>
-            </span>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 };

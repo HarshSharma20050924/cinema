@@ -1,5 +1,18 @@
-import React, { useState, useEffect } from "react";
-import { SettingsIcon, ArrowLeftIcon, XIcon, ChevronDownIcon, SearchIcon, DownloadIcon } from "../../icons";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import {
+  SettingsIcon,
+  ArrowLeftIcon,
+  XIcon,
+  ChevronDownIcon,
+  SearchIcon,
+  DownloadIcon,
+  TvIcon,
+  HomeIcon,
+  CategoryIcon,
+  StarIcon,
+  ClapperIcon,
+  SparklesIcon,
+} from "../../icons";
 import { NavSearchBar } from "./NavSearchBar";
 import { ProviderDropdown } from "./ProviderDropdown";
 import { downloadManager } from "../../utils/downloadManager";
@@ -15,8 +28,9 @@ export interface NavbarProps {
   onToggleGlobalSearch: () => void;
   onOpenSettings: () => void;
   onOpenDownloads?: () => void;
+  onOpenSearch?: () => void;
   onGoHome?: () => void;
-  onSelectCategoryNav?: (type: "home" | "movies" | "tv" | "categories" | "rankings" | "downloads") => void;
+  onSelectCategoryNav?: (type: "home" | "movies" | "tv" | "anime" | "coming-soon" | "categories" | "rankings" | "downloads" | "mylist") => void;
   activeNavTab?: string;
   isModalNavbar?: boolean;
   onClose?: () => void;
@@ -33,6 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleGlobalSearch,
   onOpenSettings,
   onOpenDownloads,
+  onOpenSearch,
   onGoHome,
   onSelectCategoryNav,
   activeNavTab = "home",
@@ -44,7 +59,48 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeDownloadCount, setActiveDownloadCount] = useState(0);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const isDesktop = typeof window !== "undefined" && Boolean((window as any).CinemaDesktop?.isDesktop);
+
+  // Tab measurement and GPU sliding red pill indicator
+  const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const [indicator, setIndicator] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    opacity: number;
+  }>({ left: 0, top: 0, width: 0, height: 0, opacity: 0 });
+
+  useLayoutEffect(() => {
+    const activeId = activeNavTab === "home" && !searchQuery ? "home" : activeNavTab;
+    const el = tabRefs.current[activeId];
+    if (el) {
+      setIndicator({
+        left: el.offsetLeft,
+        top: el.offsetTop,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        opacity: 1,
+      });
+    } else {
+      setIndicator((prev) => ({ ...prev, opacity: 0 }));
+    }
+  }, [activeNavTab, searchQuery]);
+
+  // Click outside listener for Settings popup menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
+        setSettingsMenuOpen(false);
+      }
+    };
+    if (settingsMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [settingsMenuOpen]);
 
   useEffect(() => {
     return downloadManager.subscribe((tasks) => {
@@ -61,13 +117,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   const navItems: Array<{
-    id: "home" | "movies" | "tv" | "categories" | "rankings" | "downloads";
+    id: "home" | "movies" | "tv" | "anime" | "coming-soon";
     label: string;
+    icon?: React.ReactNode;
     onClick: () => void;
   }> = [
     {
       id: "home",
       label: "Home",
+      icon: <HomeIcon size={15} color="#ffffff" />,
       onClick: () => {
         if (onGoHome) onGoHome();
         onSearchChange("");
@@ -76,36 +134,40 @@ export const Navbar: React.FC<NavbarProps> = ({
     {
       id: "movies",
       label: "Movies",
+      icon: <ClapperIcon size={15} color="#ffffff" />,
       onClick: () => {
         if (onSelectCategoryNav) onSelectCategoryNav("movies");
       },
     },
     {
       id: "tv",
-      label: "TV Shows",
+      label: "Shows",
+      icon: <TvIcon size={15} color="#ffffff" />,
       onClick: () => {
         if (onSelectCategoryNav) onSelectCategoryNav("tv");
       },
     },
     {
-      id: "categories",
-      label: "Categories",
+      id: "anime",
+      label: "Anime",
+      icon: <SparklesIcon size={15} color="#ffffff" />,
       onClick: () => {
-        if (onSelectCategoryNav) onSelectCategoryNav("categories");
+        if (onSelectCategoryNav) onSelectCategoryNav("anime");
       },
     },
     {
-      id: "rankings",
-      label: "⭐ Top 250",
+      id: "coming-soon",
+      label: "Coming Soon",
+      icon: (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+      ),
       onClick: () => {
-        if (onSelectCategoryNav) onSelectCategoryNav("rankings");
-      },
-    },
-    {
-      id: "downloads",
-      label: "Download",
-      onClick: () => {
-        if (onSelectCategoryNav) onSelectCategoryNav("downloads");
+        if (onSelectCategoryNav) onSelectCategoryNav("coming-soon");
       },
     },
   ];
@@ -120,18 +182,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         right: 0,
         width: "100%",
         zIndex: isModalNavbar ? 60 : 40,
-        borderBottom: isModalNavbar || !hasHero ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
-        background: isModalNavbar || !hasHero ? "rgba(0, 0, 0, 0.96)" : isScrolled ? "rgba(0, 0, 0, 0.82)" : "transparent",
-        backdropFilter: isModalNavbar || isScrolled || !hasHero ? "blur(20px) saturate(1.4)" : "none",
-        WebkitBackdropFilter: isModalNavbar || isScrolled || !hasHero ? "blur(20px) saturate(1.4)" : "none",
-        transition: "background 0.4s ease, backdrop-filter 0.4s ease",
+        borderBottom: "none",
+        background: "transparent",
+        backdropFilter: "none",
+        WebkitBackdropFilter: "none",
       }}
     >
       {/* DESKTOP NAVBAR (> 768px) */}
       <div
         className="desktop-navbar-row"
         style={{
-          padding: "10px 28px",
+          padding: "14px 32px 10px 32px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -227,18 +288,46 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Center Nav Links */}
+        {/* Center Floating Glassmorphic Pill Capsule Nav with Sliding Red Indicator */}
         <nav
+          aria-label="Primary"
           style={{
             position: "absolute",
             left: "50%",
             transform: "translateX(-50%)",
             display: "flex",
             alignItems: "center",
-            gap: "6px",
+            gap: "8px",
             zIndex: 10,
+            padding: "6px 8px",
+            borderRadius: "9999px",
+            background: "linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 22, 32, 0.45) 45%, rgba(8, 10, 16, 0.55) 100%)",
+            backdropFilter: "blur(28px) saturate(200%)",
+            WebkitBackdropFilter: "blur(28px) saturate(200%)",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
+            boxShadow: "0 16px 40px -10px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4)",
           }}
         >
+          {/* Sliding Red Active Indicator with GPU Acceleration */}
+          <div
+            style={{
+              position: "absolute",
+              top: `${indicator.top}px`,
+              left: 0,
+              transform: `translate3d(${indicator.left}px, 0, 0)`,
+              width: `${indicator.width}px`,
+              height: `${indicator.height}px`,
+              borderRadius: "9999px",
+              background: "linear-gradient(135deg, #ff1723 0%, #e50914 100%)",
+              boxShadow: "0 4px 18px rgba(229, 9, 20, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.4)",
+              opacity: indicator.opacity,
+              pointerEvents: "none",
+              transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
+              willChange: "transform, width",
+              zIndex: 1,
+            }}
+          />
+
           {navItems.map((item) => {
             const isActive =
               item.id === "home"
@@ -249,98 +338,310 @@ export const Navbar: React.FC<NavbarProps> = ({
             return (
               <button
                 key={item.id}
+                ref={(el) => {
+                  tabRefs.current[item.id] = el;
+                }}
                 onClick={item.onClick}
                 onMouseEnter={() => setHoveredNav(item.id)}
                 onMouseLeave={() => setHoveredNav(null)}
                 style={{
                   position: "relative",
-                  padding: "9px 22px",
-                  borderRadius: "999px",
-                  background: isHovered && !isActive ? "rgba(255, 255, 255, 0.06)" : "transparent",
-                  color: isActive ? "#ffffff" : isHovered ? "#ffffff" : "rgba(255, 255, 255, 0.8)",
-                  fontSize: "16px",
+                  zIndex: 2,
+                  padding: "8px 18px",
+                  borderRadius: "9999px",
+                  background: "transparent",
+                  color: isActive ? "#ffffff" : isHovered ? "#ffffff" : "rgba(255, 255, 255, 0.80)",
+                  fontSize: "14px",
                   fontWeight: isActive ? 700 : 500,
                   cursor: "pointer",
                   border: "none",
                   outline: "none",
                   display: "inline-flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.2s ease",
+                  gap: "7px",
                   userSelect: "none",
+                  whiteSpace: "nowrap",
+                  transition: "color 0.15s ease",
                 }}
               >
+                {/* Active icon ONLY shown on active tab */}
+                {isActive && item.icon && (
+                  <span style={{ display: "inline-flex", alignItems: "center", color: "#ffffff" }}>
+                    {item.icon}
+                  </span>
+                )}
                 <span>{item.label}</span>
-                <span
-                  style={{
-                    position: "absolute",
-                    bottom: "2px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    width: isHovered ? "48px" : "0px",
-                    height: "2.5px",
-                    borderRadius: "3px",
-                    backgroundColor: "#e50914",
-                    boxShadow: isHovered ? "0 0 12px rgba(229, 9, 20, 0.7)" : "none",
-                    opacity: isHovered ? 1 : 0,
-                    transition: "width 0.24s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease",
-                  }}
-                />
               </button>
             );
           })}
-        </nav>
 
-        {/* Right Actions: Search + Extension Selector + Settings + Close */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {/* Desktop Search Bar */}
-          <NavSearchBar
-            searchQuery={searchQuery}
-            onSearchChange={onSearchChange}
-            isGlobalSearch={isGlobalSearch}
-            onToggleGlobalSearch={onToggleGlobalSearch}
-            activeProviderName={activeProvider?.name}
-          />
-
-          {/* Active Extension Selector */}
-          <ProviderDropdown
-            providers={providers}
-            activeProvider={activeProvider}
-            onSelectProvider={onSelectProvider}
-            onSearchReset={() => onSearchChange("")}
-          />
-
-          {/* Settings Button */}
-          <button
-            onClick={onOpenSettings}
-            title="Settings"
+          {/* Vertical Divider */}
+          <div
             style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "999px",
-              background: "rgba(14, 14, 14, 0.85)",
-              border: "1px solid rgba(255, 255, 255, 0.16)",
+              width: "1px",
+              height: "22px",
+              background: "rgba(255, 255, 255, 0.2)",
+              margin: "0 2px",
+              zIndex: 2,
+            }}
+          />
+
+          {/* Search Button in Capsule */}
+          <button
+            onClick={() => {
+              if (onOpenSearch) onOpenSearch();
+            }}
+            title="Search movies, series & actors"
+            style={{
+              width: "38px",
+              height: "38px",
+              borderRadius: "50%",
+              background: "transparent",
+              border: "none",
+              color: "rgba(255, 255, 255, 0.85)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#ffffff",
               cursor: "pointer",
-              backdropFilter: "blur(14px)",
-              WebkitBackdropFilter: "blur(14px)",
-              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.4)",
-              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+              transition: "all 0.2s ease",
+              zIndex: 2,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(24, 24, 24, 0.95)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
+              e.currentTarget.style.color = "#ffffff";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+              e.currentTarget.style.transform = "scale(1.08)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(14, 14, 14, 0.85)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";
+              e.currentTarget.style.color = "rgba(255, 255, 255, 0.85)";
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.transform = "scale(1)";
             }}
           >
-            <SettingsIcon size={17} />
+            <SearchIcon size={17} />
           </button>
+
+          {/* Settings & More Menu Button in Capsule */}
+          <div style={{ position: "relative", zIndex: 2 }} ref={settingsMenuRef}>
+            <button
+              onClick={() => setSettingsMenuOpen((prev) => !prev)}
+              title="Settings & More"
+              style={{
+                width: "38px",
+                height: "38px",
+                borderRadius: "50%",
+                background: settingsMenuOpen ? "rgba(255, 255, 255, 0.18)" : "transparent",
+                border: "none",
+                color: settingsMenuOpen ? "#ffffff" : "rgba(255, 255, 255, 0.85)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "#ffffff";
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+                e.currentTarget.style.transform = "scale(1.08)";
+              }}
+              onMouseLeave={(e) => {
+                if (!settingsMenuOpen) {
+                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.85)";
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.transform = "scale(1)";
+                }
+              }}
+            >
+              <SettingsIcon size={17} />
+            </button>
+
+            {/* Frosted Dropdown for Top 250, Categories, Downloads, and Settings */}
+            {settingsMenuOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 10px)",
+                  right: 0,
+                  minWidth: "220px",
+                  borderRadius: "16px",
+                  background: "rgba(16, 18, 26, 0.88)",
+                  backdropFilter: "blur(24px) saturate(180%)",
+                  WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                  border: "1px solid rgba(255, 255, 255, 0.16)",
+                  boxShadow: "0 20px 48px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15)",
+                  padding: "8px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  zIndex: 100,
+                  animation: "fadeIn 0.15s ease",
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setSettingsMenuOpen(false);
+                    if (onSelectCategoryNav) onSelectCategoryNav("rankings");
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    background: "transparent",
+                    border: "none",
+                    color: "#ffffff",
+                    fontSize: "13.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                >
+                  <StarIcon size={16} color="#e50914" fill="#e50914" />
+                  <span>Top 250 Rankings</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSettingsMenuOpen(false);
+                    if (onSelectCategoryNav) onSelectCategoryNav("categories");
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    background: "transparent",
+                    border: "none",
+                    color: "#ffffff",
+                    fontSize: "13.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                >
+                  <CategoryIcon size={16} color="#e50914" />
+                  <span>Categories & Genres</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSettingsMenuOpen(false);
+                    if (onSelectCategoryNav) onSelectCategoryNav("downloads");
+                    else if (onOpenDownloads) onOpenDownloads();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    background: "transparent",
+                    border: "none",
+                    color: "#ffffff",
+                    fontSize: "13.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                >
+                  <DownloadIcon size={16} color="#e50914" />
+                  <span>Downloads</span>
+                  {activeDownloadCount > 0 && (
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        background: "#e50914",
+                        color: "#fff",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: "999px",
+                      }}
+                    >
+                      {activeDownloadCount}
+                    </span>
+                  )}
+                </button>
+
+                <div
+                  style={{
+                    height: "1px",
+                    background: "rgba(255, 255, 255, 0.12)",
+                    margin: "4px 0",
+                  }}
+                />
+
+                <button
+                  onClick={() => {
+                    setSettingsMenuOpen(false);
+                    onOpenSettings();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    background: "transparent",
+                    border: "none",
+                    color: "rgba(255, 255, 255, 0.85)",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "rgba(255, 255, 255, 0.85)";
+                  }}
+                >
+                  <SettingsIcon size={16} />
+                  <span>Extension & Player Settings</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </nav>
+
+        {/* Right Actions: Downloads / Spacer */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "120px", justifyContent: "flex-end" }}>
 
           {/* Desktop Downloads Button */}
           {onOpenDownloads && (isDesktop || activeDownloadCount > 0) && (
@@ -352,25 +653,27 @@ export const Navbar: React.FC<NavbarProps> = ({
                 width: "42px",
                 height: "42px",
                 borderRadius: "999px",
-                background: "rgba(14, 14, 14, 0.85)",
-                border: "1px solid rgba(255, 255, 255, 0.16)",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "#ffffff",
                 cursor: "pointer",
-                backdropFilter: "blur(14px)",
-                WebkitBackdropFilter: "blur(14px)",
-                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.4)",
-                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                boxShadow: "0 4px 14px rgba(0, 0, 0, 0.35)",
+                transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(24, 24, 24, 0.95)";
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)";
                 e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
+                e.currentTarget.style.transform = "scale(1.05)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(14, 14, 14, 0.85)";
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.transform = "scale(1)";
               }}
             >
               <DownloadIcon size={17} />
@@ -399,40 +702,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Modal Close / Back Button */}
-          {onClose && (
-            <button
-              onClick={onClose}
-              title="Close details"
-              style={{
-                width: "42px",
-                height: "42px",
-                borderRadius: "999px",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.16)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#ffffff",
-                cursor: "pointer",
-                backdropFilter: "blur(14px)",
-                WebkitBackdropFilter: "blur(14px)",
-                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
-                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(229, 9, 20, 0.25)";
-                e.currentTarget.style.borderColor = "rgba(229, 9, 20, 0.5)";
-                e.currentTarget.style.color = "#ff4d4d";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";
-                e.currentTarget.style.color = "#ffffff";
-              }}
-            >
-              <XIcon size={18} />
-            </button>
-          )}
+
         </div>
       </div>
 
@@ -610,27 +880,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {onClose && (
-              <button
-                onClick={onClose}
-                title="Close"
-                style={{
-                  width: "34px",
-                  height: "34px",
-                  borderRadius: "999px",
-                  background: "rgba(14, 14, 14, 0.85)",
-                  border: "1px solid rgba(255, 255, 255, 0.14)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  cursor: "pointer",
-                  backdropFilter: "blur(10px)",
-                }}
-              >
-                <XIcon size={15} />
-              </button>
-            )}
+
           </div>
         </div>
 

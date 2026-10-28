@@ -6,14 +6,8 @@ import type { Post } from "../types";
 
 const PRIORITY_PROVIDERS = [
   "hdhub4u",
-  "tpb",
-  "olamovies",
-  "gramcinema",
-  "vega",
-  "topmovies",
-  "moviesmod",
-  "katmoviehd",
-  "kisskh",
+  "movieBoxWeb",
+  "4khdhub",
 ];
 
 export function useMediaPosts(
@@ -146,7 +140,7 @@ export function useMediaPosts(
             const baseProviders =
               installedProviders.length > 0
                 ? installedProviders
-                : ["hdhub4u", "tpb", "olamovies", "gramcinema", "vega", "topmovies"];
+                : ["hdhub4u", "movieBoxWeb", "4khdhub"];
 
             const sortedProviders = [...new Set(baseProviders)].sort((a, b) => {
               const aIdx = PRIORITY_PROVIDERS.indexOf(a.toLowerCase());

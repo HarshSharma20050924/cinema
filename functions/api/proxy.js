@@ -67,6 +67,15 @@ export async function onRequest(context) {
   } else if (host.includes('mxplayer') || host.includes('d3sgzbosmwirao.cloudfront.net')) {
     refererHeader = 'https://www.mxplayer.in/';
     originHeader = 'https://www.mxplayer.in';
+  } else if (
+    host.includes('net52.cc') ||
+    host.includes('freecdn') ||
+    host.includes('netflixmirror') ||
+    host.includes('primemirror') ||
+    host.includes('disneymirror')
+  ) {
+    refererHeader = 'https://net52.cc/home';
+    originHeader = 'https://net52.cc';
   }
 
   const isMovieBox = host.includes('hakunaymatata.com') || host.includes('inmoviebox.com') || host.includes('moviebox');
@@ -76,6 +85,35 @@ export async function onRequest(context) {
     'Origin': originHeader,
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   };
+
+  // Special anti-bot credentials for NetMirror / Prime / Netflix / Disney
+  if (
+    host.includes('net52.cc') ||
+    host.includes('freecdn') ||
+    host.includes('netflixmirror') ||
+    host.includes('primemirror') ||
+    host.includes('disneymirror')
+  ) {
+    forwardHeaders['User-Agent'] = 'Mozilla/5.0 (Linux; Android 13; Pixel 5 Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.132 Safari/537.36 /OS.Gatu v3.0';
+    forwardHeaders['Referer'] = 'https://net52.cc/home';
+    forwardHeaders['Origin'] = 'https://net52.cc';
+    const ott = host.includes('prime') || targetUrl.includes('t=pv') ? 'pv' : (host.includes('disney') || targetUrl.includes('t=ds') || targetUrl.includes('t=dp') ? 'ds' : 'nf');
+    forwardHeaders['Cookie'] = `hd=on; ott=${ott}`;
+  }
+
+  // Merge any explicitly passed JSON headers
+  const customHeadersParam = url.searchParams.get('headers');
+  if (customHeadersParam) {
+    try {
+      const parsedH = JSON.parse(customHeadersParam);
+      if (typeof parsedH === 'object' && parsedH !== null) {
+        Object.assign(forwardHeaders, parsedH);
+        if (parsedH['Referer']) refererHeader = parsedH['Referer'];
+        if (parsedH['Origin']) originHeader = parsedH['Origin'];
+      }
+    } catch (_) {}
+  }
+
   if (request.headers.get('Range')) {
     forwardHeaders['Range'] = request.headers.get('Range');
   }
@@ -220,7 +258,8 @@ export async function onRequest(context) {
             } else if (!match.startsWith('http://') && !match.startsWith('https://')) {
               resolved = baseUrl + match;
             }
-            return `${currentOrigin}/api/proxy?url=${encodeURIComponent(resolved)}&referer=${encodeURIComponent(refererHeader)}`;
+            const extraH = customHeadersParam ? `&headers=${encodeURIComponent(customHeadersParam)}` : '';
+            return `${currentOrigin}/api/proxy?url=${encodeURIComponent(resolved)}&referer=${encodeURIComponent(refererHeader)}${extraH}`;
           });
 
           // Also rewrite URI="..." inside tag lines (e.g. #EXT-X-KEY, #EXT-X-MEDIA)
@@ -231,7 +270,8 @@ export async function onRequest(context) {
             } else if (!p1.startsWith('http://') && !p1.startsWith('https://')) {
               resolved = baseUrl + p1;
             }
-            return `URI="${currentOrigin}/api/proxy?url=${encodeURIComponent(resolved)}&referer=${encodeURIComponent(refererHeader)}"`;
+            const extraH = customHeadersParam ? `&headers=${encodeURIComponent(customHeadersParam)}` : '';
+            return `URI="${currentOrigin}/api/proxy?url=${encodeURIComponent(resolved)}&referer=${encodeURIComponent(refererHeader)}${extraH}"`;
           });
 
           responseHeaders.set('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');

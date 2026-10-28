@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { PlayIcon, DownloadIcon, FilmIcon, SearchIcon, LoaderIcon } from "../../icons";
+import { PlayIcon, DownloadIcon, FilmIcon, SearchIcon, LoaderIcon, XIcon } from "../../icons";
 import { isValidStreamUrl, isLandingPageUrl, isDirectMediaUrl } from "./linkHelpers";
 import { getSeasonDisplayInfo } from "../../utils/seasonUtils";
 import { SeasonDropdown } from "./SeasonDropdown";
@@ -300,7 +300,8 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
             padding: "4px 8px",
           }}
         >
-          ✕ Close
+          <XIcon size={14} style={{ marginRight: "4px" }} />
+          Close
         </button>
       </div>
 
@@ -359,8 +360,9 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "14px", fontWeight: 700, color: "#22c55e" }}>
-                    📺 Single Episodes ({episodes.length} Episodes Available)
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: "#22c55e", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <FilmIcon size={15} color="#22c55e" />
+                    Single Episodes ({episodes.length} Episodes Available)
                   </span>
                   {activeSeason?.quality && (
                     <span
@@ -748,8 +750,9 @@ export const DetailsLinksDrawer: React.FC<DetailsLinksDrawerProps> = ({
           {seasonPacks.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", borderTop: episodes.length > 0 ? "1px solid rgba(255, 255, 255, 0.08)" : "none", paddingTop: episodes.length > 0 ? "16px" : "0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "14px", fontWeight: 700, color: "#38bdf8" }}>
-                  📦 Complete Season Packs (Download Full Season as Batch / Zip)
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#38bdf8", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <DownloadIcon size={15} color="#38bdf8" />
+                  Complete Season Packs (Download Full Season as Batch / Zip)
                 </span>
                 <span
                   style={{

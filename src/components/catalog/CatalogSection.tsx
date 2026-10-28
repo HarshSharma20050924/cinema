@@ -13,6 +13,9 @@ interface CatalogSectionProps {
   initialPosts?: Post[];
   onViewAll: (filter: string, title: string) => void;
   onSelectPost: (post: Post) => void;
+  layout?: "landscape" | "portrait";
+  showRank?: boolean;
+  showDateBadge?: boolean;
 }
 
 export const CatalogSection: React.FC<CatalogSectionProps> = ({
@@ -22,7 +25,13 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
   initialPosts,
   onViewAll,
   onSelectPost,
+  layout,
+  showRank,
+  showDateBadge,
 }) => {
+  const isTop10 = Boolean(showRank || title.toLowerCase().includes("top 10") || title.toLowerCase().includes("ranking"));
+  const isComingSoon = Boolean(showDateBadge || title.toLowerCase().includes("coming soon"));
+  const isLandscape = layout === "landscape";
   const getCachedPosts = (): Post[] => {
     if (initialPosts && initialPosts.length > 0) return initialPosts;
     if (!providerValue) return [];
@@ -74,8 +83,9 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
 
   const handleScroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
-    const scrollAmount = direction === "left" ? -550 : 550;
-    scrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    const container = scrollRef.current;
+    const scrollAmount = Math.max(container.clientWidth * 0.82, 340);
+    container.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
   };
 
   const [showSlowLoadHint, setShowSlowLoadHint] = useState(false);
@@ -105,50 +115,23 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
             display: "flex",
             gap: "14px",
             overflowX: "hidden",
-            padding: "4px 24px 12px 24px",
+            padding: "4px 48px 12px 48px",
           }}
         >
-          {Array.from({ length: 12 }).map((_, idx) => (
+          {Array.from({ length: 10 }).map((_, idx) => (
             <div
               key={idx}
               className="skeleton"
               style={{
-                flex: "0 0 clamp(150px, 14vw, 180px)",
-                aspectRatio: "2/3",
+                flex: isLandscape
+                  ? "0 0 clamp(300px, 24vw, 360px)"
+                  : "0 0 clamp(185px, 15vw, 215px)",
+                aspectRatio: isLandscape ? "16/9" : "2/3",
                 borderRadius: "14px",
               }}
             />
           ))}
         </div>
-        {showSlowLoadHint && (
-          <div
-            style={{
-              padding: "0 24px",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              fontSize: "12px",
-              color: "rgba(255, 255, 255, 0.65)",
-            }}
-          >
-            <span>Taking longer to load.</span>
-            <button
-              onClick={() => window.location.reload()}
-              style={{
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.16)",
-                color: "#fff",
-                fontSize: "11px",
-                fontWeight: 600,
-                padding: "3px 8px",
-                borderRadius: "6px",
-                cursor: "pointer",
-              }}
-            >
-              ↻ Reload
-            </button>
-          </div>
-        )}
       </section>
     );
   }
@@ -157,128 +140,139 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
     <section
       style={{
         width: "100%",
-        maxWidth: "1440px",
-        margin: "0 auto 34px auto",
+        margin: "0 0 38px 0",
         position: "relative",
       }}
       onMouseEnter={() => setShowArrows(true)}
       onMouseLeave={() => setShowArrows(false)}
     >
-      {/* Header: Red vertical indicator line + Title + View All button */}
+      {/* Header: Cno.to style title with chevron that turns red on hover */}
       <div
         className="catalog-section-header"
+        onClick={() => onViewAll(filter, title)}
+        onMouseEnter={() => setViewAllHover(true)}
+        onMouseLeave={() => setViewAllHover(false)}
         style={{
-          display: "flex",
+          display: "inline-flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          gap: "6px",
           marginBottom: "14px",
-          padding: "0 24px",
+          padding: "0 48px",
+          cursor: "pointer",
+          userSelect: "none",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div
-            style={{
-              width: "3.5px",
-              height: "18px",
-              backgroundColor: "#e50914",
-              borderRadius: "2px",
-            }}
-          />
-          <ShadedHeading
-            text={title}
-            style={{
-              fontSize: "19px",
-              fontWeight: 700,
-              letterSpacing: "-0.01em",
-            }}
-          />
-        </div>
-
-        {/* View All Pill Button (Matches Gram Cinema) */}
-        <button
-          onClick={() => onViewAll(filter, title)}
-          onMouseEnter={() => setViewAllHover(true)}
-          onMouseLeave={() => setViewAllHover(false)}
+        <h2
           style={{
-            padding: "5px 14px",
-            borderRadius: "20px",
-            fontSize: "12px",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            display: "inline-flex",
+            fontSize: "21px",
+            fontWeight: 800,
+            color: viewAllHover ? "#e50914" : "#ffffff",
+            letterSpacing: "-0.01em",
+            margin: 0,
+            transition: "color 0.2s ease",
+            display: "flex",
             alignItems: "center",
-            gap: "5px",
-            border: "none",
-            background: viewAllHover ? "#e50914" : "rgba(229, 9, 20, 0.15)",
-            color: viewAllHover ? "#ffffff" : "#ff4d5a",
-            boxShadow: viewAllHover ? "0 2px 10px rgba(229, 9, 20, 0.4)" : "none",
+            gap: "6px",
           }}
         >
-          <span>View All</span>
-          <span>&rarr;</span>
-        </button>
+          <span>{title}</span>
+          <ChevronRightIcon
+            size={18}
+            color={viewAllHover ? "#e50914" : "rgba(255, 255, 255, 0.45)"}
+            style={{
+              transition: "all 0.2s ease",
+              transform: viewAllHover ? "translateX(3px)" : "translateX(0)",
+            }}
+          />
+        </h2>
       </div>
 
       {/* Carousel Container */}
       <div style={{ position: "relative", width: "100%" }}>
         {/* Left Scroll Button */}
+        {/* Left Scroll Button (Translucent Frosted Glass Navbar UI) */}
         {showArrows && (
           <button
             onClick={() => handleScroll("left")}
+            aria-label="Scroll Left"
             style={{
               position: "absolute",
-              left: "8px",
+              left: "14px",
               top: "50%",
               transform: "translateY(-50%)",
               zIndex: 10,
-              width: "36px",
-              height: "36px",
+              width: "40px",
+              height: "40px",
               borderRadius: "50%",
-              background: "rgba(12, 12, 12, 0.92)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              color: "#fff",
+              background: "rgba(255, 255, 255, 0.10)",
+              border: "1px solid rgba(255, 255, 255, 0.20)",
+              color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.8)",
-              backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.6)",
+              backdropFilter: "blur(18px)",
+              WebkitBackdropFilter: "blur(18px)",
+              transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s, border-color 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-50%) scale(1.12)";
+              e.currentTarget.style.background = "#e50914";
+              e.currentTarget.style.borderColor = "#e50914";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(-50%) scale(1)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.20)";
             }}
           >
-            <ChevronLeftIcon size={18} />
+            <ChevronLeftIcon size={20} />
           </button>
         )}
 
-        {/* Right Scroll Button */}
+        {/* Right Scroll Button (Translucent Frosted Glass Navbar UI) */}
         {showArrows && (
           <button
             onClick={() => handleScroll("right")}
+            aria-label="Scroll Right"
             style={{
               position: "absolute",
-              right: "8px",
+              right: "14px",
               top: "50%",
               transform: "translateY(-50%)",
               zIndex: 10,
-              width: "36px",
-              height: "36px",
+              width: "40px",
+              height: "40px",
               borderRadius: "50%",
-              background: "rgba(12, 12, 12, 0.92)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              color: "#fff",
+              background: "rgba(255, 255, 255, 0.10)",
+              border: "1px solid rgba(255, 255, 255, 0.20)",
+              color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.8)",
-              backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.6)",
+              backdropFilter: "blur(18px)",
+              WebkitBackdropFilter: "blur(18px)",
+              transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s, border-color 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-50%) scale(1.12)";
+              e.currentTarget.style.background = "#e50914";
+              e.currentTarget.style.borderColor = "#e50914";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(-50%) scale(1)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.20)";
             }}
           >
-            <ChevronRightIcon size={18} />
+            <ChevronRightIcon size={20} />
           </button>
         )}
 
-        {/* Scrollable Track */}
+        {/* Scrollable Track (Stretches full-width across screen, no gaps) */}
         <div
           ref={scrollRef}
           className="catalog-row-track"
@@ -286,7 +280,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
             display: "flex",
             gap: "14px",
             overflowX: "auto",
-            padding: "4px 24px 12px 24px",
+            padding: "4px 48px 16px 48px",
             scrollBehavior: "smooth",
             scrollbarWidth: "none",
           }}
@@ -294,10 +288,14 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
           {posts.slice(0, 20).map((post, idx) => (
             <div
               key={`${post.provider || ""}:${post.link}-${idx}`}
-              className="catalog-row-item"
+              className={`catalog-row-item ${isLandscape ? "catalog-row-item-landscape" : ""}`}
               style={{
-                flex: "0 0 155px",
-                width: "155px",
+                flex: isLandscape
+                  ? "0 0 clamp(320px, 26vw, 400px)"
+                  : "0 0 clamp(180px, 14vw, 210px)",
+                width: isLandscape
+                  ? "clamp(320px, 26vw, 400px)"
+                  : "clamp(180px, 14vw, 210px)",
               }}
             >
               <MediaCard
@@ -305,6 +303,9 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
                 post={post}
                 onClick={onSelectPost}
                 priority={idx < 8}
+                layout={isLandscape ? "landscape" : "portrait"}
+                rank={isTop10 && idx < 10 ? idx + 1 : undefined}
+                badge={isComingSoon ? (post.tag || post.year || undefined) : undefined}
               />
             </div>
           ))}

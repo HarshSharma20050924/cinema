@@ -338,6 +338,10 @@ async function checkLatestReleases() {
 }
 
 function startMultiChannelPoster() {
+  if (process.env.ENABLE_AUTO_POSTER !== 'true') {
+    console.log('⏸️ [Multi-Channel Poster] Auto-poster is disabled (ENABLE_AUTO_POSTER !== "true")');
+    return;
+  }
   console.log('🚀 Starting Multi-Channel Dedicated Auto-Poster (Every 3 minutes)...');
   // Initial run after 5s startup delay
   setTimeout(checkLatestReleases, 5000);
@@ -354,5 +358,9 @@ module.exports = {
 
 // Only start daemon when executed directly (e.g. by PM2)
 if (require.main === module) {
-  startMultiChannelPoster();
+  if (process.env.ENABLE_AUTO_POSTER === 'true') {
+    startMultiChannelPoster();
+  } else {
+    console.log('⏸️ [Multi-Channel Poster] ENABLE_AUTO_POSTER is not "true". Exiting.');
+  }
 }

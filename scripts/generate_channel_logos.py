@@ -59,12 +59,6 @@ def generate_all_channel_logos():
         {"id": "animesalt", "label": "ANIMESALT", "code": "AS"},
         {"id": "gramcinema", "label": "GRAMCINEMA", "code": "GC"},
         {"id": "olamovies", "label": "OLAMOVIES", "code": "OM"},
-        # Category Bots
-        {"id": "bot_desi", "label": "CINEMAWOOD", "code": "CW"},
-        {"id": "bot_series", "label": "OTT SERIES", "code": "OS"},
-        {"id": "bot_4k", "label": "CINEMA 4K", "code": "4K"},
-        {"id": "bot_anime", "label": "ANIME", "code": "AN"},
-        {"id": "bot_cinema", "label": "CINEMA", "code": "CN"},
     ]
 
     w, h = 512, 512

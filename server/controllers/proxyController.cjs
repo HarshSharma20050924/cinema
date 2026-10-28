@@ -85,6 +85,19 @@ function resolveRequestHeaders(targetUrl, queryHeaders, queryReferer, queryOrigi
       headers["User-Agent"] = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36";
       headers["Origin"] = parsed.origin;
       headers["Referer"] = parsed.origin + "/";
+    } else if (
+      host.includes("net52.cc") ||
+      host.includes("freecdn") ||
+      host.includes("netflixmirror") ||
+      host.includes("primemirror") ||
+      host.includes("disneymirror")
+    ) {
+      headers["User-Agent"] = "Mozilla/5.0 (Linux; Android 13; Pixel 5 Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.132 Safari/537.36 /OS.Gatu v3.0";
+      headers["Origin"] = "https://net52.cc";
+      headers["Referer"] = "https://net52.cc/home";
+      if (!headers["Cookie"]) {
+        headers["Cookie"] = host.includes("prime") ? "hd=on; ott=pv" : (host.includes("disney") ? "hd=on; ott=ds" : "hd=on; ott=nf");
+      }
     } else {
       if (!headers["Origin"]) headers["Origin"] = parsed.origin;
       if (!headers["Referer"]) headers["Referer"] = parsed.origin + "/";
@@ -402,7 +415,7 @@ async function proxyStream(req, res) {
       timeout: 25000,
       validateStatus: (status) => status < 500,
     });
-    console.log('[ProxyStream]', { targetUrl: targetUrl.slice(0, 80), isHead, status: response.status, referer: headers['Referer'] });
+    if (response.status !== 404) { console.log('[ProxyStream]', { targetUrl: targetUrl.slice(0, 80), isHead, status: response.status, referer: headers['Referer'] }); }
     res.status(response.status);
 
     if (response.headers["content-type"]) res.set("Content-Type", response.headers["content-type"]);

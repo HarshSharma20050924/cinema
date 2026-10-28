@@ -1,21 +1,31 @@
 import React, { useState, useEffect, useRef } from "react";
 import { fetchTMDBDetails, type TMDBDetails } from "../../api/tmdb";
 import { api, getBackendUrl } from "../../api/client";
-import { parseTitleAndYear } from "../media/MediaCard";
+import { parseTitleAndYear, backdropCache, persistBackdrop } from "../media/MediaCard";
 import { Navbar } from "../layout/Navbar";
 import { appCache } from "../../utils/cache";
 import { isValidStreamUrl, isLandingPageUrl, isDirectMediaUrl } from "./linkHelpers";
 import { getSeasonDisplayInfo } from "../../utils/seasonUtils";
+import { upgradeToHighRes } from "../hero/HeroSpotlight";
 import { DetailsHero } from "./DetailsHero";
 import { DetailsLinksDrawer } from "./DetailsLinksDrawer";
+import { DetailsEpisodesGrid } from "./DetailsEpisodesGrid";
 import { DetailsScreenshots } from "./DetailsScreenshots";
 import { DetailsTrailer } from "./DetailsTrailer";
 import { DetailsCast } from "./DetailsCast";
+import { DetailsTopics } from "./DetailsTopics";
+import { DetailsWhereToWatch } from "./DetailsWhereToWatch";
 import { DetailsRecommendations } from "./DetailsRecommendations";
+import { DetailsReviews } from "./DetailsReviews";
+import { DetailsAbout } from "./DetailsAbout";
 import { MoreLinksModal, type MoreLinksModalData } from "./MoreLinksModal";
 import { ScreenshotLightboxModal } from "./ScreenshotLightboxModal";
 import { downloadManager } from "../../utils/downloadManager";
 import { DownloadManagerModal } from "../downloads/DownloadManagerModal";
+import { UniversalDownloadsModal } from "./UniversalDownloadsModal";
+import { ArrowLeftIcon } from "../../icons";
+import { SeriesRatingsHeatmap } from "./SeriesRatingsHeatmap";
+import { aggregateUniversalLinks, normalizeRawLinks, type NormalizedServerLink } from "../../utils/universalSourcesEngine";
 import type { Post, MediaDetails, StreamItem, Provider, ExternalPlayerType } from "../../types";
 
 export interface DetailsModalProps {
@@ -41,13 +51,19 @@ export interface DetailsModalProps {
     servers?: StreamItem[],
     backdrop?: string,
     poster?: string,
-    runtime?: string | number
+    runtime?: string | number,
+    season?: number,
+    episode?: number,
+    episodes?: any[],
+    seasonsCount?: number,
+    tmdbId?: number
   ) => void;
   onPlayExternal?: (url: string, player: ExternalPlayerType) => void;
   onSelectRecommended?: (post: Post) => void;
   onSelectPerson?: (personId: number) => void;
   onSearchGlobal?: (title: string) => void;
   defaultPlayer?: ExternalPlayerType;
+  initialTab?: "stream" | "download" | null;
 }
 
 export const DetailsModal: React.FC<DetailsModalProps> = ({
@@ -74,9 +90,16 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   onSelectPerson,
   onSearchGlobal,
   defaultPlayer,
+  initialTab,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<"stream" | "download" | null>(null);
+  const [activeTab, setActiveTab] = useState<"stream" | "download" | null>(initialTab ?? null);
+
+  useEffect(() => {
+    if (initialTab !== undefined) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [selectedSeasonIdx, setSelectedSeasonIdx] = useState<number>(0);
   const [tmdb, setTmdb] = useState<TMDBDetails | null>(null);
 
@@ -87,6 +110,105 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   const [isScanningMirrors, setIsScanningMirrors] = useState<boolean>(false);
   const [releaseServers, setReleaseServers] = useState<Record<string, StreamItem[]>>({});
   const [moreLinksData, setMoreLinksData] = useState<MoreLinksModalData | null>(null);
+  const [universalLinks, setUniversalLinks] = useState<NormalizedServerLink[]>([]);
+  const [loadingUniversalLinks, setLoadingUniversalLinks] = useState(false);
+  const [showRatingsHeatmap, setShowRatingsHeatmap] = useState<boolean>(true);
+  const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number>(1);
+
+  // Fullscreen landscape poster transition on click into details hero (direct settle on page reload)
+  const [heroIntroStage, setHeroIntroStage] = useState<"fullscreen" | "fitting" | "settled">(() => {
+    if (typeof window !== "undefined") {
+      if ((post as any)?.isDirectDeepLink) return "settled";
+    }
+    return "fullscreen";
+  });
+
+  useEffect(() => {
+    if ((post as any)?.isDirectDeepLink) {
+      setHeroIntroStage("settled");
+      return;
+    }
+    setHeroIntroStage("fullscreen");
+    const t = setTimeout(() => {
+      setHeroIntroStage("settled");
+    }, 400);
+    return () => clearTimeout(t);
+  }, [post?.link, post?.title]);
+
+  // Multi-extension parallel aggregator for stream & download servers (glitch-free single continuous load)
+  const loadedUniversalRef = useRef<string>("");
+  const movieKey = (post?.link || post?.title || "").toLowerCase().trim();
+
+  useEffect(() => {
+    if (loadedUniversalRef.current !== movieKey) {
+      loadedUniversalRef.current = "";
+      setUniversalLinks([]);
+    }
+  }, [movieKey]);
+
+  useEffect(() => {
+    if (!post || !movieKey) return;
+    if (loadedUniversalRef.current === movieKey && universalLinks.length > 0) return;
+    loadedUniversalRef.current = movieKey;
+
+    let mounted = true;
+    async function loadUniversalSources() {
+      if (universalLinks.length === 0) {
+        setLoadingUniversalLinks(true);
+      }
+      try {
+        if (streams && streams.length > 0) {
+          const localNormalized = normalizeRawLinks(streams, post?.provider || activeProvider?.value || "server");
+          if (mounted && localNormalized.length > 0) {
+            setUniversalLinks(localNormalized);
+          }
+        }
+
+        const queryTitle = details?.title || post?.title || "";
+        const multiLinks = await aggregateUniversalLinks(
+          queryTitle,
+          (details as any)?.isSeries || tmdb?.mediaType === "tv" ? "tv" : "movie",
+          providers,
+          (chunk) => {
+            if (!mounted || chunk.length === 0) return;
+            setUniversalLinks((prev) => {
+              const seen = new Set(prev.map((p) => p.url));
+              const merged = [...prev];
+              for (const l of chunk) {
+                if (!seen.has(l.url)) {
+                  seen.add(l.url);
+                  merged.push(l);
+                }
+              }
+              return merged;
+            });
+            setLoadingUniversalLinks(false);
+          }
+        );
+        if (mounted && multiLinks.length > 0) {
+          setUniversalLinks((prev) => {
+            const seen = new Set(prev.map((p) => p.url));
+            const merged = [...prev];
+            for (const l of multiLinks) {
+              if (!seen.has(l.url)) {
+                seen.add(l.url);
+                merged.push(l);
+              }
+            }
+            return merged.length > 0 ? merged : multiLinks;
+          });
+        }
+      } catch {
+        // Fallback
+      } finally {
+        if (mounted) setLoadingUniversalLinks(false);
+      }
+    }
+    loadUniversalSources();
+    return () => {
+      mounted = false;
+    };
+  }, [movieKey]);
 
   // Screenshots lightbox viewer state
   const [selectedScreenshotIdx, setSelectedScreenshotIdx] = useState<number | null>(null);
@@ -155,11 +277,25 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
     let isCurrent = true;
     const titleToSearch = details?.title || cleanTitle || post?.title || "";
+    const explicitTmdbId = (post as any)?.tmdbId || (details as any)?.tmdbId || undefined;
+    const explicitYear =
+      details?.year ||
+      (post?.year && String(post.year).match(/\b(19\d{2}|20\d{2})\b/)?.[0]) ||
+      (post?.title?.match(/\b(19\d{2}|20\d{2})\b/)?.[0]) ||
+      undefined;
 
-    fetchTMDBDetails(titleToSearch, details?.imdbId)
+    const detectedType: "movie" | "tv" =
+      isSeries || (post as any)?.mediaType === "tv" || (details as any)?.mediaType === "tv"
+        ? "tv"
+        : "movie";
+
+    fetchTMDBDetails(titleToSearch, details?.imdbId, explicitYear, explicitTmdbId, detectedType)
       .then((data) => {
         if (isCurrent && data) {
           setTmdb(data);
+          if (data.backdropUrl && cleanTitle) {
+            persistBackdrop(cleanTitle, data.backdropUrl);
+          }
         }
       })
       .catch((err) => console.warn("TMDB details fetch error:", err));
@@ -212,12 +348,49 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     ? `${baseTitle} - Season ${seasonNum}`
     : baseTitle;
 
+  // Strict landscape backdrop resolution:
+  // Under NO circumstances should a vertical 2:3 portrait poster be used as a backdrop!
+  const knownPortraitUrls = new Set(
+    [
+      details?.poster?.trim(),
+      details?.image?.trim(),
+      post?.image?.trim(),
+      tmdb?.posterUrl?.trim(),
+    ].filter(Boolean) as string[]
+  );
+
+  const isLegitLandscape = (url?: string | null): boolean => {
+    if (!url) return false;
+    const clean = url.trim();
+    if (!clean) return false;
+    if (knownPortraitUrls.has(clean)) return false;
+    return true;
+  };
+
+  const rawBackdrop =
+    (tmdb?.backdropUrl && isLegitLandscape(tmdb.backdropUrl) && tmdb.backdropUrl.trim()) ||
+    (post.backdropUrl && isLegitLandscape(post.backdropUrl) && post.backdropUrl.trim()) ||
+    (cleanTitle && isLegitLandscape(backdropCache.get(cleanTitle.toLowerCase())) && backdropCache.get(cleanTitle.toLowerCase())) ||
+    (details?.backdrop && isLegitLandscape(details.backdrop) && details.backdrop.trim()) ||
+    "";
+  const backdropImage = rawBackdrop ? upgradeToHighRes(rawBackdrop) : "";
+
+  const posterImage =
+    (details?.poster && details.poster.trim()) ||
+    (details?.image && details.image.trim()) ||
+    (post.image && post.image.trim()) ||
+    (tmdb?.posterUrl && tmdb.posterUrl.trim()) ||
+    "";
+
   // Robust series detection across all providers
   const isSeries =
     details?.type === "series" ||
     details?.type === "tv" ||
     details?.type === "tvseries" ||
     details?.type === "tv_series" ||
+    (details as any)?.mediaType === "tv" ||
+    (post as any)?.mediaType === "tv" ||
+    tmdb?.mediaType === "tv" ||
     Boolean(details?.seasonPacks && details.seasonPacks.length > 0) ||
     Boolean(details?.type !== "movie" && (
       /\bseason\s*\d|\bepisode\s*\d|\bep\s*\d|\bs\d{1,2}\s*e\d{1,2}\b/i.test(post?.title || "") ||
@@ -352,7 +525,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   };
 
   // Direct download handler for any mirror URL
-  const handleDownloadDirectUrl = (url: string, serverName: string, label?: string) => {
+  const handleDownloadDirectUrl = (url: string, serverName: string, label?: string, headers?: Record<string, string>) => {
     if (!url) return;
 
     // 0. Intermediate hosters & shortlink protectors (e.g. OlaMovies links.ol-am.top, katdrive, send.cm)
@@ -427,16 +600,29 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     }
 
     // 5. Standard backend download proxy
-    const downloadUrl = `${backendUrl}/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFileName)}`;
+    let downloadUrl = `${backendUrl}/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFileName)}`;
+    if (headers && Object.keys(headers).length > 0) {
+      downloadUrl += `&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+    }
     downloadManager.startDownload(downloadUrl, displayTitle, cleanFileName);
     if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
       setIsDownloadManagerOpen(true);
     }
   };
 
-  const handlePlayRelease = async (key: string, primaryLink: string) => {
+  const handlePlayRelease = async (
+    key: string,
+    primaryLink: string,
+    epSeason?: number,
+    epNum?: number
+  ) => {
     setStreamingKey(key);
     setResolvingKey(key);
+
+    const curSeason = epSeason !== undefined ? epSeason : (isSeries ? selectedSeasonNumber || 1 : undefined);
+    const curEp = epNum !== undefined ? epNum : (isSeries ? 1 : undefined);
+    const curSeasonsCount = tmdb?.seasonsCount || (details as any)?.totalSeasons || linkList.length || 1;
+    const playTitle = isSeries ? `${displayTitle} - S${curSeason} E${curEp}` : displayTitle;
 
     try {
       const backendUrl = getBackendUrl();
@@ -445,9 +631,36 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         const infoHash = parts[2] || "";
         const encName = parts.slice(3).join(":") || encodeURIComponent(cleanFileName);
         const streamUrl = `${backendUrl}/api/stream/torrent?hash=${infoHash}&name=${encName}`;
-        onPlayStream(streamUrl, displayTitle, [{ server: "Torrent Stream", link: streamUrl }], details?.backdrop, details?.poster, details?.runtime);
+        onPlayStream(
+          streamUrl,
+          playTitle,
+          [{ server: "Torrent Stream", link: streamUrl }],
+          backdropImage,
+          posterImage,
+          details?.runtime || tmdb?.runtime,
+          curSeason,
+          curEp,
+          isSeries ? episodes : undefined,
+          isSeries ? curSeasonsCount : undefined,
+          tmdb?.id
+        );
         return;
       }
+
+      // Immediately launch player in connecting/fetching state
+      onPlayStream(
+        "",
+        playTitle,
+        undefined,
+        backdropImage,
+        posterImage,
+        details?.runtime || tmdb?.runtime,
+        curSeason,
+        curEp,
+        isSeries ? episodes : undefined,
+        isSeries ? curSeasonsCount : undefined,
+        tmdb?.id
+      );
 
       const list = await fetchServersForLink(key, primaryLink);
       const streamable = list.filter(
@@ -483,7 +696,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
       let chosen = sortedStreamable[0]?.link;
 
-      // If no direct streamable link found (e.g. from OlaMovies where releases are .zip or shortlinks), auto-resolve working stream from other extensions
+      // If no direct streamable link found, search only the 3 allowed providers (moviebox, hdhub4u, 4khdhub)
       if (!chosen || chosen.includes(".zip") || chosen.includes("links.ol-am.top") || chosen.includes("links.olamovies")) {
         try {
           const cleanQ = displayTitle.replace(/\(\d{4}\)/g, "").trim();
@@ -491,7 +704,13 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
           if (searchRes.ok) {
             const matches: any[] = await searchRes.json();
             const altMatch = matches.find(
-              (m) => m && m.provider !== "olamovies" && (m.provider === "vega" || m.provider === "hdhub4u" || m.provider === "autoEmbed" || m.provider === "tpb")
+              (m) =>
+                m &&
+                (m.provider === "hdhub4u" ||
+                  m.provider === "movieBoxWeb" ||
+                  m.provider === "4khdhub" ||
+                  m.provider === "moviebox" ||
+                  m.provider === "4khdhub4u")
             );
             if (altMatch) {
               const metaRes = await fetch(`${backendUrl}/api/meta?provider=${encodeURIComponent(altMatch.provider)}&link=${encodeURIComponent(altMatch.link)}`);
@@ -545,11 +764,16 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
           onPlayStream(
             chosen,
-            displayTitle,
+            playTitle,
             allCandidateServers.length > 0 ? allCandidateServers : undefined,
-            details?.backdrop,
-            details?.poster,
-            details?.runtime
+            backdropImage,
+            posterImage,
+            details?.runtime || tmdb?.runtime,
+            curSeason,
+            curEp,
+            isSeries ? episodes : undefined,
+            isSeries ? curSeasonsCount : undefined,
+            tmdb?.id
           );
         }
       }
@@ -588,7 +812,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         list[0];
       const dlLink = dlCandidate?.link || primaryLink;
       const serverName = dlCandidate?.server || "Download";
-      handleDownloadDirectUrl(dlLink, serverName, label);
+      handleDownloadDirectUrl(dlLink, serverName, label, (dlCandidate as any)?.headers);
     } catch (err) {
       console.error("Download release resolution error:", err);
       handleDownloadDirectUrl(primaryLink, "Mirror", label);
@@ -599,22 +823,63 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     }
   };
 
-  // Artwork & metadata resolution: provider's authentic artwork prioritized over external lookups
-  const backdropImage =
-    (details?.backdrop && details.backdrop.trim()) ||
-    (tmdb?.backdropUrl && tmdb.backdropUrl.trim()) ||
-    (details?.poster && details.poster.trim()) ||
-    (details?.image && details.image.trim()) ||
-    (post.image && post.image.trim()) ||
-    "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1600";
+  const handlePlayPrimary = () => {
+    const currentSeason = selectedSeasonNumber || 1;
+    const currentSeasonsCount = tmdb?.seasonsCount || (details as any)?.totalSeasons || linkList.length || 1;
+    const topStream = streams && streams.length > 0
+      ? (streams.find((s) => isValidStreamUrl(s.link) && !s.link.includes(".zip")) || streams[0])
+      : null;
 
-  const posterImage =
-    (details?.poster && details.poster.trim()) ||
-    (details?.image && details.image.trim()) ||
-    (post.image && post.image.trim()) ||
-    (tmdb?.posterUrl && tmdb.posterUrl.trim()) ||
-    "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600";
+    const playTitle = isSeries
+      ? `${displayTitle} - S${currentSeason} E1`
+      : displayTitle;
 
+    onPlayStream(
+      topStream?.link || "",
+      playTitle,
+      streams && streams.length > 0 ? streams : undefined,
+      backdropImage,
+      posterImage,
+      details?.runtime || tmdb?.runtime,
+      isSeries ? currentSeason : undefined,
+      isSeries ? 1 : undefined,
+      isSeries ? episodes : undefined,
+      isSeries ? currentSeasonsCount : undefined,
+      tmdb?.id
+    );
+
+    // 2. If it's a series and we have episodes, resolve episode 1 for the selected season
+    if (isSeries && episodes && episodes.length > 0) {
+      const ep1 = episodes[0];
+      const epKey = `${currentSeason - 1}_0`;
+      const epLink = ep1.link || ep1.url;
+      if (epLink) {
+        handlePlayRelease(epKey, epLink, currentSeason, 1);
+        return;
+      }
+    }
+
+    // 3. If movie releases exist in linkList, resolve release 0
+    if (linkList && linkList.length > 0) {
+      const firstRelease = linkList[0];
+      const primaryLink = firstRelease.directLinks?.[0]?.link || firstRelease.link;
+      if (primaryLink) {
+        handlePlayRelease(`release_0`, primaryLink);
+        return;
+      }
+    }
+
+    // 4. If universalLinks exist, resolve top link
+    if (universalLinks && universalLinks.length > 0) {
+      const topUniv = universalLinks[0];
+      if (topUniv?.url) {
+        handlePlayRelease(`univ_0`, topUniv.url);
+        return;
+      }
+    }
+  };
+
+  // Resolved metadata IDs
   const resolvedImdbId =
     tmdb?.imdbId ||
     details?.imdbId ||
@@ -704,7 +969,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   const rating =
     (tmdb?.rating && tmdb.rating !== "N/A" && tmdb.rating) ||
     (details?.rating && details.rating !== "N/A" && details.rating) ||
-    (post.tag?.match(/\d+(\.\d+)?/)?.[0]) ||
+    (post.tag?.match(/\b(10(?:\.0)?|[1-9](?:\.\d)?)\b/)?.[0]) ||
     null;
 
   const year =
@@ -744,6 +1009,27 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
+      {/* 0. Page Ambient Blurred Background (Matches Home slides & filter pages) */}
+      {backdropImage && (
+        <div
+          style={{
+            position: "fixed",
+            top: "-15%",
+            left: "-15%",
+            width: "130%",
+            height: "130%",
+            backgroundImage: `url(${backdropImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center 25%",
+            filter: "blur(75px) saturate(2.2) brightness(0.68)",
+            transform: "translate3d(0, 0, 0)",
+            pointerEvents: "none",
+            zIndex: 0,
+            opacity: heroIntroStage === "fullscreen" ? 0 : 1,
+            transition: "opacity 0.4s ease",
+          }}
+        />
+      )}
       {/* 1. TOP NAVBAR */}
       <Navbar
         providers={providers}
@@ -764,6 +1050,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         onClose={onClose}
       />
 
+
       {/* 2. HERO SPOTLIGHT BANNER + DYNAMIC LINKS DRAWER */}
       <DetailsHero
         backdropImage={backdropImage}
@@ -771,6 +1058,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         onBackdropLoaded={() => setBackdropLoaded(true)}
         posterImage={posterImage}
         heroPosterLoaded={heroPosterLoaded}
+        heroIntroStage={heroIntroStage}
         onPosterLoaded={() => setHeroPosterLoaded(true)}
         displayTitle={displayTitle}
         rating={rating}
@@ -794,6 +1082,9 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         activeTab={activeTab}
         onToggleTab={(tab) => setActiveTab(activeTab === tab ? null : tab)}
         activeTrailerEmbed={activeTrailerEmbed}
+        tmdb={tmdb}
+        onPlayPrimary={handlePlayPrimary}
+        onSelectPerson={onSelectPerson}
       >
         <DetailsLinksDrawer
           activeTab={activeTab}
@@ -830,13 +1121,124 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         />
       </DetailsHero>
 
-      {/* 3. MOVIE STILLS & SCREENSHOTS SECTION */}
-      <DetailsScreenshots
-        screenshots={allScreenshots}
-        onSelectScreenshot={setSelectedScreenshotIdx}
-      />
+      {/* 3. EPISODES GRID (16:9 Landscape Cards matching Cno.to and Cinejoy) */}
+      {(isSeries || tmdb?.mediaType === "tv") && (
+        <DetailsEpisodesGrid
+          tmdbId={tmdb?.id}
+          seasonsCount={tmdb?.seasonsCount || (details as any)?.totalSeasons || linkList.length || 1}
+          selectedSeason={selectedSeasonNumber}
+          onSelectSeason={(seasonNum) => {
+            setSelectedSeasonNumber(seasonNum);
+            const targetIdx = seasonNum - 1;
+            if (targetIdx >= 0 && targetIdx < linkList.length) {
+              setSelectedSeasonIdx(targetIdx);
+            }
+          }}
+          providerEpisodes={episodes}
+          onPlayEpisode={(epNum, epTitle, directLink) => {
+            const currentSeasonsCount = tmdb?.seasonsCount || (details as any)?.totalSeasons || linkList.length || 1;
+            const epDisplayTitle = `${displayTitle} - S${selectedSeasonNumber} E${epNum}: ${epTitle || ""}`;
+            onPlayStream(
+              directLink || "",
+              epDisplayTitle,
+              streams,
+              backdropImage,
+              posterImage,
+              details?.runtime || tmdb?.runtime,
+              selectedSeasonNumber,
+              epNum,
+              episodes,
+              currentSeasonsCount,
+              tmdb?.id
+            );
+            if (!directLink) {
+              const ep = episodes[epNum - 1];
+              const epKey = `${selectedSeasonNumber - 1}_${epNum - 1}`;
+              const link = ep?.link || ep?.url;
+              if (link) {
+                handlePlayRelease(epKey, link, selectedSeasonNumber, epNum);
+              }
+            }
+          }}
+          onDownloadEpisode={(epNum, epTitle, directLink) => {
+            const epFileName = `${displayTitle} S${selectedSeasonNumber} E${epNum}${epTitle ? ` - ${epTitle}` : ""}`;
+            if (directLink) {
+              handleDownloadDirectUrl(
+                directLink,
+                "Server 1",
+                epFileName
+              );
+              return;
+            }
 
-      {/* 4. OFFICIAL TRAILER SECTION */}
+            // Direct episode resolution without redirection or mismatch
+            (async () => {
+              try {
+                const cleanQ = displayTitle.replace(/\(\d{4}\)/g, "").trim();
+                const mbRes = await fetch(`/api/search?provider=movieBoxWeb&q=${encodeURIComponent(cleanQ)}`);
+                if (mbRes.ok) {
+                  const mbMatches: any[] = await mbRes.json();
+                  const cleanLower = cleanQ.toLowerCase().trim();
+                  const cand = mbMatches.find((m) => m && (m.title || "").toLowerCase().includes(cleanLower)) || mbMatches[0];
+                  if (cand?.link) {
+                    const metaRes = await fetch(`/api/meta?provider=movieBoxWeb&link=${encodeURIComponent(cand.link)}`);
+                    if (metaRes.ok) {
+                      const meta = await metaRes.json();
+                      const rawLinkList = Array.isArray(meta?.linkList) ? meta.linkList : [];
+                      const seasonRegex = new RegExp(`\\bSeason\\s*0*${selectedSeasonNumber}\\b`, "i");
+                      const seasonItem = rawLinkList.find((i: any) => seasonRegex.test(i.title || "")) || rawLinkList[0];
+                      const targetEp = seasonItem?.directLinks?.[epNum - 1]?.link || seasonItem?.directLinks?.[0]?.link;
+                      if (targetEp) {
+                        const sRes = await fetch(`/api/streams?provider=movieBoxWeb&link=${encodeURIComponent(targetEp)}&download=true&title=${encodeURIComponent(epFileName)}`);
+                        if (sRes.ok) {
+                          const sList = await sRes.json();
+                          if (Array.isArray(sList) && sList[0]?.link) {
+                            handleDownloadDirectUrl(sList[0].link, "Server 1", epFileName, sList[0].headers);
+                            return;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (_) {}
+
+              // Fallback to active provider
+              const ep = episodes[epNum - 1];
+              const link = ep?.link || ep?.url;
+              if (link) {
+                api.getStreams(activeProvider?.value || "hdhub4u", link, "series")
+                  .then((resolved) => {
+                    const dl = (resolved && resolved[0]?.link) || link;
+                    handleDownloadDirectUrl(dl, "Server 1", epFileName);
+                  })
+                  .catch(() => {
+                    setActiveTab("download");
+                  });
+              } else {
+                setActiveTab("download");
+              }
+            })();
+          }}
+          onToggleRatingsHeatmap={() => {
+            setShowRatingsHeatmap(true);
+            setTimeout(() => {
+              const container = document.getElementById("cinema-details-scroll-container");
+              const el = document.getElementById("series-ratings-heatmap-section");
+              if (container && el) {
+                const containerRect = container.getBoundingClientRect();
+                const elRect = el.getBoundingClientRect();
+                const targetTop = container.scrollTop + (elRect.top - containerRect.top) - 80;
+                container.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+              } else if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }, 60);
+          }}
+        />
+      )}
+
+      {/* 4. TRAILERS & EXTRAS (Cno.to Screenshot 4) */}
       <DetailsTrailer
         trailerEmbed={activeTrailerEmbed}
         trailerUrl={activeTrailerUrl}
@@ -845,19 +1247,97 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         title={displayTitle}
       />
 
-      {/* 5. CAST SECTION */}
+      {/* 5. SERIES / ANIME RATINGS BY EPISODE HEATMAP (Cno.to Screenshot 5) */}
+      {(isSeries || tmdb?.mediaType === "tv") && showRatingsHeatmap && (
+        <div
+          id="series-ratings-heatmap-section"
+          style={{ padding: "0 48px", position: "relative", zIndex: 10, margin: "16px 0 32px 0", scrollMarginTop: "90px" }}
+        >
+          <SeriesRatingsHeatmap
+            tmdbId={tmdb?.id || 0}
+            seasonsCount={tmdb?.seasonsCount || (details as any)?.totalSeasons || 1}
+            onPlayEpisode={(sNum, epNum, epTitle) => {
+              const targetIdx = sNum - 1;
+              if (targetIdx >= 0 && targetIdx < linkList.length) {
+                setSelectedSeasonIdx(targetIdx);
+              }
+              const ep = episodes[epNum - 1];
+              const directLink = ep?.link || ep?.url || ep?.file;
+              const epDisplayTitle = `${displayTitle} - S${sNum} E${epNum}: ${epTitle || ""}`;
+              const currentSeasonsCount = tmdb?.seasonsCount || (details as any)?.totalSeasons || linkList.length || 1;
+              onPlayStream(
+                directLink || "",
+                epDisplayTitle,
+                streams,
+                backdropImage,
+                posterImage,
+                details?.runtime || tmdb?.runtime,
+                sNum,
+                epNum,
+                episodes,
+                currentSeasonsCount,
+                tmdb?.id
+              );
+              if (!directLink) {
+                const epKey = `${targetIdx >= 0 ? targetIdx : 0}_${epNum - 1}`;
+                const link = ep?.link || ep?.url;
+                if (link) {
+                  handlePlayRelease(epKey, link, sNum, epNum);
+                }
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* 6. CAST & CREW SECTION (Circular Headshots matching Cno.to & Cinejoy) */}
       <DetailsCast
         cast={tmdb?.cast}
         onSelectPerson={onSelectPerson}
       />
 
-      {/* 6. RECOMMENDED & SIMILAR MOVIES */}
+      {/* 7. PHOTOS & STILLS GALLERY (Cno.to Screenshot 4) */}
+      <DetailsScreenshots
+        screenshots={allScreenshots}
+        posters={tmdb?.posters}
+        onSelectScreenshot={setSelectedScreenshotIdx}
+      />
+
+      {/* 8. TOPICS & WHERE TO WATCH (Unified Section matching Screenshot 2) */}
+      <DetailsTopics
+        topics={tmdb?.keywords}
+        watchProviders={tmdb?.watchProviders}
+        onSelectTopic={onSearchGlobal}
+      />
+
+      {/* 10. YOU MIGHT ALSO LIKE / MORE LIKE THIS (Cno.to & Cinejoy) */}
       <DetailsRecommendations
         recommendations={tmdb?.recommendations}
         similar={tmdb?.similar}
         targetProviderKey={targetProviderKey}
         onSelectRecommended={onSelectRecommended}
         containerRef={containerRef}
+      />
+
+      {/* 11. REVIEWS SECTION */}
+      <DetailsReviews
+        reviews={tmdb?.reviews}
+        title={displayTitle}
+        imdbRating={realRating}
+      />
+
+      {/* 12. ABOUT SECTION (Cno.to Screenshot 7) */}
+      <DetailsAbout
+        tmdb={tmdb}
+        displayTitle={displayTitle}
+        isSeries={isSeries}
+        plot={plot}
+        creatorOrDirector={creatorOrDirector}
+        imdbUrl={imdbUrl}
+        resolvedImdbId={resolvedImdbId}
+        runtime={runtime}
+        genres={genres}
+        onSelectPerson={onSelectPerson}
       />
 
       {/* 7. MORE DOWNLOAD / STREAM LINKS / MIRRORS MODAL */}
@@ -883,6 +1363,28 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       <DownloadManagerModal
         isOpen={isDownloadManagerOpen}
         onClose={() => setIsDownloadManagerOpen(false)}
+      />
+
+      {/* 10. UNIVERSAL MULTI-EXTENSION DOWNLOAD & STREAM MODAL (Cinejoy Screenshots 1, 2, 3) */}
+      <UniversalDownloadsModal
+        isOpen={activeTab !== null}
+        onClose={() => setActiveTab(null)}
+        title={displayTitle}
+        isSeries={isSeries}
+        isAnime={(details as any)?.isAnime || post?.genres?.toLowerCase().includes("anime") || false}
+        seasonsCount={tmdb?.seasonsCount || (details as any)?.totalSeasons || 1}
+        episodesCount={episodes?.length || tmdb?.episodesCount || 12}
+        serverLinks={universalLinks}
+        loading={loadingUniversalLinks}
+        mode={activeTab || "download"}
+        onPlayLink={(link) => {
+          onPlayStream(link.url, `${displayTitle} • ${link.serverName} (${link.quality})`, streams, backdropImage, posterImage);
+          setActiveTab(null);
+        }}
+        onDownloadLink={(link) => {
+          handleDownloadDirectUrl(link.url, link.serverName, `${displayTitle} ${link.quality}`);
+          setActiveTab(null);
+        }}
       />
 
     </div>
