@@ -172,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     {
       id: "mylist",
-      label: "My List",
+      label: "Watchlist",
       icon: (
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="8" y1="6" x2="21" y2="6"></line>

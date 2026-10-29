@@ -274,9 +274,9 @@ export const MyListPage: React.FC<MyListPageProps> = ({
           </div>
         ) : (
           <>
-            {/* Header: My List */}
+            {/* Header: Watchlist */}
             <div style={{ display: "flex", alignItems: "baseline", gap: "16px" }}>
-              <h1 style={{ margin: 0, fontSize: "42px", fontWeight: 800, letterSpacing: "-0.5px" }}>My List</h1>
+              <h1 style={{ margin: 0, fontSize: "42px", fontWeight: 800, letterSpacing: "-0.5px" }}>Watchlist</h1>
             </div>
 
             {/* 1. Continue Watching Shelf (Screenshots 2 & 7) */}
@@ -296,25 +296,27 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                     minWidth: "180px",
                     aspectRatio: "2/3",
                     borderRadius: "14px",
-                    border: "2px dashed rgba(255, 255, 255, 0.18)",
-                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1.5px dashed rgba(255, 255, 255, 0.22)",
+                    background: "rgba(255, 255, 255, 0.04)",
+                    backdropFilter: "blur(16px)",
+                    WebkitBackdropFilter: "blur(16px)",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "10px",
                     cursor: "pointer",
-                    transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                    transition: "all 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#e50914";
-                    e.currentTarget.style.background = "rgba(229, 9, 20, 0.08)";
-                    e.currentTarget.style.transform = "translateY(-4px)";
+                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.45)";
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+                    e.currentTarget.style.transform = "translateY(-8px) scale(1.02)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.18)";
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
-                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.22)";
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
+                    e.currentTarget.style.transform = "translateY(0) scale(1)";
                   }}
                 >
                   <div
@@ -613,12 +615,13 @@ export const MyListPage: React.FC<MyListPageProps> = ({
             style={{
               width: "100%",
               maxWidth: "380px",
-              background: "rgba(18, 22, 30, 0.88)",
-              backdropFilter: "blur(28px)",
-              border: "1px solid rgba(255, 255, 255, 0.16)",
-              borderRadius: "20px",
+              background: "rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(32px) saturate(200%)",
+              WebkitBackdropFilter: "blur(32px) saturate(200%)",
+              border: "1px solid rgba(255, 255, 255, 0.24)",
+              borderRadius: "24px",
               padding: "24px",
-              boxShadow: "0 28px 70px rgba(0, 0, 0, 0.9)",
+              boxShadow: "0 28px 70px rgba(0, 0, 0, 0.45), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
               display: "flex",
               flexDirection: "column",
             }}
@@ -713,14 +716,14 @@ const pillActionButtonStyle: React.CSSProperties = {
 };
 
 const statCardStyle: React.CSSProperties = {
-  background: "rgba(18, 22, 30, 0.65)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
-  border: "1px solid rgba(255, 255, 255, 0.10)",
-  borderRadius: "16px",
+  background: "rgba(255, 255, 255, 0.08)",
+  backdropFilter: "blur(28px) saturate(180%)",
+  WebkitBackdropFilter: "blur(28px) saturate(180%)",
+  border: "1px solid rgba(255, 255, 255, 0.18)",
+  borderRadius: "20px",
   padding: "20px 24px",
   display: "flex",
   flexDirection: "column",
   gap: "4px",
-  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.4)",
+  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.25), inset 0 1px 1.5px rgba(255, 255, 255, 0.3)",
 };

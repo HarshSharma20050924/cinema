@@ -528,17 +528,17 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           overflow: "hidden",
           background: "#0c0c0c",
           transform: isHovered
-            ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${isLandscape ? 1.045 : 1.035}, ${isLandscape ? 1.045 : 1.035}, ${isLandscape ? 1.045 : 1.035})`
-            : "rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)",
+            ? `translateY(-8px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${isLandscape ? 1.045 : 1.035}, ${isLandscape ? 1.045 : 1.035}, ${isLandscape ? 1.045 : 1.035})`
+            : "translateY(0px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)",
           transformStyle: "preserve-3d",
           boxShadow: isHovered
             ? isLandscape
-              ? "0 22px 44px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0,0,0,0.5)"
-              : "0 18px 36px rgba(0, 0, 0, 0.9)"
+              ? "0 28px 56px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0,0,0,0.5)"
+              : "0 24px 48px rgba(0, 0, 0, 0.92)"
             : "0 4px 14px rgba(0, 0, 0, 0.5)",
           transition: isHovered
-            ? "transform 0.08s ease-out, box-shadow 0.25s ease"
-            : "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease",
+            ? "transform 0.12s ease-out, box-shadow 0.28s ease"
+            : "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease",
         }}
       >
         {/* Top 10 Big Bold Rank Number */}

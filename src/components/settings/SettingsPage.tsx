@@ -1,36 +1,165 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useSettings } from "../../hooks/useSettings";
 import { clearWatchHistory } from "../../utils/userListsService";
 import { clearAllContinueWatching } from "../../utils/continueWatchingService";
+import {
+  getProfiles,
+  getActiveProfile,
+  setActiveProfile,
+  createProfile,
+  updateProfile,
+  deleteProfile,
+  getAccountEmail,
+  setAccountEmail,
+  signOutAccount,
+  signInAccount,
+  AVATAR_OPTIONS,
+  type UserProfile,
+} from "../../utils/profileService";
 
 export interface SettingsPageProps {
   onClose: () => void;
   onOpenProfiles?: () => void;
 }
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({
-  onClose,
-  onOpenProfiles,
-}) => {
+export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const { settings, updateSettings } = useSettings();
   const [activeCategory, setActiveCategory] = useState<
     "account" | "appearance" | "playback" | "servers" | "subtitles" | "ads" | "febbox"
   >("account");
 
-  // Dynamic ambient sliding background
+  // Profile State from real persistent profileService
+  const [profiles, setProfiles] = useState<UserProfile[]>(() => getProfiles());
+  const [activeProfile, setActiveProfileState] = useState<UserProfile>(() => getActiveProfile());
+  const [accountEmail, setAccountEmailState] = useState<string>(() => getAccountEmail());
+
+  // Modals
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
+  const [showAddProfileModal, setShowAddProfileModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [newEmailInput, setNewEmailInput] = useState("");
+  const [newProfileName, setNewProfileName] = useState("");
+  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0]);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3200);
+  };
+
+  const refreshProfileData = () => {
+    setProfiles(getProfiles());
+    setActiveProfileState(getActiveProfile());
+    setAccountEmailState(getAccountEmail());
+  };
+
+  useEffect(() => {
+    refreshProfileData();
+    const handleUpdate = () => refreshProfileData();
+    window.addEventListener("cinema:profile_changed", handleUpdate);
+    return () => window.removeEventListener("cinema:profile_changed", handleUpdate);
+  }, []);
+
+  // Ambient instant blurred sliding background (optimized w780 URLs + preloaded)
   const ambientImages = [
-    "https://image.tmdb.org/t/p/original/sHI9xlFRWCJ38AIIfOqnGjuEvXz.jpg",
-    "https://image.tmdb.org/t/p/original/m4TUaeqAIf2m4Y49zB1AecQ2b19.jpg",
-    "https://image.tmdb.org/t/p/original/yDHYTfA3R0jFYba16jBB1ef8oIt.jpg",
+    "https://image.tmdb.org/t/p/w1280/sHI9xlFRWCJ38AIIfOqnGjuEvXz.jpg",
+    "https://image.tmdb.org/t/p/w1280/m4TUaeqAIf2m4Y49zB1AecQ2b19.jpg",
+    "https://image.tmdb.org/t/p/w1280/yDHYTfA3R0jFYba16jBB1ef8oIt.jpg",
+    "https://image.tmdb.org/t/p/w1280/8YFL5QQVPy3AgrEQxNYVSgiPEbe.jpg",
   ];
   const [activeBgIdx, setActiveBgIdx] = useState(0);
 
   useEffect(() => {
+    // Preload ambient images into browser cache immediately
+    ambientImages.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+
     const timer = setInterval(() => {
       setActiveBgIdx((prev) => (prev + 1) % ambientImages.length);
-    }, 10000);
+    }, 9000);
     return () => clearInterval(timer);
   }, [ambientImages.length]);
+
+  // Tab measurement and GPU sliding red pill indicator matching Navbar exactly
+  const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const [indicator, setIndicator] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    opacity: number;
+  }>({ left: 0, top: 0, width: 0, height: 0, opacity: 0 });
+
+  useLayoutEffect(() => {
+    const el = tabRefs.current[activeCategory];
+    if (el) {
+      setIndicator({
+        left: el.offsetLeft,
+        top: el.offsetTop,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        opacity: 1,
+      });
+    } else {
+      setIndicator((prev) => ({ ...prev, opacity: 0 }));
+    }
+  }, [activeCategory]);
+
+  const categories = [
+    { id: "account", label: "Account" },
+    { id: "appearance", label: "Appearance" },
+    { id: "playback", label: "Playback" },
+    { id: "servers", label: "Servers" },
+    { id: "subtitles", label: "Subtitles" },
+    { id: "ads", label: "Ads" },
+    { id: "febbox", label: "Febbox" },
+  ];
+
+  // Exact Navbar Glass Tokens
+  const cardStyle: React.CSSProperties = {
+    background: "rgba(255, 255, 255, 0.08)",
+    backdropFilter: "blur(32px) saturate(200%)",
+    WebkitBackdropFilter: "blur(32px) saturate(200%)",
+    border: "1px solid rgba(255, 255, 255, 0.20)",
+    borderRadius: "24px",
+    padding: "24px 28px",
+    boxShadow: "0 20px 50px rgba(0, 0, 0, 0.35), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.35)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "18px",
+  };
+
+  const pillButtonStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "9px 20px",
+    borderRadius: "9999px",
+    background: "rgba(255, 255, 255, 0.08)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    border: "1px solid rgba(255, 255, 255, 0.16)",
+    boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.2)",
+    color: "#ffffff",
+    fontSize: "13.5px",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+    whiteSpace: "nowrap",
+  };
+
+  const sectionLabelStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "12px",
+    fontWeight: 800,
+    color: "rgba(255, 255, 255, 0.55)",
+    letterSpacing: "1.2px",
+    textTransform: "uppercase",
+  };
 
   return (
     <div
@@ -41,14 +170,34 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         backgroundColor: "#07090e",
         overflowY: "auto",
         overflowX: "hidden",
-        paddingTop: "70px",
+        paddingTop: "40px",
         paddingBottom: "100px",
         animation: "fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
       }}
     >
-      {/* ------------------------------------------------------------- */}
-      {/* Dynamic Ambient Blurred Sliding Backdrop (Screenshot 12)       */}
-      {/* ------------------------------------------------------------- */}
+      <style>{`
+        .cinema-settings-pill-btn:hover {
+          background: rgba(255, 255, 255, 0.18) !important;
+          border-color: rgba(255, 255, 255, 0.28) !important;
+          transform: translateY(-1px);
+        }
+        .cinema-settings-danger-btn:hover {
+          background: rgba(239, 68, 68, 0.2) !important;
+          border-color: rgba(239, 68, 68, 0.4) !important;
+          transform: translateY(-1px);
+        }
+      `}</style>
+
+      {/* Dynamic Instant Ambient Sliding Blurred Backdrop */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "radial-gradient(ellipse at 50% 20%, rgba(30, 36, 52, 0.6) 0%, rgba(7, 9, 14, 0.95) 70%)",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      />
       {ambientImages.map((imgUrl, i) => (
         <div
           key={imgUrl}
@@ -68,7 +217,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         />
       ))}
 
-      {/* Main Settings Wrapper */}
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div
+          style={{
+            position: "fixed",
+            top: "28px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 100010,
+            background: "linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(20, 24, 34, 0.85) 100%)",
+            backdropFilter: "blur(28px) saturate(200%)",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            borderRadius: "9999px",
+            padding: "10px 26px",
+            color: "#ffffff",
+            fontSize: "13.5px",
+            fontWeight: 700,
+            boxShadow: "0 16px 40px rgba(0, 0, 0, 0.75)",
+            animation: "fadeIn 0.18s ease-out",
+          }}
+        >
+          {toastMsg}
+        </div>
+      )}
+
+      {/* Main Container */}
       <div
         style={{
           position: "relative",
@@ -81,408 +255,1035 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           gap: "28px",
         }}
       >
-        {/* Top Header: Back Button & Title */}
+        {/* Top Header: Back Button */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button
             onClick={onClose}
+            className="cinema-settings-pill-btn"
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: "8px",
-              padding: "9px 20px",
-              borderRadius: "999px",
-              background: "rgba(255, 255, 255, 0.08)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(255, 255, 255, 0.16)",
+              padding: "9px 22px",
+              borderRadius: "9999px",
+              background: "rgba(255, 255, 255, 0.10)",
+              backdropFilter: "blur(28px) saturate(180%)",
+              WebkitBackdropFilter: "blur(28px) saturate(180%)",
+              border: "1px solid rgba(255, 255, 255, 0.22)",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.4)",
               color: "#ffffff",
               fontSize: "13.5px",
               fontWeight: 600,
               cursor: "pointer",
-              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-              e.currentTarget.style.transform = "translateY(0)";
             }}
           >
             ← Back
           </button>
-
-          <h1 style={{ margin: 0, fontSize: "28px", fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: "10px" }}>
-            ⚙ Settings
-          </h1>
-
-          <div style={{ width: "80px" }} />
         </div>
 
-        {/* Category Pills Navigation (Screenshot 12) */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            overflowX: "auto",
-            padding: "6px 8px",
-            borderRadius: "999px",
-            background: "rgba(14, 16, 22, 0.65)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-          }}
-        >
-          {[
-            { id: "account", label: "Account" },
-            { id: "appearance", label: "Appearance" },
-            { id: "playback", label: "Playback" },
-            { id: "servers", label: "Servers" },
-            { id: "subtitles", label: "Subtitles" },
-            { id: "ads", label: "Ads" },
-            { id: "febbox", label: "Febbox" },
-          ].map((cat) => {
-            const isActive = activeCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id as any)}
-                style={{
-                  padding: "8px 18px",
-                  borderRadius: "999px",
-                  background: isActive ? "#e50914" : "transparent",
-                  border: isActive ? "1px solid #e50914" : "none",
-                  color: isActive ? "#ffffff" : "rgba(255, 255, 255, 0.75)",
-                  fontSize: "13px",
-                  fontWeight: isActive ? 700 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  boxShadow: isActive ? "0 4px 14px rgba(229, 9, 20, 0.45)" : "none",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ------------------------------------------------------------- */}
-        {/* Category 1: Account (Screenshots 8, 9, 12)                     */}
-        {/* ------------------------------------------------------------- */}
-        {(activeCategory === "account" || activeCategory === "appearance") && (
-          <div style={settingsCardStyle}>
-            <h3 style={sectionHeadingStyle}>Account</h3>
-            {/* User Profile Card */}
+        {/* Floating Category Pills Navigation with Sliding Red Indicator (Exact Navbar Match) */}
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div
+            style={{
+              position: "relative",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "6px 8px",
+              borderRadius: "9999px",
+              background: "rgba(255, 255, 255, 0.10)",
+              backdropFilter: "blur(28px) saturate(180%)",
+              WebkitBackdropFilter: "blur(28px) saturate(180%)",
+              border: "1px solid rgba(255, 255, 255, 0.22)",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.4)",
+              overflowX: "auto",
+              maxWidth: "100%",
+            }}
+          >
+            {/* Sliding Red Active Pill */}
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "16px 20px",
-                borderRadius: "14px",
-                background: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                position: "absolute",
+                top: `${indicator.top}px`,
+                left: 0,
+                transform: `translate3d(${indicator.left}px, 0, 0)`,
+                width: `${indicator.width}px`,
+                height: `${indicator.height}px`,
+                borderRadius: "9999px",
+                background: "linear-gradient(135deg, #ff1723 0%, #e50914 100%)",
+                boxShadow: "0 4px 18px rgba(229, 9, 20, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.4)",
+                opacity: indicator.opacity,
+                pointerEvents: "none",
+                transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
+                willChange: "transform, width",
+                zIndex: 1,
               }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                {/* Avatar Moon Icon */}
-                <div
+            />
+
+            {categories.map((cat) => {
+              const isActive = activeCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  ref={(el) => {
+                    tabRefs.current[cat.id] = el;
+                  }}
+                  onClick={() => setActiveCategory(cat.id as any)}
                   style={{
-                    width: "52px",
-                    height: "52px",
-                    borderRadius: "50%",
-                    background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "24px",
-                    boxShadow: "0 4px 16px rgba(99, 102, 241, 0.4)",
+                    position: "relative",
+                    zIndex: 2,
+                    padding: "8px 20px",
+                    borderRadius: "9999px",
+                    background: "transparent",
+                    border: "none",
+                    color: isActive ? "#ffffff" : "rgba(255, 255, 255, 0.78)",
+                    fontSize: "13.5px",
+                    fontWeight: isActive ? 700 : 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "color 0.2s ease",
                   }}
                 >
-                  🌙
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#fff" }}>Harsh</h4>
-                  <span style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.5)" }}>cinemaisherebtw@gmail.com</span>
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ============================================================= */}
+        {/* TAB 1: ACCOUNT (Matching Screenshots 4 & 5 exactly)           */}
+        {/* ============================================================= */}
+        {activeCategory === "account" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            {/* 1. ACCOUNT Section */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <span style={sectionLabelStyle}>Account</span>
+              <div style={cardStyle}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+                    {/* User Avatar Circle */}
+                    <div
+                      style={{
+                        width: "56px",
+                        height: "56px",
+                        borderRadius: "50%",
+                        background: activeProfile.avatarColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "26px",
+                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px rgba(255, 255, 255, 0.3)",
+                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                      }}
+                    >
+                      {activeProfile.avatar}
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "#fff" }}>
+                        {activeProfile.name} {activeProfile.isKids && "(Kids)"}
+                      </h4>
+                      <span style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>{accountEmail}</span>
+                    </div>
+                  </div>
+
+                  {/* Switch Profile & Manage Profiles Pills */}
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      className="cinema-settings-pill-btn"
+                      onClick={() => setShowSwitchModal(true)}
+                      style={pillButtonStyle}
+                    >
+                      Switch Profile
+                    </button>
+                    <button
+                      className="cinema-settings-pill-btn"
+                      onClick={() => setShowManageModal(true)}
+                      style={pillButtonStyle}
+                    >
+                      Manage Profiles
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  onClick={onOpenProfiles}
-                  style={pillSubButtonStyle}
-                >
-                  Switch Profile
-                </button>
-                <button
-                  onClick={onOpenProfiles}
-                  style={pillSubButtonStyle}
-                >
-                  Manage Profiles
-                </button>
+            {/* 2. PRIVACY Section */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <span style={sectionLabelStyle}>Privacy</span>
+              <div style={cardStyle}>
+                {/* Watch history item */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Watch history</h4>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                      Clears Continue Watching shelf and what you've finished.
+                    </p>
+                  </div>
+                  <button
+                    className="cinema-settings-pill-btn"
+                    onClick={() => {
+                      clearWatchHistory();
+                      clearAllContinueWatching();
+                      showToast("Watch history cleared successfully");
+                    }}
+                    style={pillButtonStyle}
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.08)", margin: "4px 0" }} />
+
+                {/* Ratings & hidden titles item */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Ratings & hidden titles</h4>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                      Resets what shapes your personalized recommendations.
+                    </p>
+                  </div>
+                  <button
+                    className="cinema-settings-pill-btn"
+                    onClick={() => {
+                      try {
+                        localStorage.removeItem("cinema_user_ratings_v1");
+                        localStorage.removeItem("cinema_hidden_titles");
+                        window.dispatchEvent(new CustomEvent("cinema:ratings_updated"));
+                        window.dispatchEvent(new CustomEvent("cinema:hidden_titles_updated"));
+                        showToast("Ratings & hidden titles reset");
+                      } catch (_) {}
+                    }}
+                    style={pillButtonStyle}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. SIGN-IN & SECURITY Section */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <span style={sectionLabelStyle}>Sign-In & Security</span>
+              <div style={cardStyle}>
+                {/* Email Item */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Email</h4>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>{accountEmail}</p>
+                  </div>
+                  <button
+                    className="cinema-settings-pill-btn"
+                    onClick={() => {
+                      setNewEmailInput(accountEmail);
+                      setShowEmailModal(true);
+                    }}
+                    style={pillButtonStyle}
+                  >
+                    Change
+                  </button>
+                </div>
+
+                <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.08)", margin: "4px 0" }} />
+
+                {/* Sign Out Item */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Sign out</h4>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                      Your list and progress stays in your account.
+                    </p>
+                  </div>
+                  <button
+                    className="cinema-settings-danger-btn"
+                    onClick={() => {
+                      if (confirm("Are you sure you want to sign out?")) {
+                        signOutAccount();
+                        showToast("Signed out successfully");
+                      }
+                    }}
+                    style={{
+                      ...pillButtonStyle,
+                      color: "#ff4d4f",
+                      border: "1px solid rgba(255, 77, 79, 0.28)",
+                      background: "rgba(255, 77, 79, 0.08)",
+                    }}
+                  >
+                    Sign Out
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* Category 2: Playback Settings (Screenshot 8 & 12)             */}
-        {/* ------------------------------------------------------------- */}
-        {(activeCategory === "playback" || activeCategory === "appearance") && (
-          <div style={settingsCardStyle}>
-            <h3 style={sectionHeadingStyle}>Playback</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              {/* Autoplay previews */}
-              <div style={toggleRowStyle}>
+        {/* ============================================================= */}
+        {/* TAB 2: APPEARANCE                                             */}
+        {/* ============================================================= */}
+        {activeCategory === "appearance" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            <span style={sectionLabelStyle}>Appearance</span>
+            <div style={cardStyle}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <h5 style={toggleTitleStyle}>Autoplay previews</h5>
-                  <p style={toggleDescStyle}>Play trailers quietly on title pages, banners, and covers.</p>
+                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Theme</h4>
+                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                    Deep frosted glass with cinema red accent
+                  </p>
                 </div>
-                <ToggleSwitch checked={true} onChange={() => {}} />
+                <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#e50914" }}>Translucent Glass</span>
               </div>
-
-              {/* Start previews muted */}
-              <div style={toggleRowStyle}>
+              <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.08)" }} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <h5 style={toggleTitleStyle}>Start previews muted</h5>
-                  <p style={toggleDescStyle}>Keep volume muted when hovering or previewing.</p>
+                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Smooth UI Animations</h4>
+                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                    GPU-accelerated sliding indicators & spring lift
+                  </p>
                 </div>
-                <ToggleSwitch checked={true} onChange={() => {}} />
+                <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#22c55e" }}>Enabled</span>
               </div>
+            </div>
+          </div>
+        )}
 
-              {/* Autoplay next episode */}
-              <div style={toggleRowStyle}>
+        {/* ============================================================= */}
+        {/* TAB 3: PLAYBACK                                               */}
+        {/* ============================================================= */}
+        {activeCategory === "playback" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            <span style={sectionLabelStyle}>Playback</span>
+            <div style={cardStyle}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <h5 style={toggleTitleStyle}>Autoplay next episode</h5>
-                  <p style={toggleDescStyle}>Start the next episode when credits roll.</p>
+                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Auto-Play Next Episode</h4>
+                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                    Automatically starts next episode when current ends
+                  </p>
                 </div>
-                <ToggleSwitch checked={true} onChange={() => {}} />
-              </div>
-
-              {/* Crop black bars */}
-              <div style={toggleRowStyle}>
-                <div>
-                  <h5 style={toggleTitleStyle}>Crop black bars (Zoom to Fill)</h5>
-                  <p style={toggleDescStyle}>Cut away the black bars that come inside video to fill wide screen.</p>
-                </div>
-                <ToggleSwitch
-                  checked={settings.defaultPlayer === "fill"}
-                  onChange={() => {}}
+                <input
+                  type="checkbox"
+                  checked={settings.autoplayNext !== false}
+                  onChange={(e) => updateSettings({ autoplayNext: e.target.checked })}
+                  style={{ width: "20px", height: "20px", accentColor: "#e50914", cursor: "pointer" }}
                 />
               </div>
-
-              {/* Ambient mode */}
-              <div style={toggleRowStyle}>
+              <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.08)" }} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <h5 style={toggleTitleStyle}>Ambient mode</h5>
-                  <p style={toggleDescStyle}>Soft light in picture colors fills black bars around video.</p>
-                </div>
-                <ToggleSwitch checked={false} onChange={() => {}} />
-              </div>
-
-              {/* Subtitles default */}
-              <div style={toggleRowStyle}>
-                <div>
-                  <h5 style={toggleTitleStyle}>Subtitles</h5>
-                  <p style={toggleDescStyle}>Turn on automatically when available.</p>
+                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Default Video Quality</h4>
+                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                    Preferred stream quality for playback
+                  </p>
                 </div>
                 <select
+                  value={settings.preferredQuality || "1080p"}
+                  onChange={(e) => updateSettings({ preferredQuality: e.target.value as any })}
                   style={{
+                    padding: "8px 16px",
+                    borderRadius: "9999px",
                     background: "rgba(255, 255, 255, 0.08)",
-                    border: "1px solid rgba(255, 255, 255, 0.16)",
+                    border: "1px solid rgba(255, 255, 255, 0.18)",
                     color: "#fff",
-                    borderRadius: "999px",
-                    padding: "6px 14px",
                     fontSize: "13px",
-                    fontWeight: 600,
-                    outline: "none",
                     cursor: "pointer",
                   }}
                 >
-                  <option value="off">Off</option>
-                  <option value="en">English (US)</option>
-                  <option value="hi">Hindi</option>
+                  <option value="auto" style={{ background: "#1a1e28" }}>Auto (Best)</option>
+                  <option value="1080p" style={{ background: "#1a1e28" }}>1080p Full HD</option>
+                  <option value="720p" style={{ background: "#1a1e28" }}>720p HD</option>
+                  <option value="4k" style={{ background: "#1a1e28" }}>4K Ultra HD</option>
                 </select>
               </div>
             </div>
           </div>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* Category 3: Privacy & Watch History (Screenshot 9)            */}
-        {/* ------------------------------------------------------------- */}
-        <div style={settingsCardStyle}>
-          <h3 style={sectionHeadingStyle}>Privacy</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <div style={toggleRowStyle}>
+        {/* ============================================================= */}
+        {/* TAB 4: SERVERS                                                */}
+        {/* ============================================================= */}
+        {activeCategory === "servers" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            <span style={sectionLabelStyle}>Servers</span>
+            <div style={cardStyle}>
               <div>
-                <h5 style={toggleTitleStyle}>Watch history</h5>
-                <p style={toggleDescStyle}>Clears Continue Watching shelf and what you've finished.</p>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Streaming Provider Priority</h4>
+                <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                  Server fallback automatically selects fastest responding node
+                </p>
               </div>
-              <button
-                onClick={() => {
-                  if (window.confirm("Clear all Continue Watching and history?")) {
-                    clearWatchHistory();
-                    clearAllContinueWatching();
-                    alert("History cleared!");
-                  }
-                }}
-                style={pillSubButtonStyle}
-              >
-                Clear
-              </button>
-            </div>
-
-            <div style={toggleRowStyle}>
-              <div>
-                <h5 style={toggleTitleStyle}>Ratings & hidden titles</h5>
-                <p style={toggleDescStyle}>Resets what shapes your personalized recommendations.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {["Auto-Fastest Node (Global CDN)", "Ultra Low Latency HLS", "Direct Febbox Cloud"].map((srv, i) => (
+                  <div
+                    key={srv}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 18px",
+                      borderRadius: "14px",
+                      background: i === 0 ? "rgba(229, 9, 20, 0.12)" : "rgba(255, 255, 255, 0.04)",
+                      border: i === 0 ? "1px solid rgba(229, 9, 20, 0.35)" : "1px solid rgba(255, 255, 255, 0.08)",
+                    }}
+                  >
+                    <span style={{ fontSize: "13.5px", fontWeight: 600, color: "#fff" }}>{srv}</span>
+                    <span style={{ fontSize: "12px", color: i === 0 ? "#22c55e" : "rgba(255, 255, 255, 0.5)", fontWeight: 700 }}>
+                      {i === 0 ? "● Active" : "Standby"}
+                    </span>
+                  </div>
+                ))}
               </div>
-              <button
-                onClick={() => {
-                  if (window.confirm("Reset all ratings?")) {
-                    localStorage.removeItem("cinema_user_ratings");
-                    alert("Ratings reset!");
-                  }
-                }}
-                style={pillSubButtonStyle}
-              >
-                Reset
-              </button>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* Category 4: Security & Sign Out (Screenshot 9)                */}
-        {/* ------------------------------------------------------------- */}
-        <div style={settingsCardStyle}>
-          <h3 style={sectionHeadingStyle}>Sign-in & Security</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <div style={toggleRowStyle}>
-              <div>
-                <h5 style={toggleTitleStyle}>Email</h5>
-                <p style={toggleDescStyle}>cinemaisherebtw@gmail.com</p>
+        {/* ============================================================= */}
+        {/* TAB 5: SUBTITLES                                              */}
+        {/* ============================================================= */}
+        {activeCategory === "subtitles" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            <span style={sectionLabelStyle}>Subtitles</span>
+            <div style={cardStyle}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Subtitles by Default</h4>
+                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                    Load English subtitles when media starts
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.subtitlesEnabled !== false}
+                  onChange={(e) => updateSettings({ subtitlesEnabled: e.target.checked })}
+                  style={{ width: "20px", height: "20px", accentColor: "#e50914", cursor: "pointer" }}
+                />
               </div>
-              <button style={pillSubButtonStyle}>Change</button>
-            </div>
-
-            <div style={toggleRowStyle}>
-              <div>
-                <h5 style={toggleTitleStyle}>Sign out</h5>
-                <p style={toggleDescStyle}>Your list and progress stays in your account.</p>
-              </div>
-              <button
-                onClick={() => {
-                  alert("Signed out!");
-                  onClose();
-                }}
-                style={{ ...pillSubButtonStyle, color: "#e50914", borderColor: "rgba(229, 9, 20, 0.4)" }}
-              >
-                Sign Out
-              </button>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ============================================================= */}
+        {/* TAB 6: ADS & FEBBOX                                           */}
+        {/* ============================================================= */}
+        {(activeCategory === "ads" || activeCategory === "febbox") && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            <span style={sectionLabelStyle}>{activeCategory}</span>
+            <div style={cardStyle}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>Ad-Free High-Speed Playback</h4>
+                <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                  Native stream proxy eliminates third-party popups and interstitial ads.
+                </p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 800 }}>✓ ACTIVE & PROTECTED</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* ============================================================= */}
+      {/* MODAL 1: SWITCH PROFILE MODAL                                 */}
+      {/* ============================================================= */}
+      {showSwitchModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100020,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setShowSwitchModal(false)}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "520px",
+              ...cardStyle,
+              padding: "32px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h3 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#fff" }}>Who's Watching?</h3>
+              <button
+                onClick={() => setShowSwitchModal(false)}
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "50%",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "none",
+                  color: "#fff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", justifyContent: "center", padding: "20px 0" }}>
+              {profiles.map((p) => {
+                const isActive = p.id === activeProfile.id;
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      setActiveProfile(p.id);
+                      showToast(`Switched to ${p.name}`);
+                      setShowSwitchModal(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "10px",
+                      cursor: "pointer",
+                      padding: "8px",
+                      borderRadius: "16px",
+                      transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                  >
+                    <div
+                      style={{
+                        position: "relative",
+                        width: "74px",
+                        height: "74px",
+                        borderRadius: "50%",
+                        background: p.avatarColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "34px",
+                        boxShadow: isActive ? "0 0 0 3px #e50914, 0 10px 30px rgba(229, 9, 20, 0.5)" : "0 8px 24px rgba(0, 0, 0, 0.6)",
+                      }}
+                    >
+                      {p.avatar}
+                      {isActive && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: "-2px",
+                            right: "-2px",
+                            width: "22px",
+                            height: "22px",
+                            borderRadius: "50%",
+                            background: "#e50914",
+                            color: "#fff",
+                            fontSize: "12px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "2px solid #07090e",
+                          }}
+                        >
+                          ✓
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: isActive ? 700 : 500, color: isActive ? "#fff" : "rgba(255, 255, 255, 0.75)" }}>
+                      {p.name}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Add Profile button */}
+              <div
+                onClick={() => {
+                  setShowSwitchModal(false);
+                  setShowAddProfileModal(true);
+                }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "10px",
+                  cursor: "pointer",
+                  padding: "8px",
+                  borderRadius: "16px",
+                  transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                <div
+                  style={{
+                    width: "74px",
+                    height: "74px",
+                    borderRadius: "50%",
+                    background: "rgba(255, 255, 255, 0.08)",
+                    border: "1.5px dashed rgba(255, 255, 255, 0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "28px",
+                    color: "rgba(255, 255, 255, 0.7)",
+                  }}
+                >
+                  +
+                </div>
+                <span style={{ fontSize: "14px", fontWeight: 500, color: "rgba(255, 255, 255, 0.7)" }}>Add Profile</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL 2: MANAGE PROFILES MODAL                                */}
+      {/* ============================================================= */}
+      {showManageModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100020,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setShowManageModal(false)}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "500px",
+              ...cardStyle,
+              padding: "28px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "#fff" }}>Manage Profiles</h3>
+              <button
+                onClick={() => setShowManageModal(false)}
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "50%",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "none",
+                  color: "#fff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "300px", overflowY: "auto" }}>
+              {profiles.map((p) => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    borderRadius: "16px",
+                    background: "rgba(255, 255, 255, 0.04)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div
+                      style={{
+                        width: "44px",
+                        height: "44px",
+                        borderRadius: "50%",
+                        background: p.avatarColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "20px",
+                      }}
+                    >
+                      {p.avatar}
+                    </div>
+                    <div>
+                      <h5 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#fff" }}>{p.name}</h5>
+                      <span style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.5)" }}>{p.isKids ? "Kids Profile" : "Standard"}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      className="cinema-settings-pill-btn"
+                      onClick={() => {
+                        setEditingProfile(p);
+                        setNewProfileName(p.name);
+                        const match = AVATAR_OPTIONS.find((a) => a.icon === p.avatar) || AVATAR_OPTIONS[0];
+                        setSelectedAvatar(match);
+                        setShowManageModal(false);
+                      }}
+                      style={pillButtonStyle}
+                    >
+                      Edit
+                    </button>
+                    {profiles.length > 1 && (
+                      <button
+                        className="cinema-settings-danger-btn"
+                        onClick={() => {
+                          if (confirm(`Delete profile "${p.name}"?`)) {
+                            deleteProfile(p.id);
+                            showToast(`Deleted ${p.name}`);
+                          }
+                        }}
+                        style={{
+                          ...pillButtonStyle,
+                          color: "#ff4d4f",
+                          border: "1px solid rgba(255, 77, 79, 0.28)",
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                setShowManageModal(false);
+                setShowAddProfileModal(true);
+              }}
+              style={{
+                ...pillButtonStyle,
+                width: "100%",
+                padding: "12px",
+                background: "rgba(255, 255, 255, 0.12)",
+              }}
+            >
+              + Create New Profile
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL 3: EDIT PROFILE MODAL                                   */}
+      {/* ============================================================= */}
+      {editingProfile && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100021,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setEditingProfile(null)}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "460px",
+              ...cardStyle,
+              padding: "28px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "#fff" }}>Edit Profile</h3>
+            <div>
+              <label style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255, 255, 255, 0.6)" }}>PROFILE NAME</label>
+              <input
+                type="text"
+                value={newProfileName}
+                onChange={(e) => setNewProfileName(e.target.value)}
+                style={{
+                  width: "100%",
+                  marginTop: "6px",
+                  padding: "11px 16px",
+                  borderRadius: "12px",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.16)",
+                  color: "#fff",
+                  fontSize: "14px",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255, 255, 255, 0.6)" }}>CHOOSE AVATAR</label>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "10px" }}>
+                {AVATAR_OPTIONS.map((opt) => (
+                  <div
+                    key={opt.icon}
+                    onClick={() => setSelectedAvatar(opt)}
+                    style={{
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "50%",
+                      background: opt.gradient,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "22px",
+                      cursor: "pointer",
+                      boxShadow: selectedAvatar.icon === opt.icon ? "0 0 0 3px #ffffff, 0 6px 20px " + opt.glow : "none",
+                      transform: selectedAvatar.icon === opt.icon ? "scale(1.1)" : "scale(1)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {opt.icon}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                className="cinema-settings-pill-btn"
+                onClick={() => setEditingProfile(null)}
+                style={pillButtonStyle}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (newProfileName.trim()) {
+                    updateProfile(editingProfile.id, {
+                      name: newProfileName.trim(),
+                      avatar: selectedAvatar.icon,
+                      avatarColor: selectedAvatar.gradient,
+                    });
+                    showToast("Profile updated");
+                    setEditingProfile(null);
+                  }
+                }}
+                style={{
+                  ...pillButtonStyle,
+                  background: "#e50914",
+                  border: "1px solid #e50914",
+                }}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL 4: ADD PROFILE MODAL                                    */}
+      {/* ============================================================= */}
+      {showAddProfileModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100021,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setShowAddProfileModal(false)}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "460px",
+              ...cardStyle,
+              padding: "28px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "#fff" }}>Add New Profile</h3>
+            <div>
+              <label style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255, 255, 255, 0.6)" }}>NAME</label>
+              <input
+                type="text"
+                placeholder="Enter name"
+                value={newProfileName}
+                onChange={(e) => setNewProfileName(e.target.value)}
+                autoFocus
+                style={{
+                  width: "100%",
+                  marginTop: "6px",
+                  padding: "11px 16px",
+                  borderRadius: "12px",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.16)",
+                  color: "#fff",
+                  fontSize: "14px",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255, 255, 255, 0.6)" }}>AVATAR ICON</label>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "10px" }}>
+                {AVATAR_OPTIONS.map((opt) => (
+                  <div
+                    key={opt.icon}
+                    onClick={() => setSelectedAvatar(opt)}
+                    style={{
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "50%",
+                      background: opt.gradient,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "22px",
+                      cursor: "pointer",
+                      boxShadow: selectedAvatar.icon === opt.icon ? "0 0 0 3px #ffffff, 0 6px 20px " + opt.glow : "none",
+                      transform: selectedAvatar.icon === opt.icon ? "scale(1.1)" : "scale(1)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {opt.icon}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                className="cinema-settings-pill-btn"
+                onClick={() => setShowAddProfileModal(false)}
+                style={pillButtonStyle}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (newProfileName.trim()) {
+                    createProfile(newProfileName.trim(), selectedAvatar.icon, selectedAvatar.gradient, false);
+                    showToast(`Created profile ${newProfileName.trim()}`);
+                    setNewProfileName("");
+                    setShowAddProfileModal(false);
+                  }
+                }}
+                disabled={!newProfileName.trim()}
+                style={{
+                  ...pillButtonStyle,
+                  background: "#e50914",
+                  border: "1px solid #e50914",
+                  opacity: newProfileName.trim() ? 1 : 0.5,
+                }}
+              >
+                Create Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL 5: CHANGE EMAIL / SIGN IN MODAL                         */}
+      {/* ============================================================= */}
+      {showEmailModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100021,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setShowEmailModal(false)}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "440px",
+              ...cardStyle,
+              padding: "28px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "#fff" }}>Change Account Email</h3>
+            <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+              All profiles under this account will be associated with this email.
+            </p>
+            <input
+              type="email"
+              value={newEmailInput}
+              onChange={(e) => setNewEmailInput(e.target.value)}
+              placeholder="name@example.com"
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "11px 16px",
+                borderRadius: "12px",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
+                color: "#fff",
+                fontSize: "14px",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                className="cinema-settings-pill-btn"
+                onClick={() => setShowEmailModal(false)}
+                style={pillButtonStyle}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (newEmailInput.trim()) {
+                    setAccountEmail(newEmailInput.trim());
+                    showToast("Account email updated");
+                    setShowEmailModal(false);
+                  }
+                }}
+                disabled={!newEmailInput.trim()}
+                style={{
+                  ...pillButtonStyle,
+                  background: "#e50914",
+                  border: "1px solid #e50914",
+                  opacity: newEmailInput.trim() ? 1 : 0.5,
+                }}
+              >
+                Save Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
-
-// Toggle switch component matching Screenshot 8
-const ToggleSwitch: React.FC<{ checked: boolean; onChange: () => void }> = ({
-  checked,
-  onChange,
-}) => {
-  const [isOn, setIsOn] = useState(checked);
-  return (
-    <div
-      onClick={() => {
-        setIsOn(!isOn);
-        onChange();
-      }}
-      style={{
-        width: "44px",
-        height: "26px",
-        borderRadius: "999px",
-        background: isOn ? "#22c55e" : "rgba(255, 255, 255, 0.22)",
-        position: "relative",
-        cursor: "pointer",
-        transition: "background 0.2s ease",
-        flexShrink: 0,
-      }}
-    >
-      <div
-        style={{
-          width: "20px",
-          height: "20px",
-          borderRadius: "50%",
-          background: "#ffffff",
-          position: "absolute",
-          top: "3px",
-          left: isOn ? "21px" : "3px",
-          transition: "left 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-          boxShadow: "0 2px 6px rgba(0, 0, 0, 0.4)",
-        }}
-      />
-    </div>
-  );
-};
-
-const settingsCardStyle: React.CSSProperties = {
-  background: "rgba(14, 16, 22, 0.78)",
-  backdropFilter: "blur(28px)",
-  WebkitBackdropFilter: "blur(28px)",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
-  borderRadius: "20px",
-  padding: "24px 28px",
-  boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6)",
-  display: "flex",
-  flexDirection: "column",
-  gap: "16px",
-};
-
-const sectionHeadingStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "12px",
-  fontWeight: 800,
-  letterSpacing: "1px",
-  color: "rgba(255, 255, 255, 0.45)",
-  textTransform: "uppercase",
-};
-
-const toggleRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "6px 0",
-};
-
-const toggleTitleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "14.5px",
-  fontWeight: 600,
-  color: "#ffffff",
-};
-
-const toggleDescStyle: React.CSSProperties = {
-  margin: "3px 0 0",
-  fontSize: "12.5px",
-  color: "rgba(255, 255, 255, 0.5)",
-};
-
-const pillSubButtonStyle: React.CSSProperties = {
-  padding: "6px 16px",
-  borderRadius: "999px",
-  background: "rgba(255, 255, 255, 0.08)",
-  border: "1px solid rgba(255, 255, 255, 0.16)",
-  color: "#ffffff",
-  fontSize: "13px",
-  fontWeight: 600,
-  cursor: "pointer",
-  transition: "all 0.15s ease",
 };

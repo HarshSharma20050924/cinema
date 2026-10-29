@@ -10,7 +10,6 @@ import {
   addItemToCustomList,
   removeItemFromCustomList,
   createCustomList,
-  addToWatchHistory,
   type CustomList,
   type UserRatingType,
 } from "../../utils/userListsService";
@@ -51,6 +50,20 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
       setCustomLists(getCustomLists());
     }
   }, [isOpen, post]);
+
+  // Dismiss on any scroll anywhere (window, document, or container)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleScroll = () => {
+      onClose();
+    };
+    window.addEventListener("scroll", handleScroll, { capture: true, passive: true });
+    window.addEventListener("wheel", handleScroll, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll, { capture: true });
+      window.removeEventListener("wheel", handleScroll, { capture: true });
+    };
+  }, [isOpen, onClose]);
 
   // Click outside to close
   useEffect(() => {
@@ -93,51 +106,107 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
     onClose();
   };
 
-  const handleMarkWatched = (e: React.MouseEvent) => {
+  const handleNotInterested = (e: React.MouseEvent) => {
     e.stopPropagation();
-    addToWatchHistory(post);
-    alert(`Marked "${post.title}" as Watched!`);
+    try {
+      const raw = localStorage.getItem("cinema_hidden_titles") || "[]";
+      const list = JSON.parse(raw);
+      const id = String(post.id || post.tmdbId);
+      if (!list.includes(id)) {
+        list.push(id);
+        localStorage.setItem("cinema_hidden_titles", JSON.stringify(list));
+        window.dispatchEvent(new CustomEvent("cinema:hidden_titles_updated"));
+      }
+    } catch (_) {}
     onClose();
   };
 
-  // Compute smart coordinates so menu does not overflow viewport edge
+  const isTv = post.type === "tv" || post.type === "series";
+  const rawYear = post.year || (post.releaseDate ? post.releaseDate.slice(0, 4) : "2024");
+  const mediaTypeLabel = isTv ? "TV Show" : "Movie";
+
+  // Compute smart coordinates matching Screenshot 3
   const menuStyle: React.CSSProperties = {
     position: "fixed",
     zIndex: 99999,
-    width: "250px",
-    background: "rgba(18, 22, 30, 0.88)",
-    backdropFilter: "blur(24px) saturate(190%)",
-    WebkitBackdropFilter: "blur(24px) saturate(190%)",
-    border: "1px solid rgba(255, 255, 255, 0.16)",
-    borderRadius: "18px",
-    padding: "12px",
-    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.14)",
+    width: "256px",
+    background: "rgba(255, 255, 255, 0.12)",
+    backdropFilter: "blur(32px) saturate(200%)",
+    WebkitBackdropFilter: "blur(32px) saturate(200%)",
+    border: "1px solid rgba(255, 255, 255, 0.24)",
+    borderRadius: "22px",
+    padding: "10px 10px 12px",
+    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.4)",
     display: "flex",
     flexDirection: "column",
-    gap: "3px",
-    animation: "fadeInScale 0.15s cubic-bezier(0.16, 1, 0.3, 1)",
+    gap: "2px",
+    animation: "cinemaMenuPop 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
     userSelect: "none",
   };
 
   if (position) {
-    const maxX = typeof window !== "undefined" ? window.innerWidth - 270 : 800;
-    const maxY = typeof window !== "undefined" ? window.innerHeight - 440 : 600;
-    // Align menu so it opens nicely below and aligned with the button
-    const targetX = position.x - 240;
-    menuStyle.left = `${Math.max(16, Math.min(targetX, maxX))}px`;
-    menuStyle.top = `${Math.max(16, Math.min(position.y, maxY))}px`;
+    const menuWidth = 256;
+    const menuHeight = 360;
+    const maxX = typeof window !== "undefined" ? window.innerWidth - (menuWidth + 16) : 800;
+    const maxY = typeof window !== "undefined" ? window.innerHeight - (menuHeight + 16) : 600;
+
+    // Anchor smoothly near the card's trigger button
+    let targetX = position.x - (menuWidth - 20);
+    if (targetX < 16) targetX = position.x + 8;
+    targetX = Math.max(16, Math.min(targetX, maxX));
+
+    let targetY = position.y + 4;
+    if (targetY > maxY) targetY = Math.max(16, position.y - menuHeight - 8);
+
+    menuStyle.left = `${targetX}px`;
+    menuStyle.top = `${targetY}px`;
   } else {
     menuStyle.top = "50%";
     menuStyle.left = "50%";
     menuStyle.transform = "translate(-50%, -50%)";
   }
 
-  const rawYear = post.year || (post.releaseDate ? post.releaseDate.slice(0, 4) : "2024");
-  const mediaTypeLabel = post.type === "tv" || post.type === "series" ? "TV Series" : "Movie";
+  const menuItemStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "10px 12px",
+    borderRadius: "12px",
+    background: "transparent",
+    border: "none",
+    color: "#f1f5f9",
+    fontSize: "14px",
+    fontWeight: 500,
+    cursor: "pointer",
+    textAlign: "left",
+    transition: "background 0.14s ease, color 0.14s ease, transform 0.14s ease",
+    width: "100%",
+  };
 
   return createPortal(
     <>
-      {/* Full-screen click-outside catcher overlay */}
+      <style>{`
+        @keyframes cinemaMenuPop {
+          0% {
+            opacity: 0;
+            transform: scale(0.92) translateY(-4px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .cinema-ctx-btn:hover {
+          background: rgba(255, 255, 255, 0.08) !important;
+          color: #ffffff !important;
+        }
+        .cinema-ctx-reaction:hover {
+          background: rgba(255, 255, 255, 0.14) !important;
+          transform: translateY(-1px);
+        }
+      `}</style>
+
+      {/* Invisible backdrop to capture outside clicks */}
       <div
         style={{
           position: "fixed",
@@ -157,90 +226,76 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
       />
 
       <div ref={menuRef} style={menuStyle} onClick={(e) => e.stopPropagation()}>
-        {/* Header: Title & Subtitle */}
-        <div style={{ padding: "6px 8px 10px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
+        {/* Header: Title & Subtitle matching Screenshot 3 */}
+        <div style={{ padding: "8px 10px 10px" }}>
           <h4
             style={{
               margin: 0,
-              fontSize: "15px",
+              fontSize: "16px",
               fontWeight: 700,
               color: "#ffffff",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              letterSpacing: "-0.2px",
             }}
           >
             {post.title}
           </h4>
-          <span style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.5)", fontWeight: 500 }}>
+          <span style={{ fontSize: "12.5px", color: "rgba(255, 255, 255, 0.52)", fontWeight: 500 }}>
             {mediaTypeLabel} · {rawYear}
           </span>
         </div>
 
-        {/* Action 1: Play */}
+        {/* 1. Go to Show / Movie */}
         <button
-          className="cinema-ctx-item"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-            if (onPlay) onPlay(post);
-          }}
-          style={menuItemStyle}
-        >
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="5 3 19 12 5 21 5 3" />
-          </svg>
-          <span>Play</span>
-        </button>
-
-        {/* Action 2: Details */}
-        <button
-          className="cinema-ctx-item"
+          className="cinema-ctx-btn"
           onClick={(e) => {
             e.stopPropagation();
             onClose();
             if (onOpenDetails) onOpenDetails(post);
+            else if (onPlay) onPlay(post);
           }}
           style={menuItemStyle}
         >
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="16" x2="12" y2="12" />
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
-          <span>Details</span>
+          <span>{isTv ? "Go to Show" : "Go to Movie"}</span>
         </button>
 
-        {/* Action 3: Add to My List */}
-        <button className="cinema-ctx-item" onClick={handleToggleSaved} style={menuItemStyle}>
+        {/* 2. Add to Watchlist */}
+        <button className="cinema-ctx-btn" onClick={handleToggleSaved} style={menuItemStyle}>
           {isSaved ? (
             <>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#e50914" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <span style={{ color: "#e50914", fontWeight: 700 }}>In My List</span>
+              <span style={{ color: "#22c55e", fontWeight: 600 }}>In Watchlist</span>
             </>
           ) : (
             <>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span>Add to My List</span>
+              <span>Add to Watchlist</span>
             </>
           )}
         </button>
 
-        {/* Action 4: Add to a List... */}
+        {/* 3. Add to a List... */}
         <button
-          className="cinema-ctx-item"
+          className="cinema-ctx-btn"
           onClick={(e) => {
             e.stopPropagation();
             setShowAddToListModal(true);
           }}
           style={menuItemStyle}
         >
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
             <line x1="8" y1="6" x2="21" y2="6" />
             <line x1="8" y1="12" x2="21" y2="12" />
             <line x1="8" y1="18" x2="21" y2="18" />
@@ -251,97 +306,152 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
           <span>Add to a List...</span>
         </button>
 
-        {/* Action 5: Reaction Row (Thumbs Down / Up / Heart) matching Screenshot 1 */}
-        <div style={{ display: "flex", gap: "6px", padding: "6px 4px 8px" }}>
+        {/* 4. Reaction Row: [Dislike] [Like] [Heart] matching Screenshot 3 */}
+        <div style={{ display: "flex", gap: "6px", padding: "6px 4px 6px" }}>
+          {/* Dislike */}
           <button
+            className="cinema-ctx-reaction"
             onClick={(e) => handleSetRating("dislike", e)}
             title="Not for me"
-            style={ratingButtonStyle(currentRating === "dislike")}
+            style={{
+              flex: 1,
+              height: "44px",
+              borderRadius: "12px",
+              background: currentRating === "dislike" ? "rgba(255, 255, 255, 0.22)" : "rgba(255, 255, 255, 0.08)",
+              border: "none",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
           >
-            <svg width={16} height={16} viewBox="0 0 24 24" fill={currentRating === "dislike" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+            <svg width={18} height={18} viewBox="0 0 24 24" fill={currentRating === "dislike" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
             </svg>
           </button>
 
+          {/* Like */}
           <button
+            className="cinema-ctx-reaction"
             onClick={(e) => handleSetRating("like", e)}
             title="I like this"
-            style={ratingButtonStyle(currentRating === "like")}
+            style={{
+              flex: 1,
+              height: "44px",
+              borderRadius: "12px",
+              background: currentRating === "like" ? "rgba(255, 255, 255, 0.22)" : "rgba(255, 255, 255, 0.08)",
+              border: "none",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
           >
-            <svg width={16} height={16} viewBox="0 0 24 24" fill={currentRating === "like" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+            <svg width={18} height={18} viewBox="0 0 24 24" fill={currentRating === "like" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
             </svg>
           </button>
 
+          {/* Heart / Love */}
           <button
+            className="cinema-ctx-reaction"
             onClick={(e) => handleSetRating("favorite", e)}
             title="Love this"
-            style={ratingButtonStyle(currentRating === "favorite")}
+            style={{
+              flex: 1,
+              height: "44px",
+              borderRadius: "12px",
+              background: currentRating === "favorite" ? "rgba(229, 9, 20, 0.24)" : "rgba(255, 255, 255, 0.08)",
+              border: "none",
+              color: currentRating === "favorite" ? "#e50914" : "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
           >
-            <svg width={16} height={16} viewBox="0 0 24 24" fill={currentRating === "favorite" ? "#e50914" : "none"} stroke={currentRating === "favorite" ? "#e50914" : "currentColor"} strokeWidth="2">
+            <svg
+              width={18}
+              height={18}
+              viewBox="0 0 24 24"
+              fill={currentRating === "favorite" ? "#e50914" : "none"}
+              stroke={currentRating === "favorite" ? "#e50914" : "currentColor"}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
           </button>
         </div>
 
-        <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.08)", margin: "4px 0" }} />
+        {/* Divider matching Screenshot 3 */}
+        <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.08)", margin: "4px 4px" }} />
 
-        {/* Action 6: Mark as Watched */}
-        <button className="cinema-ctx-item" onClick={handleMarkWatched} style={menuItemStyle}>
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
+        {/* 5. Not Interested */}
+        <button className="cinema-ctx-btn" onClick={handleNotInterested} style={menuItemStyle}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+            <line x1="1" y1="1" x2="23" y2="23" />
           </svg>
-          <span>Mark as Watched</span>
+          <span>Not Interested</span>
         </button>
 
-        {/* Action 7: Download */}
-        <button
-          className="cinema-ctx-item"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-            if (onOpenDownloads) onOpenDownloads(post);
-          }}
-          style={menuItemStyle}
-        >
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          <span>Download...</span>
-        </button>
-
-        {/* Action 8: Share */}
-        <button className="cinema-ctx-item" onClick={handleShare} style={menuItemStyle}>
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="18" cy="5" r="3" />
-            <circle cx="6" cy="12" r="3" />
-            <circle cx="18" cy="19" r="3" />
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+        {/* 6. Share */}
+        <button className="cinema-ctx-btn" onClick={handleShare} style={menuItemStyle}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            <polyline points="16 6 12 2 8 6" />
+            <line x1="12" y1="2" x2="12" y2="15" />
           </svg>
           <span>Share</span>
         </button>
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* ADD TO LIST MODAL (Screenshot 4)                              */}
+      {/* ADD TO LIST MODAL                                             */}
       {/* ------------------------------------------------------------- */}
       {showAddToListModal && (
         <div
-          style={modalOverlayStyle}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100000,
+            background: "rgba(0, 0, 0, 0.72)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
           onClick={(e) => {
             e.stopPropagation();
             setShowAddToListModal(false);
           }}
         >
           <div
-            style={modalCardStyle}
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              background: "rgba(30, 33, 40, 0.95)",
+              backdropFilter: "blur(28px)",
+              WebkitBackdropFilter: "blur(28px)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              borderRadius: "20px",
+              padding: "24px",
+              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.85)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: "19px", fontWeight: 700, color: "#fff" }}>Add to List</h3>
@@ -349,126 +459,166 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
               </div>
               <button
                 onClick={() => setShowAddToListModal(false)}
-                style={closeBtnStyle}
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "none",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                }}
               >
                 ✕
               </button>
             </div>
 
-            {/* List Selection Options */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "16px 0" }}>
-              {/* Option: + New List */}
-              <button
-                onClick={() => {
-                  setShowNewListModal(true);
-                }}
-                style={listOptionButtonStyle}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={plusIconCircleStyle}>+</div>
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: "#fff" }}>New List</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "260px", overflowY: "auto" }}>
+              {customLists.length === 0 ? (
+                <div style={{ padding: "20px 0", textAlign: "center", color: "rgba(255, 255, 255, 0.5)", fontSize: "13.5px" }}>
+                  No custom lists created yet.
                 </div>
-              </button>
-
-              {/* Existing User Lists */}
-              {customLists.map((list) => {
-                const isItemInList = list.items.some(
-                  (i) => String(i.id) === String(post.id) || (post.tmdbId && i.tmdbId === post.tmdbId)
-                );
-                return (
-                  <button
-                    key={list.id}
-                    onClick={() => {
-                      if (isItemInList) {
-                        removeItemFromCustomList(list.id, post.id || post.tmdbId || "");
-                      } else {
-                        addItemToCustomList(list.id, post);
-                      }
-                      setCustomLists(getCustomLists());
-                    }}
-                    style={listOptionButtonStyle}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              ) : (
+                customLists.map((list) => {
+                  const hasItem = list.items.some((i) => (i.id || i.tmdbId) === (post.id || post.tmdbId));
+                  return (
+                    <div
+                      key={list.id}
+                      onClick={() => {
+                        if (hasItem) {
+                          removeItemFromCustomList(list.id, post.id || post.tmdbId);
+                        } else {
+                          addItemToCustomList(list.id, post);
+                        }
+                        setCustomLists(getCustomLists());
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "12px 16px",
+                        borderRadius: "14px",
+                        background: hasItem ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.04)",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ fontSize: "14px", fontWeight: 600, color: "#fff" }}>{list.name}</span>
                       <div
                         style={{
-                          width: "20px",
-                          height: "20px",
-                          borderRadius: "50%",
-                          border: isItemInList ? "2px solid #e50914" : "2px solid rgba(255, 255, 255, 0.4)",
-                          background: isItemInList ? "#e50914" : "transparent",
+                          width: "22px",
+                          height: "22px",
+                          borderRadius: "6px",
+                          background: hasItem ? "#22c55e" : "rgba(255, 255, 255, 0.08)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          transition: "all 0.15s ease",
+                          color: "#fff",
+                          fontSize: "13px",
                         }}
                       >
-                        {isItemInList && <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff" }} />}
+                        {hasItem && "✓"}
                       </div>
-                      <span style={{ fontSize: "14px", fontWeight: 600, color: "#fff" }}>{list.name}</span>
                     </div>
-                    <span style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.45)" }}>
-                      {list.items.length} {list.items.length === 1 ? "title" : "titles"}
-                    </span>
-                  </button>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
-            {/* Done Button */}
             <button
               onClick={() => {
                 setShowAddToListModal(false);
-                onClose();
+                setShowNewListModal(true);
               }}
-              style={actionBtnStyle}
+              style={{
+                padding: "12px",
+                borderRadius: "14px",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                color: "#fff",
+                fontSize: "14px",
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}
             >
-              Done
+              <span>+ Create New List</span>
             </button>
           </div>
         </div>
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* NEW LIST MODAL (Screenshot 5)                                 */}
+      {/* CREATE NEW LIST MODAL                                         */}
       {/* ------------------------------------------------------------- */}
       {showNewListModal && (
         <div
-          style={modalOverlayStyle}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100001,
+            background: "rgba(0, 0, 0, 0.72)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
           onClick={(e) => {
             e.stopPropagation();
             setShowNewListModal(false);
           }}
         >
           <div
-            style={modalCardStyle}
+            style={{
+              width: "100%",
+              maxWidth: "400px",
+              background: "rgba(30, 33, 40, 0.95)",
+              backdropFilter: "blur(28px)",
+              WebkitBackdropFilter: "blur(28px)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              borderRadius: "20px",
+              padding: "24px",
+              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.85)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: "0 0 16px", fontSize: "19px", fontWeight: 700, color: "#fff" }}>New List</h3>
+            <h3 style={{ margin: 0, fontSize: "19px", fontWeight: 700, color: "#fff" }}>Create New List</h3>
             <input
               type="text"
-              placeholder="Name"
+              placeholder="List name (e.g. Weekend Binge, Favorites)"
               value={newListName}
               onChange={(e) => setNewListName(e.target.value)}
               autoFocus
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: "10px",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
-                color: "#ffffff",
-                fontSize: "14px",
-                outline: "none",
-                marginBottom: "20px",
-              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newListName.trim()) {
                   const created = createCustomList(newListName.trim());
                   addItemToCustomList(created.id, post);
-                  setCustomLists(getCustomLists());
-                  setShowNewListModal(false);
                   setNewListName("");
+                  setShowNewListModal(false);
+                  onClose();
                 }
+              }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "12px",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
+                color: "#fff",
+                fontSize: "14px",
+                outline: "none",
+                boxSizing: "border-box",
               }}
             />
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
@@ -477,8 +627,8 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
                 style={{
                   padding: "9px 18px",
                   borderRadius: "999px",
-                  background: "rgba(255, 255, 255, 0.08)",
-                  border: "1px solid rgba(255, 255, 255, 0.16)",
+                  background: "transparent",
+                  border: "1px solid rgba(255, 255, 255, 0.14)",
                   color: "#fff",
                   fontSize: "13.5px",
                   fontWeight: 600,
@@ -492,25 +642,25 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
                   if (newListName.trim()) {
                     const created = createCustomList(newListName.trim());
                     addItemToCustomList(created.id, post);
-                    setCustomLists(getCustomLists());
-                    setShowNewListModal(false);
                     setNewListName("");
+                    setShowNewListModal(false);
+                    onClose();
                   }
                 }}
                 disabled={!newListName.trim()}
                 style={{
                   padding: "9px 22px",
                   borderRadius: "999px",
-                  background: newListName.trim() ? "#e50914" : "rgba(255, 255, 255, 0.14)",
+                  background: "#e50914",
                   border: "none",
                   color: "#fff",
                   fontSize: "13.5px",
                   fontWeight: 700,
                   cursor: newListName.trim() ? "pointer" : "not-allowed",
-                  boxShadow: newListName.trim() ? "0 4px 14px rgba(229, 9, 20, 0.45)" : "none",
+                  opacity: newListName.trim() ? 1 : 0.5,
                 }}
               >
-                Create
+                Create & Add
               </button>
             </div>
           </div>
@@ -519,118 +669,4 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
     </>,
     document.body
   );
-};
-
-const menuItemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  padding: "9px 10px",
-  borderRadius: "10px",
-  background: "transparent",
-  border: "none",
-  color: "#ffffff",
-  fontSize: "13.5px",
-  fontWeight: 500,
-  cursor: "pointer",
-  textAlign: "left",
-  transition: "all 0.15s ease",
-  width: "100%",
-};
-
-const ratingButtonStyle = (active: boolean): React.CSSProperties => ({
-  flex: 1,
-  height: "36px",
-  borderRadius: "10px",
-  background: active ? "rgba(229, 9, 20, 0.22)" : "rgba(255, 255, 255, 0.07)",
-  border: active ? "1px solid #e50914" : "1px solid rgba(255, 255, 255, 0.12)",
-  color: active ? "#ffffff" : "rgba(255, 255, 255, 0.75)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  transition: "all 0.15s ease",
-});
-
-const modalOverlayStyle: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 999999,
-  background: "rgba(0, 0, 0, 0.72)",
-  backdropFilter: "blur(18px)",
-  WebkitBackdropFilter: "blur(18px)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "20px",
-  animation: "fadeIn 0.15s ease",
-};
-
-const modalCardStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: "400px",
-  background: "rgba(18, 22, 30, 0.88)",
-  backdropFilter: "blur(28px)",
-  WebkitBackdropFilter: "blur(28px)",
-  border: "1px solid rgba(255, 255, 255, 0.16)",
-  borderRadius: "20px",
-  padding: "22px",
-  boxShadow: "0 28px 70px rgba(0, 0, 0, 0.9)",
-  display: "flex",
-  flexDirection: "column",
-  animation: "scaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-};
-
-const closeBtnStyle: React.CSSProperties = {
-  width: "30px",
-  height: "30px",
-  borderRadius: "50%",
-  background: "rgba(255, 255, 255, 0.08)",
-  border: "none",
-  color: "#fff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  fontSize: "14px",
-};
-
-const listOptionButtonStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "11px 12px",
-  borderRadius: "12px",
-  background: "rgba(255, 255, 255, 0.05)",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
-  cursor: "pointer",
-  transition: "all 0.15s ease",
-  width: "100%",
-};
-
-const plusIconCircleStyle: React.CSSProperties = {
-  width: "24px",
-  height: "24px",
-  borderRadius: "50%",
-  background: "rgba(255, 255, 255, 0.12)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: "15px",
-  fontWeight: 700,
-  color: "#fff",
-};
-
-const actionBtnStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "11px",
-  borderRadius: "999px",
-  background: "#e50914",
-  border: "none",
-  color: "#ffffff",
-  fontSize: "14px",
-  fontWeight: 700,
-  cursor: "pointer",
-  boxShadow: "0 4px 14px rgba(229, 9, 20, 0.45)",
-  transition: "all 0.15s ease",
 };

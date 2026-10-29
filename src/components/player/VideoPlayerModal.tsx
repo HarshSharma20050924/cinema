@@ -2721,110 +2721,180 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           transition: "opacity 0.3s ease",
         }}
       >
-        {/* Back Button */}
+        {/* Back Button with Pure Crystal Transparent Frosted Glass */}
         <button
           onClick={() => {
             saveCurrentProgress();
             onClose();
           }}
           style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "50%",
-            background: "rgba(255, 255, 255, 0.08)",
-            border: "none",
-            color: "#ffffff",
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
-            justifyContent: "center",
+            gap: "8px",
+            padding: "8px 18px",
+            borderRadius: "9999px",
+            background: "rgba(255, 255, 255, 0.12)",
+            backdropFilter: "blur(28px) saturate(180%)",
+            WebkitBackdropFilter: "blur(28px) saturate(180%)",
+            border: "1px solid rgba(255, 255, 255, 0.24)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
+            color: "#ffffff",
             cursor: "pointer",
-            transition: "all 0.2s ease",
+            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.18)";
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.22)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+            e.currentTarget.style.transform = "scale(1.04)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.24)";
+            e.currentTarget.style.transform = "scale(1)";
           }}
           title="Back to Details (Esc)"
         >
-          <BackIcon size={20} />
+          <BackIcon size={18} />
+          <span style={{ fontSize: "13px", fontWeight: 600 }}>Back</span>
         </button>
 
+        {/* Center Floating Title Pill with Pure Crystal Transparent Frosted Glass */}
+        {title && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "7px 20px",
+              borderRadius: "9999px",
+              background: "rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(28px) saturate(180%)",
+              WebkitBackdropFilter: "blur(28px) saturate(180%)",
+              border: "1px solid rgba(255, 255, 255, 0.24)",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
+              maxWidth: "50%",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "13.5px",
+                fontWeight: 700,
+                color: "#ffffff",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {title}
+            </span>
+            {season && episode && (
+              <span
+                style={{
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                  color: "#ffffff",
+                  background: "rgba(255, 255, 255, 0.16)",
+                  padding: "2px 9px",
+                  borderRadius: "999px",
+                  border: "1px solid rgba(255, 255, 255, 0.28)",
+                  boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.3)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                S{season} E{episode}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Right Action Icons: Watch Party + Comments */}
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button
             onClick={handleCopyWatchParty}
             style={{
-              width: "40px",
-              height: "40px",
+              width: "42px",
+              height: "42px",
               borderRadius: "50%",
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "none",
+              background: "rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(28px) saturate(180%)",
+              WebkitBackdropFilter: "blur(28px) saturate(180%)",
+              border: "1px solid rgba(255, 255, 255, 0.24)",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              transition: "all 0.2s ease",
+              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.18)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.24)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+              e.currentTarget.style.transform = "scale(1.08)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.24)";
+              e.currentTarget.style.transform = "scale(1)";
             }}
             title="Start Watch Party"
           >
-            <WatchPartyIcon size={20} />
+            <WatchPartyIcon size={19} />
           </button>
 
           <button
             onClick={() => showToast("Subtitles & Audio are ready.")}
             style={{
-              width: "40px",
-              height: "40px",
+              width: "42px",
+              height: "42px",
               borderRadius: "50%",
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "none",
+              background: "rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(28px) saturate(180%)",
+              WebkitBackdropFilter: "blur(28px) saturate(180%)",
+              border: "1px solid rgba(255, 255, 255, 0.24)",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              transition: "all 0.2s ease",
+              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.18)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.24)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+              e.currentTarget.style.transform = "scale(1.08)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.24)";
+              e.currentTarget.style.transform = "scale(1)";
             }}
             title="Discussion & Comments"
           >
-            <ChatBubbleIcon size={20} />
+            <ChatBubbleIcon size={19} />
           </button>
         </div>
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 9. SETTINGS FLYOUT MENU (Matching User Screenshot exactly)     */}
+      {/* 9. SETTINGS FLYOUT MENU with Pure Crystal Frosted Glass        */}
       {/* ------------------------------------------------------------- */}
       {activeMenu !== "none" && (
         <div
           style={{
             position: "absolute",
             bottom: "95px",
-            right: "20px",
+            right: "24px",
             width: "330px",
             maxWidth: "calc(100vw - 32px)",
-            backgroundColor: "rgba(14, 16, 22, 0.88)",
-            border: "1px solid rgba(255, 255, 255, 0.16)",
-            borderRadius: "20px",
-            boxShadow: "0 24px 60px rgba(0, 0, 0, 0.95)",
-            backdropFilter: "blur(28px)",
-            WebkitBackdropFilter: "blur(28px)",
-            padding: "4px 0",
+            background: "rgba(255, 255, 255, 0.12)",
+            border: "1px solid rgba(255, 255, 255, 0.24)",
+            borderRadius: "24px",
+            boxShadow: "0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.35)",
+            backdropFilter: "blur(32px) saturate(200%)",
+            WebkitBackdropFilter: "blur(32px) saturate(200%)",
+            padding: "8px 0",
             zIndex: 65,
             animation: "fadeIn 0.18s ease-out",
             overflow: "hidden",
@@ -4002,20 +4072,26 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         className="cinema-player-controls-bottom"
         style={{
           position: "absolute",
-          bottom: "20px",
-          left: "20px",
-          right: "20px",
+          bottom: "24px",
+          left: "24px",
+          right: "24px",
+          maxWidth: "1280px",
+          margin: "0 auto",
           zIndex: 40,
-          background: "linear-gradient(0deg, rgba(7, 9, 14, 0.96) 0%, rgba(7, 9, 14, 0.75) 65%, rgba(7, 9, 14, 0) 100%)",
-          padding: "16px 20px 12px",
-          borderRadius: "16px",
+          background: "rgba(255, 255, 255, 0.10)",
+          backdropFilter: "blur(28px) saturate(180%)",
+          WebkitBackdropFilter: "blur(28px) saturate(180%)",
+          border: "1px solid rgba(255, 255, 255, 0.22)",
+          boxShadow: "0 16px 40px rgba(0, 0, 0, 0.35), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.4)",
+          padding: "14px 22px 14px",
+          borderRadius: "24px",
           display: "flex",
           flexDirection: "column",
           gap: "8px",
           opacity: controlsVisible || !isPlaying ? 1 : 0,
           pointerEvents: controlsVisible || !isPlaying ? "auto" : "none",
-          transition: "opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-          boxShadow: "0 10px 40px rgba(0, 0, 0, 0.6)",
+          transition: "opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+          transform: controlsVisible || !isPlaying ? "translateY(0)" : "translateY(12px)",
         }}
       >
         {/* Clean Hover Time Bubble (User Request: poster box removed, only clean time bubble shown) */}

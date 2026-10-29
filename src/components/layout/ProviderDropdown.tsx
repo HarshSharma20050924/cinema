@@ -55,24 +55,24 @@ export const ProviderDropdown: React.FC<ProviderDropdownProps> = ({
           height: "42px",
           padding: "0 18px",
           borderRadius: "999px",
-          background: "rgba(14, 14, 14, 0.85)",
-          border: "1px solid rgba(255, 255, 255, 0.16)",
+          background: "rgba(255, 255, 255, 0.10)",
+          border: "1px solid rgba(255, 255, 255, 0.22)",
           color: "#ffffff",
           fontSize: "15px",
           fontWeight: 600,
           cursor: "pointer",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
-          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(28px) saturate(200%)",
+          WebkitBackdropFilter: "blur(28px) saturate(200%)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
           transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(24, 24, 24, 0.95)";
-          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
+          e.currentTarget.style.background = "rgba(255, 255, 255, 0.20)";
+          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.38)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = "rgba(14, 14, 14, 0.85)";
-          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";
+          e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.22)";
         }}
       >
         {(activeProvider?.icon || activeProvider?.value === "tpb" || activeProvider?.value === "olamovies") ? (
@@ -138,12 +138,12 @@ export const ProviderDropdown: React.FC<ProviderDropdownProps> = ({
               overflowY: "auto",
               borderRadius: isMobile ? "22px" : "20px",
               padding: "12px",
-              boxShadow: "0 24px 70px rgba(0, 0, 0, 0.98)",
+              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 1.5px rgba(255, 255, 255, 0.35)",
               zIndex: isMobile ? 9999 : 50,
-              background: "rgba(10, 10, 10, 0.98)",
-              backdropFilter: "blur(28px)",
-              WebkitBackdropFilter: "blur(28px)",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
+              background: "rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(32px) saturate(200%)",
+              WebkitBackdropFilter: "blur(32px) saturate(200%)",
+              border: "1px solid rgba(255, 255, 255, 0.22)",
               animation: isMobile ? "slideUpModal 0.2s cubic-bezier(0.16, 1, 0.3, 1)" : "fadeIn 0.15s ease-out",
             }}
           >

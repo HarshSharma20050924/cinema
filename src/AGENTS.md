@@ -1,14 +1,15 @@
 # Cinema UI & Architecture Rules
 
-## 1. Translucent Frosted Glass UI (Navbar Style) Everywhere
-- **STRICT MANDATE**: Every interactive overlay, dropdown menu, popover, shelf scroll arrow, modal header, and floating badge MUST use the **Navbar Frosted Glass UI**.
-- **Never use solid opaque black or dark gray** for dropdowns, popovers, or shelf arrows.
+## 1. Pure Crystal Transparent Frosted Glass UI Everywhere
+- **STRICT MANDATE**: Every interactive overlay, dropdown menu, popover, shelf scroll arrow, modal header, floating badge, and video player control MUST use **Pure Crystal Transparent Frosted Glass**.
+- **STRICT PROHIBITION**: NEVER use dark black, dark grey, or opaque tints (NO `rgba(14, 16, 22)`, `rgba(10, 10, 10)`, or dark black gradients). The glass MUST be truly transparent so it dynamically takes on whatever background is behind it (e.g. blue sea, grey sky, warm sunset, video scenes).
 - **Visual Token Standards**:
-  - `background`: `rgba(14, 16, 22, 0.75)` to `rgba(20, 24, 32, 0.82)` (translucent, never opaque).
-  - `backdropFilter`: `blur(20px)` / `-webkit-backdrop-filter: blur(20px)`.
-  - `border`: `1px solid rgba(255, 255, 255, 0.14)` to `rgba(255, 255, 255, 0.18)`.
-  - `boxShadow`: `0 16px 40px rgba(0, 0, 0, 0.75)`.
-  - `borderRadius`: `999px` (full pill) for buttons/badges, `16px` - `20px` for dropdown menus.
+  - `background`: `rgba(255, 255, 255, 0.08)` to `rgba(255, 255, 255, 0.14)` (pure white translucent, zero black pigment).
+  - `backdropFilter`: `blur(24px) saturate(180%)` to `blur(32px) saturate(200%)`.
+  - `WebkitBackdropFilter`: `blur(24px) saturate(180%)` to `blur(32px) saturate(200%)`.
+  - `border`: `1px solid rgba(255, 255, 255, 0.20)` to `rgba(255, 255, 255, 0.25)`.
+  - `boxShadow`: `0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.4)`.
+  - `borderRadius`: `9999px` (full pill) for buttons/badges, `20px` - `24px` for cards and dropdown menus.
 
 ## 2. Active Selection & Hover Accent (Cinema Red)
 - When a filter pill, toggle, or primary action button is **Active or Selected**, style it with **Solid Cinema Red**:
