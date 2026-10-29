@@ -104,25 +104,24 @@ export async function onRequest(context) {
       }
     };
 
-    // Build candidate URL list: 24/7 Render cloud cluster first for lightning fast response
+    // Build candidate URL list: Active Node Runners & Mobile Backends FIRST
     const candidates = [];
     const now = Date.now();
     const isRelayOnlyRoute = reqUrl.pathname === "/api/fetch" || reqUrl.pathname === "/fetch";
 
-    // 🚀 1. Distributed Render Cluster First: 5 24/7 cloud backends with round-robin load balancing
-    if (!isRelayOnlyRoute) {
-      const balancedRenderNodes = getBalancedRenderCluster();
-      for (const renderNode of balancedRenderNodes) {
-        if (!candidates.includes(renderNode)) {
-          candidates.push(renderNode);
-        }
-      }
-    }
-
-    // 2. Dynamic mobile / local dev runner nodes
+    // 🚀 1. Dynamic Node Runners / Mobile Backends FIRST (Active user runners take top priority)
     if (Array.isArray(pool)) {
-      for (const item of pool) {
-        const isFresh = !item.lastSeen || (now - item.lastSeen < 90000);
+      // Sort: server_local_dev first, then isPrimary, then newest lastSeen
+      const sortedPool = [...pool].sort((a, b) => {
+        if (a?.deviceId === "server_local_dev" && b?.deviceId !== "server_local_dev") return -1;
+        if (b?.deviceId === "server_local_dev" && a?.deviceId !== "server_local_dev") return 1;
+        if (a?.isPrimary && !b?.isPrimary) return -1;
+        if (!a?.isPrimary && b?.isPrimary) return 1;
+        return (b?.lastSeen || 0) - (a?.lastSeen || 0);
+      });
+
+      for (const item of sortedPool) {
+        const isFresh = !item.lastSeen || (now - item.lastSeen < 180000);
         const u = typeof item === "string" ? item : item?.url;
         const isRelay = (typeof item === "object") && (
           item?.role === "residential_relay" ||
@@ -145,6 +144,16 @@ export async function onRequest(context) {
       const clean = backendUrl.replace(/\/+$/, "");
       if (!candidates.includes(clean)) {
         candidates.push(clean);
+      }
+    }
+
+    // 2. Render cloud cluster fallback (ONLY after active runners, for when local runners are offline)
+    if (!isRelayOnlyRoute) {
+      const balancedRenderNodes = getBalancedRenderCluster();
+      for (const renderNode of balancedRenderNodes) {
+        if (!candidates.includes(renderNode)) {
+          candidates.push(renderNode);
+        }
       }
     }
 
@@ -259,7 +268,9 @@ export async function onRequest(context) {
         const controller = new AbortController();
         const isTunnel = candidateUrl.includes("trycloudflare.com");
         const isLongReq = reqUrl.pathname.includes("/streams") || reqUrl.pathname.includes("/download") || reqUrl.pathname.includes("/meta");
-        const timeoutMs = isTunnel ? 2500 : (isLongReq ? 20000 : 5000);
+        const isRender = candidateUrl.includes("onrender.com");
+        // Long scraping operations get 25s; trycloudflare tunnels get 10s for catalog/search; suspended Render fails fast in 2.5s
+        const timeoutMs = isLongReq ? 25000 : (isRender ? 2500 : (isTunnel ? 10000 : 6000));
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const reqHeaders = {

@@ -77,7 +77,7 @@ async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 120
         try {
           const clusterUrl = `${node}${apiSuffix}`;
           const cController = new AbortController();
-          const cTimer = setTimeout(() => cController.abort(), 7000);
+          const cTimer = setTimeout(() => cController.abort(), 2500);
           const cRes = await fetch(clusterUrl, {
             ...init,
             signal: cController.signal,

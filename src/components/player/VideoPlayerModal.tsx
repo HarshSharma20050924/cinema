@@ -631,8 +631,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         });
         baseList.push({
           id: 2,
-          name: "Server 3 (Mirror)",
-          link: `https://cinema-1-zjrx.onrender.com/api/proxy?url=${encodeURIComponent(raw)}`,
+          name: "Server 3 (Edge Stream)",
+          link: `${origin}/api/proxy?url=${encodeURIComponent(raw)}&stream=1`,
         });
       }
     }
