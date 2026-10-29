@@ -477,25 +477,26 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     extractedLang ||
     null;
 
+  const resolvedBackdrop =
+    post.backdropUrl ||
+    tmdbBackdrop ||
+    (cleanTitle ? backdropCache.get(cleanTitle.toLowerCase()) : undefined) ||
+    undefined;
+  const resolvedLogo =
+    post.logoUrl ||
+    tmdbLogo ||
+    (cleanTitle ? logoCache.get(cleanTitle.toLowerCase()) : undefined) ||
+    undefined;
+  const augmentedPost: Post = {
+    ...post,
+    backdropUrl: resolvedBackdrop,
+    logoUrl: resolvedLogo,
+  };
+
   // Handler that passes resolved backdrop and logo to ensure instant seamless full-screen hero transition
   const handleCardClick = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const resolvedBackdrop =
-      post.backdropUrl ||
-      tmdbBackdrop ||
-      (cleanTitle ? backdropCache.get(cleanTitle.toLowerCase()) : undefined) ||
-      undefined;
-    const resolvedLogo =
-      post.logoUrl ||
-      tmdbLogo ||
-      (cleanTitle ? logoCache.get(cleanTitle.toLowerCase()) : undefined) ||
-      undefined;
-    const augmented: Post = {
-      ...post,
-      backdropUrl: resolvedBackdrop,
-      logoUrl: resolvedLogo,
-    };
-    onClick(augmented);
+    onClick(augmentedPost);
   };
 
   return (
@@ -1118,16 +1119,16 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
       {contextMenuOpen && (
         <MediaContextMenu
-          post={augmented}
+          post={augmentedPost}
           isOpen={contextMenuOpen}
           onClose={() => setContextMenuOpen(false)}
           onPlay={() => {
             setContextMenuOpen(false);
-            onClick(augmented);
+            onClick(augmentedPost);
           }}
           onOpenDetails={() => {
             setContextMenuOpen(false);
-            onClick(augmented);
+            onClick(augmentedPost);
           }}
           position={menuPos}
         />
