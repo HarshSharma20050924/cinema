@@ -1942,15 +1942,6 @@ export default function App() {
               onDownload={handleDownloadFromHero}
               onInfo={handleInfoFromHero}
               onSlideChange={(_p, bg) => setAmbientBackdrop(bg || null)}
-              providerShelf={
-                activeNavTab === "home" ? (
-                  <BrowseByProviderShelf
-                    providers={installedProviders}
-                    activeProviderKey={activeProvider?.value}
-                    onSelectProvider={handleSelectProvider}
-                  />
-                ) : undefined
-              }
             />
           )}
 
@@ -2611,19 +2602,33 @@ export default function App() {
 
       {/* 4. Mobile Bottom Nav */}
       <BottomNav
-        activeTab={settingsModalOpen ? "extensions" : activeNavTab}
+        activeTab={
+          isDedicatedSearchOpen || searchQuery
+            ? "search"
+            : isMyListPageOpen || selectedNavTab === "mylist"
+            ? "mylist"
+            : activeNavTab === "movies"
+            ? "movies"
+            : activeNavTab === "tv"
+            ? "tv"
+            : "home"
+        }
         onTabChange={(tab) => {
           setMobileTab(tab);
           if (tab === "home") {
             handleBackToHome();
+            setIsDedicatedSearchOpen(false);
           } else if (tab === "movies") {
+            setIsDedicatedSearchOpen(false);
             handleSelectCategoryNav("movies");
           } else if (tab === "tv") {
+            setIsDedicatedSearchOpen(false);
             handleSelectCategoryNav("tv");
-          } else if (tab === "categories") {
-            handleSelectCategoryNav("categories");
-          } else if (tab === "extensions") {
-            setSettingsModalOpen(true);
+          } else if (tab === "search") {
+            setIsDedicatedSearchOpen(true);
+          } else if (tab === "mylist") {
+            setIsDedicatedSearchOpen(false);
+            handleSelectCategoryNav("mylist");
           }
         }}
         onOpenSettings={() => setSettingsModalOpen(true)}

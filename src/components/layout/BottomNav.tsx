@@ -1,7 +1,7 @@
 import React from 'react';
-import { HomeIcon, FilmIcon, TvIcon, CategoryIcon, ServerIcon } from '../../icons';
+import { HomeIcon, FilmIcon, TvIcon, SearchIcon, BookmarkIcon } from '../../icons';
 
-export type BottomNavTab = 'home' | 'movies' | 'tv' | 'categories' | 'extensions';
+export type BottomNavTab = 'home' | 'movies' | 'tv' | 'search' | 'mylist';
 
 interface BottomNavProps {
   activeTab: BottomNavTab | string;
@@ -31,18 +31,24 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
     {
       id: 'tv',
-      label: 'TV Shows',
+      label: 'TV',
       icon: (active) => <TvIcon size={20} color={active ? '#e50914' : 'currentColor'} />,
     },
     {
-      id: 'categories',
-      label: 'Category',
-      icon: (active) => <CategoryIcon size={20} color={active ? '#e50914' : 'currentColor'} />,
+      id: 'search',
+      label: 'Search',
+      icon: (active) => <SearchIcon size={20} color={active ? '#e50914' : 'currentColor'} />,
     },
     {
-      id: 'extensions',
-      label: 'Extensions',
-      icon: (active) => <ServerIcon size={20} color={active ? '#e50914' : 'currentColor'} />,
+      id: 'mylist',
+      label: 'My List',
+      icon: (active) => (
+        <BookmarkIcon
+          size={20}
+          color={active ? '#e50914' : 'currentColor'}
+          fill={active ? '#e50914' : 'none'}
+        />
+      ),
     },
   ];
 
@@ -61,11 +67,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         display: 'flex',
         alignItems: 'stretch',
         justifyContent: 'space-around',
-        borderTop: '1px solid rgba(255, 255, 255, 0.09)',
-        background: 'linear-gradient(180deg, rgba(14, 14, 18, 0.92) 0%, rgba(6, 6, 8, 0.98) 100%)',
-        backdropFilter: 'blur(24px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.6)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.14)',
+        background: 'rgba(10, 12, 16, 0.84)',
+        backdropFilter: 'blur(30px) saturate(200%)',
+        WebkitBackdropFilter: 'blur(30px) saturate(200%)',
+        boxShadow: '0 -4px 30px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
       }}
     >
       {tabs.map((tab) => {

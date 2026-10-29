@@ -207,16 +207,28 @@ input {
     scroll-snap-type: x proximity !important;
   }
   .catalog-row-item {
-    flex: 0 0 122px !important;
-    width: 122px !important;
+    flex: 0 0 clamp(100px, calc((100vw - 44px) / 3), 118px) !important;
+    width: clamp(100px, calc((100vw - 44px) / 3), 118px) !important;
     scroll-snap-align: start !important;
   }
   .catalog-row-item-landscape {
-    flex: 0 0 clamp(260px, 75vw, 340px) !important;
-    width: clamp(260px, 75vw, 340px) !important;
+    flex: 0 0 clamp(280px, 86vw, 360px) !important;
+    width: clamp(280px, 86vw, 360px) !important;
   }
   .catalog-row-track .skeleton {
-    flex: 0 0 122px !important;
+    flex: 0 0 clamp(100px, calc((100vw - 44px) / 3), 118px) !important;
+  }
+  .catalog-arrow-left, .catalog-arrow-right {
+    display: none !important;
+  }
+  .genre-shelf-track {
+    padding: 0 12px 12px 12px !important;
+    gap: 10px !important;
+  }
+  .genre-topic-card {
+    width: clamp(150px, calc((100vw - 36px) / 2), 185px) !important;
+    height: clamp(92px, calc(((100vw - 36px) / 2) * 0.58), 112px) !important;
+    flex-shrink: 0 !important;
   }
 
   /* Hero Spotlight (Home page) on Mobile */
@@ -252,23 +264,23 @@ input {
     font-size: 13px !important;
   }
 
-  /* Media Post Grid Layout on Mobile - Adaptive for iPhone, Samsung & Budget Phones */
+  /* Media Post Grid Layout on Mobile - Crisp 3 Columns across all smartphones */
   .media-post-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     justify-content: center !important;
-    gap: 12px !important;
-    padding: 0 6px !important;
+    gap: 12px 8px !important;
+    padding: 0 8px !important;
   }
 
   @media (max-width: 360px) {
     .media-post-grid {
-      grid-template-columns: repeat(2, 1fr) !important;
-      gap: 8px !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 10px 6px !important;
       padding: 0 4px !important;
     }
     .catalog-row-item {
-      flex: 0 0 110px !important;
-      width: 110px !important;
+      flex: 0 0 100px !important;
+      width: 100px !important;
     }
   }
 

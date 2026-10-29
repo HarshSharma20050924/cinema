@@ -195,6 +195,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
           <button
             onClick={() => handleScroll("left")}
             aria-label="Scroll Left"
+            className="desktop-only catalog-arrow-left"
             style={{
               position: "absolute",
               left: "14px",
@@ -236,6 +237,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
           <button
             onClick={() => handleScroll("right")}
             aria-label="Scroll Right"
+            className="desktop-only catalog-arrow-right"
             style={{
               position: "absolute",
               right: "14px",

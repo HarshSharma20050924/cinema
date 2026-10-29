@@ -173,6 +173,7 @@ const GenreCard: React.FC<GenreCardProps> = ({ genre, onSelect }) => {
       }}
     >
       <div
+        className="genre-topic-card"
         onClick={() => onSelect(genre.name)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseMove={handleMouseMove}
@@ -319,6 +320,7 @@ export const BrowseByGenreShelf: React.FC<BrowseByGenreShelfProps> = ({
         <button
           onClick={scrollLeft}
           title="Scroll Left"
+          className="desktop-only"
           style={{
             position: "absolute",
             left: "14px",
@@ -366,6 +368,7 @@ export const BrowseByGenreShelf: React.FC<BrowseByGenreShelfProps> = ({
         {/* Horizontal Genre Cards matching cno.to */}
         <div
           ref={scrollRef}
+          className="genre-shelf-track"
           style={{
             display: "flex",
             alignItems: "center",
@@ -386,6 +389,7 @@ export const BrowseByGenreShelf: React.FC<BrowseByGenreShelfProps> = ({
         <button
           onClick={scrollRight}
           title="Scroll Right"
+          className="desktop-only"
           style={{
             position: "absolute",
             right: "14px",

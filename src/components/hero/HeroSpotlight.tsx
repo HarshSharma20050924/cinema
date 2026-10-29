@@ -14,7 +14,6 @@ interface HeroSpotlightProps {
   categoryLabel?: string;
   onSlideChange?: (post: Post, backdropUrl?: string) => void;
   children?: React.ReactNode;
-  providerShelf?: React.ReactNode;
 }
 
 export function cleanHeroTitle(raw: string): string {
@@ -46,7 +45,6 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
   onInfo,
   categoryLabel,
   onSlideChange,
-  providerShelf,
 }) => {
   const slides = useMemo(() => {
     const list: Post[] = [];
@@ -256,9 +254,9 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
       style={{
         position: "relative",
         width: "100%",
-        minHeight: providerShelf ? "840px" : "680px",
-        height: providerShelf ? "92vh" : "85vh",
-        maxHeight: providerShelf ? "960px" : "880px",
+        minHeight: "680px",
+        height: "85vh",
+        maxHeight: "880px",
         display: "flex",
         flexDirection: "column",
         alignItems: "flex-start",
@@ -270,25 +268,20 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
         userSelect: "none",
       }}
     >
-      {/* Background Image Container - Extended down to cover through Browse by Provider (EXACT UNTOUCHED EFFECT) */}
+      {/* Background Image Container */}
       <div
         style={{
           position: "absolute",
           top: 0,
           left: 0,
           right: 0,
-          bottom: providerShelf ? "-60px" : "0",
+          bottom: 0,
           width: "100%",
           zIndex: 1,
           pointerEvents: "none",
           overflow: "hidden",
-          /* MAGIC TRICK: Fades smoothly across the bottom half of Browse by Provider */
-          WebkitMaskImage: providerShelf
-            ? "linear-gradient(to bottom, black 0%, black 86%, transparent 100%)"
-            : "linear-gradient(to bottom, black 0%, black 50%, transparent 95%)",
-          maskImage: providerShelf
-            ? "linear-gradient(to bottom, black 0%, black 86%, transparent 100%)"
-            : "linear-gradient(to bottom, black 0%, black 50%, transparent 95%)",
+          WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 50%, transparent 95%)",
+          maskImage: "linear-gradient(to bottom, black 0%, black 50%, transparent 95%)",
         }}
       >
         {/* CSS Keyframes for Seamless Right-to-Left / Left-to-Right Slide Transition */}
@@ -402,7 +395,7 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
           textAlign: "left",
           gap: "14px",
           padding: "0 48px",
-          marginBottom: providerShelf ? "84px" : "64px",
+          marginBottom: "64px",
           animation:
             prevIndex !== null
               ? direction === "next"
@@ -619,21 +612,6 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
         </div>
       </div>
 
-      {/* Row 2: Browse by Provider (Shifted downward onto extended hero background - UNTOUCHED) */}
-      {providerShelf && (
-        <div
-          style={{
-            position: "relative",
-            zIndex: 4,
-            width: "100%",
-            paddingBottom: "4px",
-            marginTop: "12px",
-          }}
-        >
-          {providerShelf}
-        </div>
-      )}
-
       {/* Navigation Arrows */}
       {slides.length > 1 && (
         <>
@@ -642,7 +620,7 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
             aria-label="Previous slide"
             style={{
               position: "absolute",
-              top: providerShelf ? "34%" : "50%",
+              top: "50%",
               left: "24px",
               transform: "translateY(-50%)",
               zIndex: 5,
@@ -678,7 +656,7 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
             aria-label="Next slide"
             style={{
               position: "absolute",
-              top: providerShelf ? "34%" : "50%",
+              top: "50%",
               right: "24px",
               transform: "translateY(-50%)",
               zIndex: 5,
@@ -712,12 +690,12 @@ export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({
         </>
       )}
 
-      {/* Slide Indicators (Cleanly positioned in the gap above Browse by Provider) */}
+      {/* Slide Indicators */}
       {slides.length > 1 && (
         <div
           style={{
             position: "absolute",
-            bottom: providerShelf ? "200px" : "38px",
+            bottom: "38px",
             right: "48px",
             zIndex: 5,
             display: "flex",

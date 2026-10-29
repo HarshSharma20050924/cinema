@@ -512,6 +512,16 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
     return "movies";
   });
 
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Switch mediaType, sort, and genre dynamically if navigating into categories
   useEffect(() => {
     const t = (initialTitle || "").toLowerCase();
@@ -1142,7 +1152,7 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
       {/* 1. Header Row */}
       <div
         style={{
-          padding: "16px 48px",
+          padding: isMobile ? "12px 14px 8px 14px" : "16px 48px",
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "space-between",
@@ -1380,11 +1390,14 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
       <div
         ref={filterBarRef}
         style={{
-          padding: "10px 48px 24px 48px",
+          padding: isMobile ? "4px 12px 14px 12px" : "10px 48px 24px 48px",
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          flexWrap: "wrap",
+          flexWrap: isMobile ? "nowrap" : "wrap",
+          overflowX: isMobile ? "auto" : "visible",
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: "none",
           position: "relative",
           zIndex: 40,
         }}
@@ -1625,13 +1638,15 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
       </div>
 
       {/* 3. Titles Grid */}
-      <div style={{ padding: "0 48px" }}>
+      <div style={{ padding: isMobile ? "0 12px" : "0 48px" }}>
         {isCurrentlyLoading ? (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(215px, 1fr))",
-              gap: "28px 20px",
+              gridTemplateColumns: isMobile
+                ? "repeat(3, minmax(0, 1fr))"
+                : "repeat(auto-fill, minmax(215px, 1fr))",
+              gap: isMobile ? "12px 8px" : "28px 20px",
             }}
           >
             {Array.from({ length: 18 }).map((_, i) => (
@@ -1690,8 +1705,10 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(215px, 1fr))",
-                gap: "28px 20px",
+                gridTemplateColumns: isMobile
+                  ? "repeat(3, minmax(0, 1fr))"
+                  : "repeat(auto-fill, minmax(215px, 1fr))",
+                gap: isMobile ? "12px 8px" : "28px 20px",
               }}
             >
               {displayedPosts.map((post, idx) => (

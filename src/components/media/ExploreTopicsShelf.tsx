@@ -153,6 +153,7 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, onSelect }) => {
       }}
     >
       <div
+        className="genre-topic-card"
         onClick={() => onSelect(topic.name)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseMove={handleMouseMove}
@@ -302,6 +303,7 @@ export const ExploreTopicsShelf: React.FC<ExploreTopicsShelfProps> = ({
         <button
           onClick={scrollLeft}
           title="Scroll Left"
+          className="desktop-only"
           style={{
             position: "absolute",
             left: "14px",
@@ -349,6 +351,7 @@ export const ExploreTopicsShelf: React.FC<ExploreTopicsShelfProps> = ({
         {/* Horizontal Topic Cards */}
         <div
           ref={scrollRef}
+          className="genre-shelf-track"
           style={{
             display: "flex",
             alignItems: "center",
@@ -369,6 +372,7 @@ export const ExploreTopicsShelf: React.FC<ExploreTopicsShelfProps> = ({
         <button
           onClick={scrollRight}
           title="Scroll Right"
+          className="desktop-only"
           style={{
             position: "absolute",
             right: "14px",

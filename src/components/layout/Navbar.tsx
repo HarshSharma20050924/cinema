@@ -12,6 +12,7 @@ import {
   StarIcon,
   ClapperIcon,
   SparklesIcon,
+  BellIcon,
 } from "../../icons";
 import { NavSearchBar } from "./NavSearchBar";
 import { ProviderDropdown } from "./ProviderDropdown";
@@ -825,94 +826,127 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button
-              onClick={() => setMobileDropdownOpen(!mobileDropdownOpen)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "6px 14px",
-                borderRadius: "999px",
-                background: "rgba(14, 14, 14, 0.85)",
-                border: "1px solid rgba(255, 255, 255, 0.14)",
-                color: "#fff",
-                fontSize: "12px",
-                fontWeight: 600,
-                maxWidth: "140px",
-                cursor: "pointer",
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {activeProvider?.name || "Provider"}
-              </span>
-              <ChevronDownIcon size={11} color="rgba(255, 255, 255, 0.6)" />
-            </button>
-
-            <button
-              onClick={onOpenSettings}
-              style={{
-                width: "34px",
-                height: "34px",
-                borderRadius: "999px",
-                background: "rgba(14, 14, 14, 0.85)",
-                border: "1px solid rgba(255, 255, 255, 0.14)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                cursor: "pointer",
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              <SettingsIcon size={15} />
-            </button>
-
-            {onOpenDownloads && (isDesktop || activeDownloadCount > 0) && (
+            {/* 1. Notifications Button */}
+            <div style={{ position: "relative" }}>
               <button
-                onClick={onOpenDownloads}
-                title="Downloads"
+                onClick={() => {
+                  setNotificationsOpen((prev) => !prev);
+                  setProfileMenuOpen(false);
+                }}
+                title="Notifications"
                 style={{
-                  position: "relative",
-                  width: "34px",
-                  height: "34px",
-                  borderRadius: "999px",
-                  background: "rgba(14, 14, 14, 0.85)",
-                  border: "1px solid rgba(255, 255, 255, 0.14)",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  background: notificationsOpen ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.18)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#fff",
+                  color: "#ffffff",
                   cursor: "pointer",
-                  backdropFilter: "blur(10px)",
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <DownloadIcon size={15} />
-                {activeDownloadCount > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "-2px",
-                      right: "-2px",
-                      width: "16px",
-                      height: "16px",
-                      borderRadius: "50%",
-                      background: "#e50914",
-                      color: "#ffffff",
-                      fontSize: "9px",
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {activeDownloadCount}
-                  </span>
-                )}
+                <BellIcon size={17} />
               </button>
-            )}
+              <NotificationsPopover
+                isOpen={notificationsOpen}
+                onClose={() => setNotificationsOpen(false)}
+              />
+            </div>
 
+            {/* 2. Direct Settings Gear Button */}
+            <button
+              onClick={() => {
+                setNotificationsOpen(false);
+                setProfileMenuOpen(false);
+                onOpenSettings();
+              }}
+              title="Settings"
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                cursor: "pointer",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
+              }}
+            >
+              <SettingsIcon size={16} />
+            </button>
 
+            {/* 3. Sign In or Profile Avatar */}
+            <div style={{ position: "relative" }}>
+              {signedIn ? (
+                <button
+                  onClick={() => {
+                    setProfileMenuOpen((prev) => !prev);
+                    setNotificationsOpen(false);
+                  }}
+                  title={profile.name}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <ProfileAvatar
+                    avatarKey={profile.avatar}
+                    size={36}
+                    gradient={profile.avatarColor}
+                  />
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (onOpenSignIn) onOpenSignIn();
+                  }}
+                  title="Sign In"
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, rgba(140, 100, 250, 0.85) 0%, rgba(90, 60, 220, 0.95) 100%)",
+                    border: "1px solid rgba(255, 255, 255, 0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#ffffff",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 16px rgba(120, 80, 240, 0.4)",
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </button>
+              )}
+
+              <ProfileMenuDropdown
+                isOpen={profileMenuOpen}
+                onClose={() => setProfileMenuOpen(false)}
+                onOpenManageProfiles={() => {
+                  if (onOpenManageProfiles) onOpenManageProfiles();
+                }}
+                onOpenSettings={onOpenSettings}
+              />
+            </div>
           </div>
         </div>
 
@@ -1055,25 +1089,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           </>
         )}
 
-        {/* Mobile Search Row with Clear / Cancel Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <NavSearchBar
-              searchQuery={searchQuery}
-              onSearchChange={onSearchChange}
-              isGlobalSearch={isGlobalSearch}
-              onToggleGlobalSearch={onToggleGlobalSearch}
-              activeProviderName={activeProvider?.name}
-              width="100%"
-            />
-          </div>
-          {searchQuery && (
+        {/* Mobile Search Row (Only visible when active search query exists) */}
+        {searchQuery && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", marginTop: "4px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <NavSearchBar
+                searchQuery={searchQuery}
+                onSearchChange={onSearchChange}
+                isGlobalSearch={isGlobalSearch}
+                onToggleGlobalSearch={onToggleGlobalSearch}
+                activeProviderName={activeProvider?.name}
+                width="100%"
+              />
+            </div>
             <button
               type="button"
               onClick={() => onSearchChange("")}
               title="Cancel search"
               style={{
-                height: "40px",
+                height: "38px",
                 padding: "0 14px",
                 borderRadius: "999px",
                 background: "#e50914",
@@ -1093,8 +1127,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               <XIcon size={13} color="#ffffff" />
               <span>Cancel</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </header>
   );
