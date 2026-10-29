@@ -115,7 +115,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   const [showRatingsHeatmap, setShowRatingsHeatmap] = useState<boolean>(true);
   const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number>(1);
 
-  // Fullscreen landscape poster transition on click into details hero (direct settle on page reload)
+  // Fullscreen landscape poster transition on click into details hero
   const [heroIntroStage, setHeroIntroStage] = useState<"fullscreen" | "fitting" | "settled">(() => {
     if (typeof window !== "undefined") {
       if ((post as any)?.isDirectDeepLink) return "settled";
@@ -131,7 +131,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     setHeroIntroStage("fullscreen");
     const t = setTimeout(() => {
       setHeroIntroStage("settled");
-    }, 400);
+    }, 450);
     return () => clearTimeout(t);
   }, [post?.link, post?.title]);
 
@@ -221,6 +221,14 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   } | null>(null);
   const [heroPosterLoaded, setHeroPosterLoaded] = useState(false);
   const [backdropLoaded, setBackdropLoaded] = useState(false);
+
+  // Safety watchdog timer: never leave backdropLoaded false indefinitely
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBackdropLoaded(true);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [post?.link, post?.title]);
 
   // Real release screenshots from details; fallback to TMDB backdrops only if provider has none
   const allScreenshots: string[] = (
@@ -1437,7 +1445,6 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         }}
         onDownloadLink={(link) => {
           handleDownloadDirectUrl(link.url, link.serverName, `${displayTitle} ${link.quality}`);
-          setActiveTab(null);
         }}
       />
 

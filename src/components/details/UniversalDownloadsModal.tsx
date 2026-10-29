@@ -37,6 +37,7 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
   const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState<number>(6);
+  const [downloadingKeys, setDownloadingKeys] = useState<Record<string, "loading" | "started">>({});
 
   const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false);
   const [episodeDropdownOpen, setEpisodeDropdownOpen] = useState(false);
@@ -718,37 +719,114 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
                           <PlayIcon size={13} fill="#ffffff" color="#ffffff" />
                           <span>Play</span>
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => onDownloadLink?.(link)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            padding: "8px 18px",
-                            borderRadius: "999px",
-                            background: "#ffffff",
-                            color: "#000000",
-                            fontSize: "13px",
-                            fontWeight: 700,
-                            border: "none",
-                            cursor: "pointer",
-                            boxShadow: "0 4px 14px rgba(255, 255, 255, 0.15)",
-                            transition: "all 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#f1f1f1";
-                            e.currentTarget.style.transform = "scale(1.02)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "#ffffff";
-                            e.currentTarget.style.transform = "scale(1)";
-                          }}
-                        >
-                          <DownloadIcon size={13} color="#000000" />
-                          <span>Download</span>
-                        </button>
-                      )}
+                      ) : (() => {
+                        const linkKey = link.id || `${link.url}_${link.serverName}_${link.quality}`;
+                        const dlStatus = downloadingKeys[linkKey];
+                        return (
+                          <button
+                            onClick={() => {
+                              if (dlStatus === "loading") return;
+                              setDownloadingKeys((prev) => ({ ...prev, [linkKey]: "loading" }));
+                              onDownloadLink?.(link);
+                              setTimeout(() => {
+                                setDownloadingKeys((prev) => ({ ...prev, [linkKey]: "started" }));
+                                setTimeout(() => {
+                                  setDownloadingKeys((prev) => {
+                                    const next = { ...prev };
+                                    delete next[linkKey];
+                                    return next;
+                                  });
+                                }, 2800);
+                              }, 2200);
+                            }}
+                            disabled={dlStatus === "loading"}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              padding: "8px 18px",
+                              minWidth: "112px",
+                              borderRadius: "999px",
+                              background: "#ffffff",
+                              color: "#000000",
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              border: "none",
+                              cursor: dlStatus === "loading" ? "wait" : "pointer",
+                              boxShadow: "0 4px 14px rgba(255, 255, 255, 0.15)",
+                              transition: "all 0.15s ease",
+                              opacity: dlStatus === "loading" ? 0.9 : 1,
+                            }}
+                            onMouseEnter={(e) => {
+                              if (dlStatus !== "loading") {
+                                e.currentTarget.style.background = "#f1f1f1";
+                                e.currentTarget.style.transform = "scale(1.02)";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "#ffffff";
+                              e.currentTarget.style.transform = "scale(1)";
+                            }}
+                          >
+                            {dlStatus === "loading" ? (
+                              <div
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "5px",
+                                  height: "18px",
+                                  padding: "0 4px",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: "5px",
+                                    height: "5px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "#000000",
+                                    display: "inline-block",
+                                    animation: "threeDotsBounce 1.2s infinite ease-in-out both",
+                                    animationDelay: "0s",
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    width: "5px",
+                                    height: "5px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "#000000",
+                                    display: "inline-block",
+                                    animation: "threeDotsBounce 1.2s infinite ease-in-out both",
+                                    animationDelay: "0.2s",
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    width: "5px",
+                                    height: "5px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "#000000",
+                                    display: "inline-block",
+                                    animation: "threeDotsBounce 1.2s infinite ease-in-out both",
+                                    animationDelay: "0.4s",
+                                  }}
+                                />
+                              </div>
+                            ) : dlStatus === "started" ? (
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                                <CheckIcon size={13} color="#16a34a" />
+                                <span style={{ color: "#16a34a" }}>Started</span>
+                              </div>
+                            ) : (
+                              <>
+                                <DownloadIcon size={13} color="#000000" />
+                                <span>Download</span>
+                              </>
+                            )}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
@@ -798,6 +876,16 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
         @keyframes cinemaSkeletonShimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
+        }
+        @keyframes threeDotsBounce {
+          0%, 80%, 100% {
+            transform: scale(0.38);
+            opacity: 0.3;
+          }
+          40% {
+            transform: scale(1.15);
+            opacity: 1;
+          }
         }
       `}</style>
     </div>

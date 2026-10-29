@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, Fragment } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "react";
 import { useProviders, matchProvider } from "./hooks/useProviders";
 import { useCatalog } from "./hooks/useCatalog";
 import { useMediaPosts } from "./hooks/useMediaPosts";
@@ -17,13 +17,10 @@ import { HeroSpotlight } from "./components/hero/HeroSpotlight";
 import { MediaGrid } from "./components/media/MediaGrid";
 import { backdropCache } from "./components/media/MediaCard";
 import { Footer } from "./components/layout/Footer";
-import { DetailsModal } from "./components/details/DetailsModal";
-import { VideoPlayerModal } from "./components/player/VideoPlayerModal";
-import { PersonDetailsModal } from "./components/person/PersonDetailsModal";
-import { DownloadManagerModal } from "./components/downloads/DownloadManagerModal";
-import { OnboardingModal } from "./components/setup/OnboardingModal";
+import { cleanSearchQuery, getInitialRouteState } from "./utils/routeState";
+import { AmbientBackground } from "./components/layout/AmbientBackground";
+import { AppModals } from "./components/layout/AppModals";
 import { SettingsModal } from "./components/settings/SettingsModal";
-import { UpdateModal } from "./components/updater/UpdateModal";
 import { DownloadPage } from "./components/download/DownloadPage";
 import { TermsPage } from "./components/legal/TermsPage";
 import { PrivacyPage } from "./components/legal/PrivacyPage";
@@ -41,8 +38,12 @@ import { MyListPage } from "./components/watchlist/MyListPage";
 import { SettingsPage } from "./components/settings/SettingsPage";
 import { HomeCinematicBanner } from "./components/home/HomeCinematicBanner";
 import { ContinueWatchingShelf } from "./components/media/ContinueWatchingShelf";
-import { ContinueWatchingModal } from "./components/media/ContinueWatchingModal";
-import type { ContinueWatchingItem } from "./utils/continueWatchingService";
+import { TopPicksPersonalizedShelf } from "./components/home/TopPicksPersonalizedShelf";
+import { SignInModal } from "./components/auth/SignInModal";
+import { CreateAccountModal } from "./components/auth/CreateAccountModal";
+import { ManageProfilesModal } from "./components/auth/ManageProfilesModal";
+import { GlassToast } from "./components/common/GlassToast";
+import { getContinueWatchingList, type ContinueWatchingItem } from "./utils/continueWatchingService";
 import { ServerIcon, DownloadIcon, RefreshIcon } from "./icons";
 import { TopProgressBar } from "./components/common/TopProgressBar";
 import {
@@ -70,281 +71,6 @@ import type { Provider, Post, MediaDetails, StreamItem, ExternalPlayerType } fro
 
 // Load saved session state on initial startup
 const initialNavState: NavigationState | null = loadNavigationState();
-
-export function cleanSearchQuery(raw: string): string {
-  if (!raw) return "";
-  let clean = raw
-    .replace(/^\s*#?\s*\d+\s*[\.\:\-\)]+\s*/, "") // remove ranking numbers like "1. ", "250. ", "#1 - " but keep titles like "12 Angry Men", "3 Idiots", "1917"
-    .replace(/\(.*?\)/g, "") // remove parenthesized content like (1972), (2026)
-    .replace(/\[.*?\]/g, "") // remove brackets like [1080p], [Dual Audio]
-    .replace(/\b(19\d{2}|20\d{2})\b/g, "") // remove standalone years
-    .replace(
-      /\b(480p|720p|1080p|2160p|4k|hd|web-dl|webrip|bluray|brrip|bdrip|hdrip|dvdrip|x264|x265|hevc|hq|hdtc|cam|camrip|predvd|pre-dvd|v2|untouched|dual audio|multi audio|hindi|english|tamil|telugu|clean|uncut|extended|complete|season\s*\d+|s\d+|episode\s*\d+|e\d+)\b/gi,
-      ""
-    )
-    .replace(/[-_.:|]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return clean || raw.trim();
-}
-
-function getInitialRouteState(saved: NavigationState | null) {
-  const urlParams = new URLSearchParams(window.location.search);
-  const q = urlParams.get("q") || urlParams.get("search") || urlParams.get("query");
-  const isGlobal = urlParams.get("global") === "1";
-  const filter = urlParams.get("filter");
-  const title = urlParams.get("title");
-  const niche = urlParams.get("niche");
-  const pageNum = parseInt(urlParams.get("page") || "1", 10);
-
-  // 1. Search Query parameter ALWAYS takes highest priority over tabs
-  if (q) {
-    return {
-      tab: "home" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: q,
-      isGlobalSearch: isGlobal || saved?.isGlobalSearch || false,
-      nicheId: niche || saved?.selectedNicheId || null,
-      page: !isNaN(pageNum) && pageNum > 0 ? pageNum : (saved?.page || 1),
-    };
-  }
-
-  let tab = urlParams.get("tab");
-  if (!tab && window.location.hash) {
-    const hash = window.location.hash.replace(/^#\/?/, "").toLowerCase();
-    if (hash) tab = hash;
-  }
-  if (!tab && saved?.activeCustomPage) {
-    tab = saved.activeCustomPage;
-  }
-  if (!tab && saved?.activeNavTab) {
-    tab = saved.activeNavTab;
-  }
-
-  if (tab === "top250" || tab === "rankings") {
-    return {
-      tab: "rankings" as const,
-      customPage: "rankings" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "letterboxd") {
-    return {
-      tab: "letterboxd" as const,
-      customPage: "letterboxd" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "imdb") {
-    return {
-      tab: "imdb" as const,
-      customPage: "imdb" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "downloads" || tab === "download") {
-    return {
-      tab: "downloads" as const,
-      customPage: "downloads" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "terms") {
-    return {
-      tab: "terms" as const,
-      customPage: "terms" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "privacy") {
-    return {
-      tab: "privacy" as const,
-      customPage: "privacy" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "disclaimer") {
-    return {
-      tab: "disclaimer" as const,
-      customPage: "disclaimer" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "coming-soon" || tab === "comingsoon" || tab === "upcoming") {
-    return {
-      tab: "coming-soon" as const,
-      customPage: null,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "categories") {
-    return {
-      tab: "categories" as const,
-      customPage: null,
-      isBrowsingCategories: true,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (tab === "movies") {
-    return {
-      tab: "movies" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: title ? { filter: filter || "", title } : null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: niche || null,
-      page: !isNaN(pageNum) && pageNum > 0 ? pageNum : 1,
-    };
-  }
-
-  if (tab === "tv") {
-    return {
-      tab: "tv" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: title ? { filter: filter || "", title } : null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: niche || null,
-      page: !isNaN(pageNum) && pageNum > 0 ? pageNum : 1,
-    };
-  }
-
-  if (tab === "anime") {
-    return {
-      tab: "anime" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: title ? { filter: filter || "/genre/anime", title } : null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: niche || null,
-      page: !isNaN(pageNum) && pageNum > 0 ? pageNum : 1,
-    };
-  }
-
-  if (q) {
-    return {
-      tab: "home" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: q,
-      isGlobalSearch: isGlobal || saved?.isGlobalSearch || false,
-      nicheId: niche || saved?.selectedNicheId || null,
-      page: !isNaN(pageNum) && pageNum > 0 ? pageNum : (saved?.page || 1),
-    };
-  }
-
-  if (tab === "home") {
-    if (filter !== null && title) {
-      return {
-        tab: "home" as const,
-        isBrowsingCategories: false,
-        viewAllCategory: { filter, title },
-        searchQuery: "",
-        isGlobalSearch: false,
-        nicheId: niche || null,
-        page: !isNaN(pageNum) && pageNum > 0 ? pageNum : 1,
-      };
-    }
-    return {
-      tab: "home" as const,
-      isBrowsingCategories: false,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: niche || null,
-      page: 1,
-    };
-  }
-
-  // Fallback to saved session state
-  if (saved?.isBrowsingCategories) {
-    return {
-      tab: "categories" as const,
-      isBrowsingCategories: true,
-      viewAllCategory: null,
-      searchQuery: "",
-      isGlobalSearch: false,
-      nicheId: null,
-      page: 1,
-    };
-  }
-
-  if (saved?.viewAllCategory) {
-    return {
-      tab: saved.activeNavTab || "movies",
-      isBrowsingCategories: false,
-      viewAllCategory: saved.viewAllCategory,
-      searchQuery: saved.searchQuery || "",
-      isGlobalSearch: saved.isGlobalSearch || false,
-      nicheId: saved.selectedNicheId || null,
-      page: saved.page || 1,
-    };
-  }
-
-  return {
-    tab: "home" as const,
-    isBrowsingCategories: false,
-    viewAllCategory: null,
-    searchQuery: saved?.searchQuery || "",
-    isGlobalSearch: saved?.isGlobalSearch || false,
-    nicheId: saved?.selectedNicheId || null,
-    page: saved?.page || 1,
-  };
-}
 
 const initialRoute = getInitialRouteState(initialNavState);
 
@@ -419,17 +145,17 @@ export default function App() {
   const [isDedicatedSearchOpen, setIsDedicatedSearchOpen] = useState<boolean>(false);
   const [ambientBackdrop, setAmbientBackdrop] = useState<string | null>(null);
 
-  // Active top-level navigation tab ("home" | "movies" | "tv" | "anime" | "coming-soon")
-  const [selectedNavTab, setSelectedNavTab] = useState<"home" | "movies" | "tv" | "anime" | "coming-soon">(() => {
+  // Active top-level navigation tab ("home" | "movies" | "tv" | "anime" | "coming-soon" | "mylist")
+  const [selectedNavTab, setSelectedNavTab] = useState<"home" | "movies" | "tv" | "anime" | "coming-soon" | "mylist">(() => {
     if (initialRoute.tab === "movies") return "movies";
     if (initialRoute.tab === "tv") return "tv";
     if (initialRoute.tab === "anime") return "anime";
     if (initialRoute.tab === "coming-soon") return "coming-soon";
-    if (initialRoute.tab === "mylist") return "mylist";
+    if (initialRoute.tab === "mylist" || initialRoute.tab === "watchlist") return "mylist";
     return "home";
   });
   const [isComingSoonPageOpen, setIsComingSoonPageOpen] = useState(initialRoute.tab === "coming-soon");
-  const [isMyListPageOpen, setIsMyListPageOpen] = useState(initialRoute.tab === "mylist");
+  const [isMyListPageOpen, setIsMyListPageOpen] = useState(initialRoute.tab === "mylist" || initialRoute.tab === "watchlist");
 
   // Dynamic Home, Movies & TV Spotlight State (Populated live from TMDB trending)
   const [homeSpotlightItems, setHomeSpotlightItems] = useState<Post[]>(HOME_SPOTLIGHT_ITEMS);
@@ -478,6 +204,36 @@ export default function App() {
   // Dedicated Anime Page Shelves (Matching Anime Showcase & Inspiration)
   const [animeSpotlightItems, setAnimeSpotlightItems] = useState<Post[]>(ANIME_SPOTLIGHT_ITEMS);
   const [animeShelves, setAnimeShelves] = useState<HomeShelf[]>(getInitialAnimeShelves);
+
+  // Auth & Profile Modals State
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
+  const [showManageProfilesModal, setShowManageProfilesModal] = useState(false);
+
+  useEffect(() => {
+    const handleOpenCreate = () => {
+      setShowCreateAccountModal(true);
+      setShowSignInModal(false);
+    };
+    window.addEventListener("cinema:open_create_account", handleOpenCreate);
+    return () => window.removeEventListener("cinema:open_create_account", handleOpenCreate);
+  }, []);
+
+  // Aggregated home posts for dynamic personalized recommendation shelf
+  const allHomePosts = useMemo(() => {
+    const list: any[] = [];
+    homeShelves.forEach((s) => {
+      if (Array.isArray(s.items)) {
+        s.items.forEach((it) => {
+          const key = it.id || it.tmdbId;
+          if (key && !list.some((existing) => (existing.id || existing.tmdbId) === key)) {
+            list.push(it);
+          }
+        });
+      }
+    });
+    return list;
+  }, [homeShelves]);
 
   useEffect(() => {
     let mounted = true;
@@ -549,6 +305,15 @@ export default function App() {
           if (shelf.id === "popular-shows" && live.trendingTv && live.trendingTv.length > 0) {
             return { ...shelf, items: live.trendingTv };
           }
+          if (shelf.id === "top-rated" && live.tvTopRated && live.tvTopRated.length > 0) {
+            return { ...shelf, items: live.tvTopRated };
+          }
+          if (shelf.id === "comedy" && live.tvComedy && live.tvComedy.length > 0) {
+            return { ...shelf, items: live.tvComedy };
+          }
+          if (shelf.id === "animation" && live.tvAnimation && live.tvAnimation.length > 0) {
+            return { ...shelf, items: live.tvAnimation };
+          }
           if (shelf.id === "docuseries" && live.docuseries && live.docuseries.length > 0) {
             return { ...shelf, items: live.docuseries };
           }
@@ -594,7 +359,7 @@ export default function App() {
   }, []);
 
   // Derive active navbar tab
-  const activeNavTab: "home" | "movies" | "tv" | "anime" | "coming-soon" | "categories" | "rankings" | "downloads" =
+  const activeNavTab: "home" | "movies" | "tv" | "anime" | "coming-soon" | "mylist" | "categories" | "rankings" | "downloads" =
     activeCustomPage === "rankings" || activeCustomPage === "letterboxd" || activeCustomPage === "imdb"
       ? "rankings"
       : activeCustomPage === "downloads"
@@ -802,7 +567,22 @@ export default function App() {
   }, []);
 
   // Cast / Person Details State & URL Hash Synchronization (e.g. #!/person/3223)
-  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash;
+      if (hash.startsWith("#!/person/")) {
+        const idPart = hash.replace("#!/person/", "").split("?")[0];
+        const pId = parseInt(idPart, 10);
+        if (!isNaN(pId)) return pId;
+      }
+      const qPerson = new URLSearchParams(window.location.search).get("person");
+      if (qPerson) {
+        const pId = parseInt(qPerson, 10);
+        if (!isNaN(pId)) return pId;
+      }
+    }
+    return null;
+  });
 
   useEffect(() => {
     const syncHash = () => {
@@ -811,17 +591,18 @@ export default function App() {
         const idPart = hash.replace("#!/person/", "").split("?")[0];
         const pId = parseInt(idPart, 10);
         if (!isNaN(pId)) {
+          selectedPersonIdRef.current = pId;
           setSelectedPersonId(pId);
         }
-      } else if (!hash.startsWith("#!/person/") && selectedPersonId !== null) {
+      } else if (!hash.startsWith("#!/person/") && selectedPersonIdRef.current !== null) {
+        selectedPersonIdRef.current = null;
         setSelectedPersonId(null);
       }
     };
 
-    syncHash();
     window.addEventListener("hashchange", syncHash);
     return () => window.removeEventListener("hashchange", syncHash);
-  }, [selectedPersonId]);
+  }, []);
 
   // Synchronize ?play= parameter from URL (e.g. from /vlc/ page or direct links)
   useEffect(() => {
@@ -841,15 +622,28 @@ export default function App() {
   }, []);
 
   const handleOpenPerson = (personId: number) => {
+    selectedPersonIdRef.current = personId;
     setSelectedPersonId(personId);
-    window.location.hash = `#!/person/${personId}`;
+    try {
+      window.history.pushState(
+        { modal: "person", personId },
+        "",
+        window.location.pathname + window.location.search + `#!/person/${personId}`
+      );
+    } catch {}
   };
 
   const handleClosePerson = () => {
+    if (selectedPersonIdRef.current === null) return;
+    selectedPersonIdRef.current = null;
     setSelectedPersonId(null);
-    if (window.location.hash.startsWith("#!/person/")) {
-      window.history.pushState(null, "", window.location.pathname + window.location.search);
-    }
+    try {
+      if (window.history.state?.modal === "person") {
+        window.history.back();
+      } else if (window.location.hash.startsWith("#!/person/")) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    } catch {}
   };
 
   // Save current navigation state to sessionStorage on any change
@@ -962,34 +756,72 @@ export default function App() {
   const savedCatalogScrollY = useRef<number>(0);
   const detailsHistoryStackRef = useRef<Post[]>([]);
   const navHistoryStackRef = useRef<NavigationSnapshot[]>([]);
+  const selectedPersonIdRef = useRef<number | null>(selectedPersonId);
+  const selectedPostRef = useRef<Post | null>(selectedPost);
+  const playbackUrlRef = useRef<string | null>(playbackUrl);
+
+  useEffect(() => {
+    selectedPersonIdRef.current = selectedPersonId;
+  }, [selectedPersonId]);
+
+  useEffect(() => {
+    selectedPostRef.current = selectedPost;
+  }, [selectedPost]);
+
+  useEffect(() => {
+    playbackUrlRef.current = playbackUrl;
+  }, [playbackUrl]);
 
   // Handle browser Back / Forward history (consistent on every page, search, and modal)
   useEffect(() => {
     const onPopState = () => {
       // 1. If video player modal is open, back closes it
-      if (playbackUrl) {
+      if (playbackUrlRef.current) {
+        playbackUrlRef.current = null;
         setPlaybackUrl(null);
+        setPlayerModalState(null);
         return;
       }
 
-      // 2. If person details modal is open, back closes it
-      if (selectedPersonId !== null) {
+      // 2. If person details modal is open, back closes ONLY person modal and returns to media details
+      if (selectedPersonIdRef.current !== null) {
+        selectedPersonIdRef.current = null;
         setSelectedPersonId(null);
+        if (window.location.hash.startsWith("#!/person/")) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
         return;
       }
 
       // 3. If media details modal is open, back returns to previous details or restores catalog/search view!
-      if (selectedPost) {
+      if (selectedPostRef.current) {
         if (detailsHistoryStackRef.current.length > 0) {
           const prevPost = detailsHistoryStackRef.current.pop()!;
           handleSelectPost(prevPost, true);
           return;
         }
+        selectedPostRef.current = null;
         setSelectedPost(null);
         setDetails(null);
         setStreams([]);
         clearOverlayState();
         document.body.style.overflow = "";
+
+        // Clean detail query parameters immediately from URL so reload does not re-open modal
+        if (typeof window !== "undefined") {
+          const sp = new URLSearchParams(window.location.search);
+          sp.delete("title");
+          sp.delete("backdrop");
+          sp.delete("backdropUrl");
+          sp.delete("link");
+          sp.delete("poster");
+          sp.delete("image");
+          sp.delete("movie");
+          sp.delete("item");
+          const newSearch = sp.toString() ? `?${sp.toString()}` : "";
+          window.history.replaceState(null, "", window.location.pathname + newSearch);
+        }
+
         const targetScroll = savedCatalogScrollY.current;
         requestAnimationFrame(() => {
           window.scrollTo({ top: targetScroll, behavior: "instant" });
@@ -1039,7 +871,7 @@ export default function App() {
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [playbackUrl, selectedPersonId, selectedPost]);
+  }, []);
 
   // Track and persist scroll position when browsing the catalog (not in modal)
   useEffect(() => {
@@ -1205,6 +1037,8 @@ export default function App() {
       if (typeof window !== "undefined") {
         const sp = new URLSearchParams(window.location.search);
         sp.delete("title");
+        sp.delete("backdrop");
+        sp.delete("backdropUrl");
         sp.delete("link");
         sp.delete("poster");
         sp.delete("image");
@@ -1243,7 +1077,9 @@ export default function App() {
     episode?: number,
     episodes?: any[],
     seasonsCount?: number,
-    tmdbId?: number
+    tmdbId?: number,
+    initialTime?: number,
+    post?: any
   ) => {
     const rawTitle = title || selectedPost?.title || details?.title || "Cinema Stream";
     const cleanMovieTitle = rawTitle
@@ -1253,6 +1089,22 @@ export default function App() {
       .replace(/[\._-]+/g, " ")
       .replace(/\s+/g, " ")
       .trim();
+
+    const finalTmdbId = tmdbId || (selectedPost as any)?.tmdbId || (details as any)?.id;
+    let autoInitialTime = initialTime;
+    if (!autoInitialTime) {
+      try {
+        const cwList = getContinueWatchingList();
+        const match = cwList.find(
+          (c) =>
+            (finalTmdbId && c.tmdbId === finalTmdbId && c.season === season && c.episode === episode) ||
+            (c.title && (cleanMovieTitle || rawTitle) && c.title.toLowerCase().trim() === (cleanMovieTitle || rawTitle).toLowerCase().trim() && c.season === season && c.episode === episode)
+        );
+        if (match && match.currentTime > 4) {
+          autoInitialTime = match.currentTime;
+        }
+      } catch {}
+    }
 
     setPlayerModalState({
       url,
@@ -1265,7 +1117,9 @@ export default function App() {
       episode,
       episodes,
       seasonsCount,
-      tmdbId,
+      tmdbId: finalTmdbId,
+      initialTime: autoInitialTime,
+      post: post || selectedPost,
     });
     setPlaybackUrl(url);
     saveNavigationState({ playbackUrl: url });
@@ -1418,19 +1272,19 @@ export default function App() {
   // Universal Back Button: Restores exact previous view and scroll position
   const handleGoBack = () => {
     // 1. If video player modal is open, close it
-    if (playbackUrl) {
+    if (playbackUrlRef.current) {
       handleClosePlayer();
       return;
     }
 
     // 2. If person details modal is open, close it
-    if (selectedPersonId !== null) {
-      setSelectedPersonId(null);
+    if (selectedPersonIdRef.current !== null) {
+      handleClosePerson();
       return;
     }
 
     // 3. If media details modal is open, return to previous details or restore catalog/search view
-    if (selectedPost) {
+    if (selectedPostRef.current) {
       handleCloseDetails(true);
       return;
     }
@@ -1699,6 +1553,7 @@ export default function App() {
     setSelectedGenreCategory(null);
     setSelectedProviderGenre(null);
     setIsMergedFilter(false);
+    setIsMyListPageOpen(false);
     setIsComingSoonPageOpen(true);
     setSelectedNavTab("coming-soon");
     setSearchQuery("");
@@ -1722,6 +1577,7 @@ export default function App() {
     ) {
       pushNavSnapshot();
       setIsComingSoonPageOpen(false);
+      setIsMyListPageOpen(false);
       setIsBrowsingCategories(false);
       setSelectedNavTab(
         type === "downloads"
@@ -1740,15 +1596,16 @@ export default function App() {
       return;
     }
 
-    pushNavSnapshot();
     setActiveCustomPage(null);
 
     if (type === "coming-soon") {
+      navHistoryStackRef.current = [];
       handleOpenComingSoon();
       return;
     }
 
     if (type === "mylist") {
+      navHistoryStackRef.current = [];
       detailsHistoryStackRef.current = [];
       setSelectedPost(null);
       setDetails(null);
@@ -1774,6 +1631,7 @@ export default function App() {
     }
 
     if (type === "movies") {
+      navHistoryStackRef.current = [];
       detailsHistoryStackRef.current = [];
       setSelectedPost(null);
       setDetails(null);
@@ -1798,6 +1656,7 @@ export default function App() {
     }
 
     if (type === "tv") {
+      navHistoryStackRef.current = [];
       detailsHistoryStackRef.current = [];
       setSelectedPost(null);
       setDetails(null);
@@ -1806,6 +1665,7 @@ export default function App() {
       document.body.style.overflow = "";
 
       setIsComingSoonPageOpen(false);
+      setIsMyListPageOpen(false);
       setSelectedGenreShowcase(null);
       setIsBrowsingCategories(false);
       setSelectedCategoryId(null);
@@ -1821,6 +1681,7 @@ export default function App() {
     }
 
     if (type === "anime") {
+      navHistoryStackRef.current = [];
       detailsHistoryStackRef.current = [];
       setSelectedPost(null);
       setDetails(null);
@@ -1829,6 +1690,7 @@ export default function App() {
       document.body.style.overflow = "";
 
       setIsComingSoonPageOpen(false);
+      setIsMyListPageOpen(false);
       setSelectedGenreShowcase(null);
       setIsBrowsingCategories(false);
       setSelectedCategoryId(null);
@@ -1844,6 +1706,7 @@ export default function App() {
 
     if (type === "categories") {
       setIsComingSoonPageOpen(false);
+      setIsMyListPageOpen(false);
       setSelectedGenreShowcase(null);
       setIsBrowsingCategories(true);
       setViewAllCategory(null);
@@ -1874,85 +1737,14 @@ export default function App() {
         isLoading={Boolean((loadingProviders || loadingPosts || loadingDetails || loadingStreams) && !selectedPost)}
       />
 
-      {/* 0. ONBOARDING GATE */}
-      {!settings.isConfigured && (
-        <OnboardingModal
-          availableProviders={allProviders}
-          onComplete={(_providerSource, installed) => {
-            completeSetup("Cinema", "Cinema", installed);
-            if (installed.length > 0) {
-              const matched = allProviders.find((p) => p.value === installed[0]);
-              if (matched) setActiveProvider(matched);
-            }
-          }}
-        />
-      )}
-
-      {/* Dynamic Double-Buffered Blurred Ambient Background (Zero-stutter GPU crossfade across all pages) */}
-      {!activeCustomPage && !searchQuery && (bgLayerA || bgLayerB) && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 0,
-            pointerEvents: "none",
-            overflow: "hidden",
-            backgroundColor: "#0a0c10",
-          }}
-        >
-          {/* Layer A */}
-          {bgLayerA && (
-            <div
-              style={{
-                position: "absolute",
-                top: "-15%",
-                left: "-15%",
-                width: "130%",
-                height: "130%",
-                backgroundImage: `url(${bgLayerA})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center 25%",
-                filter: "blur(75px) saturate(2.2) brightness(0.68)",
-                opacity: activeBgLayer === "A" ? 1 : 0,
-                transition: "opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1)",
-                willChange: "opacity",
-                transform: "translate3d(0, 0, 0)",
-              }}
-            />
-          )}
-
-          {/* Layer B */}
-          {bgLayerB && (
-            <div
-              style={{
-                position: "absolute",
-                top: "-15%",
-                left: "-15%",
-                width: "130%",
-                height: "130%",
-                backgroundImage: `url(${bgLayerB})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center 25%",
-                filter: "blur(75px) saturate(2.2) brightness(0.68)",
-                opacity: activeBgLayer === "B" ? 1 : 0,
-                transition: "opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1)",
-                willChange: "opacity",
-                transform: "translate3d(0, 0, 0)",
-              }}
-            />
-          )}
-
-          {/* Lighter atmospheric gradient keeping ambient color glowing throughout entire page & footer */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "linear-gradient(180deg, rgba(10, 12, 16, 0.06) 0%, rgba(10, 12, 16, 0.16) 35%, rgba(10, 12, 16, 0.3) 70%, rgba(10, 12, 16, 0.45) 100%)",
-            }}
-          />
-        </div>
-      )}
+      {/* Dynamic Double-Buffered Blurred Ambient Background */}
+      <AmbientBackground
+        activeCustomPage={activeCustomPage}
+        searchQuery={searchQuery}
+        bgLayerA={bgLayerA}
+        bgLayerB={bgLayerB}
+        activeBgLayer={activeBgLayer}
+      />
 
       {/* 1. Navbar (with CINEMA logo and Home / Movies / TV Shows / Categories) */}
       <Navbar
@@ -1981,6 +1773,9 @@ export default function App() {
         onOpenDownloads={() => setDownloadManagerOpen(true)}
         onOpenSearch={() => setIsDedicatedSearchOpen(true)}
         onGoHome={handleBackToHome}
+        onOpenSignIn={() => setShowSignInModal(true)}
+        onOpenCreateAccount={() => setShowCreateAccountModal(true)}
+        onOpenManageProfiles={() => setShowManageProfilesModal(true)}
         onClose={
           viewAllCategory || selectedGenreShowcase || isBrowsingCategories || isComingSoonPageOpen || activeCustomPage || isDedicatedSearchOpen || searchQuery || navHistoryStackRef.current.length > 0
             ? handleGoBack
@@ -2104,18 +1899,7 @@ export default function App() {
         /* Dedicated My List Page (Matches CNO.TO reference with Continue Watching, Custom Lists, Stats) */
         <MyListPage
           onSelectPost={handleSelectPost}
-          onResumeContinueWatching={(item) => {
-            handlePlayFromHero({
-              id: item.id,
-              title: item.title,
-              image: item.poster || item.backdrop,
-              link: item.streamUrl || item.playbackUrl || "",
-              type: item.type || (item.season ? "tv" : "movie"),
-              provider: item.provider || "movieBoxWeb",
-              tmdbId: item.tmdbId,
-              backdropUrl: item.backdrop,
-            } as any);
-          }}
+          onResumeContinueWatching={handleResumeContinueWatching}
           onOpenDownloads={() => setDownloadManagerOpen(true)}
           onBrowseMore={handleBackToHome}
         />
@@ -2453,7 +2237,14 @@ export default function App() {
                 {/* 3D Landscape Continue Watching Shelf with Red Progress Bar & Time Remaining */}
                 <ContinueWatchingShelf
                   onResume={handleResumeContinueWatching}
-                  onOpenModal={() => setContinueWatchingModalOpen(true)}
+                  onSelectPost={handleSelectPost}
+                  onOpenModal={() => setActiveNavTab("watchlist")}
+                />
+
+                {/* Personalized 16:9 Landscape Shelf: Top Picks for [User] */}
+                <TopPicksPersonalizedShelf
+                  availablePosts={allHomePosts}
+                  onSelectPost={handleSelectPost}
                 />
 
                 {homeShelves.map((shelf, idx) => (
@@ -2838,194 +2629,87 @@ export default function App() {
         onOpenSettings={() => setSettingsModalOpen(true)}
       />
 
-      {/* 5. Media Details & Releases Modal (Survives Reloads) */}
-      {selectedPost && (
-        <DetailsModal
-          post={selectedPost}
-          details={details}
-          loadingDetails={loadingDetails}
-          streams={streams}
-          loadingStreams={loadingStreams}
-          activeProvider={activeProvider}
-          providers={installedProviders}
-          onSelectProvider={(p) => {
-            handleSelectProvider(p);
-            if (selectedPost) {
-              const updated = { ...selectedPost, provider: p.value };
-              handleSelectPost(updated, true);
-            } else {
-              handleCloseDetails();
-            }
-          }}
-          searchQuery={searchQuery}
-          onSearchChange={(q) => {
-            setSearchQuery(q);
-            handleCloseDetails();
-          }}
-          isGlobalSearch={isGlobalSearch}
-          onToggleGlobalSearch={() => setIsGlobalSearch(!isGlobalSearch)}
-          onOpenSettings={() => setSettingsModalOpen(true)}
-          onGoHome={() => {
-            handleBackToHome();
-            handleCloseDetails();
-          }}
-          onSelectCategoryNav={(type) => {
-            handleSelectCategoryNav(type);
-            handleCloseDetails();
-          }}
-          activeNavTab={activeNavTab}
-          defaultPlayer={settings.defaultPlayer}
-          onClose={handleCloseDetails}
-          initialTab={detailsInitialTab}
-          onPlayStream={handleOpenStreamPlayer}
-          onPlayExternal={handlePlayExternal}
-          onSelectRecommended={(p) => handleSelectPost(p)}
-          onSelectPerson={handleOpenPerson}
-          onSearchGlobal={(title) => {
-            const rawTitle = title || selectedPost?.title || details?.title || "";
-            const clean = cleanSearchQuery(rawTitle);
-            const q = clean || rawTitle.trim();
-            if (!q) return;
-
-            detailsHistoryStackRef.current = [];
-            setSelectedPost(null);
-            setDetails(null);
-            setStreams([]);
-            clearOverlayState();
-            document.body.style.overflow = "";
-
-            setActiveCustomPage(null);
-            setIsBrowsingCategories(false);
-            setViewAllCategory(null);
-            setSelectedCategoryId(null);
-            setSelectedGenreCategory(null);
-            setSelectedProviderGenre(null);
-            setIsMergedFilter(false);
-            setIsGlobalSearch(true);
-            setSearchQuery(q);
-            setPage(1);
-
-            // Directly save to session storage navigation state so popstate / back doesn't revert to blank home
-            saveNavigationState({
-              activeProviderValue: activeProvider?.value,
-              activeFilter: "",
-              searchQuery: q,
-              isGlobalSearch: true,
-              page: 1,
-              selectedPost: null,
-              details: null,
-              streams: [],
-              playbackUrl: null,
-              activeNavTab: "home",
-              activeCustomPage: null,
-              isBrowsingCategories: false,
-              viewAllCategory: null,
-              selectedNicheId: null,
-            });
-
-            const newUrl = `${window.location.pathname}?q=${encodeURIComponent(q)}&global=1`;
-            window.history.replaceState({ q, global: "1" }, "", newUrl);
-          }}
-        />
-      )}
-
-      {/* 5b. Cast / Person Details Page with Dedicated Filmography & Bio (Matches Reference) */}
-      {selectedPersonId && (
-        <PersonDetailsModal
-          personId={selectedPersonId}
-          onClose={handleClosePerson}
-          onSelectMedia={(post) => {
-            handleSelectPost(post);
-            handleClosePerson();
-          }}
-          activeProviderKey={activeProvider?.value || "hdhub4u"}
-          activeProvider={activeProvider}
-          providers={installedProviders}
-          onSelectProvider={(p) => {
-            handleSelectProvider(p);
-            handleClosePerson();
-          }}
-          searchQuery={searchQuery}
-          onSearchChange={(q) => {
-            setSearchQuery(q);
-            handleClosePerson();
-          }}
-          isGlobalSearch={isGlobalSearch}
-          onToggleGlobalSearch={() => setIsGlobalSearch(!isGlobalSearch)}
-          onOpenSettings={() => setSettingsModalOpen(true)}
-          onGoHome={() => {
-            handleBackToHome();
-            handleClosePerson();
-          }}
-          onSelectCategoryNav={(type) => {
-            handleSelectCategoryNav(type);
-            handleClosePerson();
-          }}
-          activeNavTab={activeNavTab}
-          onNavigateTab={handleSelectCategoryNav}
-        />
-      )}
-
-      {/* 6. Download Manager Modal */}
-      <DownloadManagerModal
-        isOpen={downloadManagerOpen}
-        onClose={() => setDownloadManagerOpen(false)}
+      {/* Global Application Modals */}
+      <AppModals
+        selectedPost={selectedPost}
+        setSelectedPost={setSelectedPost}
+        details={details}
+        setDetails={setDetails}
+        loadingDetails={loadingDetails}
+        streams={streams}
+        setStreams={setStreams}
+        loadingStreams={loadingStreams}
+        activeProvider={activeProvider}
+        installedProviders={installedProviders}
+        handleSelectProvider={handleSelectProvider}
+        handleSelectPost={handleSelectPost}
+        handleCloseDetails={handleCloseDetails}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        isGlobalSearch={isGlobalSearch}
+        setIsGlobalSearch={setIsGlobalSearch}
+        settingsModalOpen={settingsModalOpen}
+        setSettingsModalOpen={setSettingsModalOpen}
+        handleBackToHome={handleBackToHome}
+        handleSelectCategoryNav={handleSelectCategoryNav}
+        activeNavTab={activeNavTab}
+        defaultPlayer={settings.defaultPlayer}
+        detailsInitialTab={detailsInitialTab}
+        handleOpenStreamPlayer={handleOpenStreamPlayer}
+        handlePlayExternal={handlePlayExternal}
+        handleOpenPerson={handleOpenPerson}
+        detailsHistoryStackRef={detailsHistoryStackRef}
+        setActiveCustomPage={setActiveCustomPage}
+        setIsBrowsingCategories={setIsBrowsingCategories}
+        setViewAllCategory={setViewAllCategory}
+        setSelectedCategoryId={setSelectedCategoryId}
+        setSelectedGenreCategory={setSelectedGenreCategory}
+        setSelectedProviderGenre={setSelectedProviderGenre}
+        setIsMergedFilter={setIsMergedFilter}
+        setPage={setPage}
+        selectedPersonId={selectedPersonId}
+        handleClosePerson={handleClosePerson}
+        downloadManagerOpen={downloadManagerOpen}
+        setDownloadManagerOpen={setDownloadManagerOpen}
+        ambientBackdrop={ambientBackdrop}
+        heroPost={heroPost}
+        heroCandidatePosts={heroCandidatePosts}
+        activeSectionSlides={activeSectionSlides}
+        playerModalState={playerModalState}
+        setPlayerModalState={setPlayerModalState}
+        playbackUrl={playbackUrl}
+        handleClosePlayer={handleClosePlayer}
+        continueWatchingModalOpen={continueWatchingModalOpen}
+        setContinueWatchingModalOpen={setContinueWatchingModalOpen}
+        handleResumeContinueWatching={handleResumeContinueWatching}
       />
 
-      {/* 7. Settings Full-Page View (Frosted Glass UI & Sliding Backdrop) */}
-      {settingsModalOpen && (
-        <SettingsPage
-          onClose={() => setSettingsModalOpen(false)}
-        />
-      )}
-
-      {/* 8. Direct In-App Auto-Updater Modal (Zero Redirects) */}
-      <UpdateModal />
-
-      {/* 9. Butter-Smooth In-App Video Player (Matching CNO.TO aesthetic exactly with Red Theme & Server Retry) */}
-      {(playerModalState || playbackUrl) && (
-        <VideoPlayerModal
-          playbackUrl={playerModalState?.url || playbackUrl}
-          title={playerModalState?.title || selectedPost?.title || details?.title || "Cinema Stream"}
-          backdrop={playerModalState?.backdrop || details?.backdrop || selectedPost?.image}
-          poster={playerModalState?.poster || details?.poster || selectedPost?.image}
-          logo={(details as any)?.logoUrl || (details as any)?.logo || (playerModalState as any)?.logo}
-          servers={playerModalState?.servers || streams}
-          runtime={playerModalState?.runtime || details?.runtime}
-          season={playerModalState?.season}
-          episode={playerModalState?.episode}
-          episodes={playerModalState?.episodes}
-          seasonsCount={playerModalState?.seasonsCount}
-          tmdbId={playerModalState?.tmdbId || (selectedPost as any)?.tmdbId || (details as any)?.id}
-          initialTime={playerModalState?.initialTime}
-          post={playerModalState?.post || selectedPost}
-          onSelectEpisode={(seasonNum, episodeNum) => {
-            setPlayerModalState((prev) =>
-              prev ? { ...prev, season: seasonNum, episode: episodeNum } : null
-            );
-          }}
-          onSelectMedia={(media) => {
-            handleClosePlayer();
-            handleSelectPost({
-              id: String(media.id),
-              title: media.title || media.name || "Movie",
-              image: media.poster_path ? `https://image.tmdb.org/t/p/w500${media.poster_path}` : (media.backdrop_path ? `https://image.tmdb.org/t/p/w780${media.backdrop_path}` : ""),
-              tmdbId: media.id,
-              type: media.media_type || (media.first_air_date ? "tv" : "movie"),
-              releaseDate: media.release_date || media.first_air_date,
-              rating: media.vote_average ? `${media.vote_average.toFixed(1)}/10` : undefined,
-            } as any);
-          }}
-          onClose={handleClosePlayer}
-        />
-      )}
-
-      {/* 10. Frosted Glass Continue Watching Full Modal */}
-      <ContinueWatchingModal
-        isOpen={continueWatchingModalOpen}
-        onClose={() => setContinueWatchingModalOpen(false)}
-        onResume={handleResumeContinueWatching}
+      {/* Auth & Profiles Modals */}
+      <SignInModal
+        isOpen={showSignInModal}
+        onClose={() => setShowSignInModal(false)}
+        onOpenCreateAccount={() => {
+          setShowSignInModal(false);
+          setShowCreateAccountModal(true);
+        }}
       />
-    </div>
+
+      <CreateAccountModal
+        isOpen={showCreateAccountModal}
+        onClose={() => setShowCreateAccountModal(false)}
+        onOpenSignIn={() => {
+          setShowCreateAccountModal(false);
+          setShowSignInModal(true);
+        }}
+        onSuccess={() => {}}
+      />
+
+      <ManageProfilesModal
+        isOpen={showManageProfilesModal}
+        onClose={() => setShowManageProfilesModal(false)}
+      />
+
+      <GlassToast />
+      </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import type { MediaPost } from "../../types";
 import { ContinueWatchingShelf } from "../media/ContinueWatchingShelf";
 import { MediaCard } from "../media/MediaCard";
@@ -9,16 +9,24 @@ import {
   getWatchHistory,
   createCustomList,
   deleteCustomList,
+  toggleSavedItem,
+  addItemToCustomList,
+  removeItemFromCustomList,
   type CustomList,
   type HistoryItem,
 } from "../../utils/userListsService";
-import type { ContinueWatchingItem } from "../../utils/continueWatchingService";
+import { Flame } from "lucide-react";
+import { CloseIcon } from "../../icons";
+import { optimizeImage } from "../../utils/imageOptimizer";
+import { toast } from "../../utils/toastService";
 
 interface MyListPageProps {
   onSelectPost: (post: MediaPost) => void;
   onResumeContinueWatching: (item: ContinueWatchingItem) => void;
   onOpenDownloads?: (post: MediaPost) => void;
   onBrowseMore?: () => void;
+  currentBackdrop?: string | null;
+  backdropSlides?: any[];
 }
 
 export const MyListPage: React.FC<MyListPageProps> = ({
@@ -26,11 +34,73 @@ export const MyListPage: React.FC<MyListPageProps> = ({
   onResumeContinueWatching,
   onOpenDownloads,
   onBrowseMore,
+  currentBackdrop,
+  backdropSlides,
 }) => {
   const [activeTab, setActiveTab] = useState<"saved" | "ratings" | "history" | "stats">("saved");
   const [typeFilter, setTypeFilter] = useState<"all" | "movie" | "tv">("all");
   const [sortBy, setSortBy] = useState<"recent" | "title" | "rating">("recent");
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const sortDropdownRef = useRef<HTMLDivElement | null>(null);
   const [selectedList, setSelectedList] = useState<CustomList | null>(null);
+
+  // Tab & Filter Sliding Pill Indicators
+  const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const [tabIndicator, setTabIndicator] = useState<{ left: number; top: number; width: number; height: number; opacity: number }>({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    opacity: 0,
+  });
+
+  const typeRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const listHeaderBoxRef = useRef<HTMLDivElement>(null);
+  const [typeIndicator, setTypeIndicator] = useState<{ left: number; top: number; width: number; height: number; opacity: number }>({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    opacity: 0,
+  });
+
+  useLayoutEffect(() => {
+    const el = tabRefs.current[activeTab];
+    if (el) {
+      setTabIndicator({
+        left: el.offsetLeft,
+        top: el.offsetTop,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        opacity: 1,
+      });
+    }
+  }, [activeTab]);
+
+  useLayoutEffect(() => {
+    const el = typeRefs.current[typeFilter];
+    if (el) {
+      setTypeIndicator({
+        left: el.offsetLeft,
+        top: el.offsetTop,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        opacity: 1,
+      });
+    }
+  }, [typeFilter]);
+
+  // Click outside to close sort dropdown
+  useEffect(() => {
+    if (!sortDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(e.target as Node)) {
+        setSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [sortDropdownOpen]);
 
   // User state
   const [customLists, setCustomLists] = useState<CustomList[]>([]);
@@ -62,21 +132,39 @@ export const MyListPage: React.FC<MyListPageProps> = ({
     };
   }, []);
 
-  // Ambient sliding backdrop images
-  const ambientImages = [
-    "https://image.tmdb.org/t/p/original/sHI9xlFRWCJ38AIIfOqnGjuEvXz.jpg",
-    "https://image.tmdb.org/t/p/original/m4TUaeqAIf2m4Y49zB1AecQ2b19.jpg",
-    "https://image.tmdb.org/t/p/original/yDHYTfA3R0jFYba16jBB1ef8oIt.jpg",
-    "https://image.tmdb.org/t/p/original/8YFL5QQVPy3AgrEQxNYVSgiPEbe.jpg",
-  ];
+  // Instant ambient sliding backdrop images dynamically synced with active tab
+  const slideUrls = useMemo(() => {
+    const urls: string[] = [];
+    if (currentBackdrop && typeof currentBackdrop === "string") {
+      urls.push(currentBackdrop);
+    }
+    if (Array.isArray(backdropSlides)) {
+      backdropSlides.forEach((s: any) => {
+        const bg = s?.backdropUrl || s?.backdrop || s?.image;
+        if (bg && typeof bg === "string" && !urls.includes(bg)) {
+          urls.push(bg);
+        }
+      });
+    }
+    if (urls.length === 0) {
+      urls.push(
+        "https://image.tmdb.org/t/p/w1280/m4TUaeqAIf2m4Y49zB1AecQ2b19.jpg",
+        "https://image.tmdb.org/t/p/w1280/yDHYTfA3R0jFYba16jBB1ef8oIt.jpg",
+        "https://image.tmdb.org/t/p/w1280/8YFL5QQVPy3AgrEQxNYVSgiPEbe.jpg"
+      );
+    }
+    return urls;
+  }, [currentBackdrop, backdropSlides]);
+
   const [activeBgIdx, setActiveBgIdx] = useState(0);
 
   useEffect(() => {
+    if (slideUrls.length <= 1) return;
     const timer = setInterval(() => {
-      setActiveBgIdx((prev) => (prev + 1) % ambientImages.length);
-    }, 9000);
+      setActiveBgIdx((prev) => (prev + 1) % slideUrls.length);
+    }, 8500);
     return () => clearInterval(timer);
-  }, [ambientImages.length]);
+  }, [slideUrls.length]);
 
   // Filtered and sorted items for active tab
   const displayItems = useMemo(() => {
@@ -115,10 +203,8 @@ export const MyListPage: React.FC<MyListPageProps> = ({
         overflowX: "hidden",
       }}
     >
-      {/* ------------------------------------------------------------- */}
-      {/* Dynamic Ambient Sliding Blurred Backdrop                      */}
-      {/* ------------------------------------------------------------- */}
-      {ambientImages.map((imgUrl, i) => (
+      {/* Dynamic Instant Blurred Ambient Slideshow (Zero lag, uses current tab's active backdrops) */}
+      {slideUrls.map((imgUrl, i) => (
         <div
           key={imgUrl}
           style={{
@@ -126,16 +212,28 @@ export const MyListPage: React.FC<MyListPageProps> = ({
             inset: 0,
             backgroundImage: `url(${imgUrl})`,
             backgroundSize: "cover",
-            backgroundPosition: "center",
-            filter: "blur(60px) brightness(0.25) saturate(160%)",
-            transform: "scale(1.1)",
+            backgroundPosition: "center 30%",
+            filter: "blur(42px) brightness(0.72) saturate(160%)",
+            transform: "scale(1.12)",
             opacity: activeBgIdx === i ? 1 : 0,
-            transition: "opacity 2.5s cubic-bezier(0.16, 1, 0.3, 1)",
+            transition: "opacity 1.6s cubic-bezier(0.16, 1, 0.3, 1)",
             pointerEvents: "none",
             zIndex: 0,
+            willChange: "opacity",
           }}
         />
       ))}
+
+      {/* Atmospheric depth overlay for high text contrast without muddy dark/red glow */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "linear-gradient(180deg, rgba(6, 8, 14, 0.15) 0%, rgba(6, 8, 14, 0.32) 50%, rgba(6, 8, 14, 0.52) 100%)",
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+      />
 
       {/* Main Content Container */}
       <div
@@ -179,6 +277,7 @@ export const MyListPage: React.FC<MyListPageProps> = ({
             <div style={{ display: "flex", gap: "32px", alignItems: "center" }}>
               {/* Big List Playlist Icon Box */}
               <div
+                ref={listHeaderBoxRef}
                 style={{
                   width: "160px",
                   height: "210px",
@@ -213,7 +312,7 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                   <button
                     onClick={() => {
                       navigator.clipboard?.writeText(window.location.href);
-                      alert("List link copied to clipboard!");
+                      toast.success("List link copied to clipboard!");
                     }}
                     style={pillActionButtonStyle}
                   >
@@ -221,13 +320,13 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                   </button>
                   <button
                     onClick={() => {
-                      if (window.confirm(`Delete list "${selectedList.name}"?`)) {
-                        deleteCustomList(selectedList.id);
-                        setSelectedList(null);
-                        setCustomLists(getCustomLists());
-                      }
+                      const listName = selectedList.name;
+                      deleteCustomList(selectedList.id);
+                      setSelectedList(null);
+                      setCustomLists(getCustomLists());
+                      toast.info(`Deleted list "${listName}"`);
                     }}
-                    style={{ ...pillActionButtonStyle, background: "rgba(229, 9, 20, 0.15)", borderColor: "rgba(229, 9, 20, 0.4)" }}
+                    style={{ ...pillActionButtonStyle, background: "rgba(255, 255, 255, 0.08)", borderColor: "rgba(255, 255, 255, 0.18)" }}
                   >
                     Delete List
                   </button>
@@ -288,53 +387,60 @@ export const MyListPage: React.FC<MyListPageProps> = ({
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#ffffff" }}>Your Lists</h2>
               <div style={{ display: "flex", gap: "20px", overflowX: "auto", paddingBottom: "12px" }}>
-                {/* + New List Card */}
+                {/* + New List Card (Equalized height with list cards) */}
                 <div
                   onClick={() => setShowNewListModal(true)}
                   style={{
                     width: "180px",
                     minWidth: "180px",
-                    aspectRatio: "2/3",
-                    borderRadius: "14px",
-                    border: "1.5px dashed rgba(255, 255, 255, 0.22)",
-                    background: "rgba(255, 255, 255, 0.04)",
-                    backdropFilter: "blur(16px)",
-                    WebkitBackdropFilter: "blur(16px)",
                     display: "flex",
                     flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "10px",
+                    gap: "8px",
                     cursor: "pointer",
-                    transition: "all 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
+                    transition: "transform 0.2s ease",
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.45)";
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-                    e.currentTarget.style.transform = "translateY(-8px) scale(1.02)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.22)";
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
-                    e.currentTarget.style.transform = "translateY(0) scale(1)";
-                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-4px)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
                 >
                   <div
                     style={{
-                      width: "40px",
-                      height: "40px",
-                      borderRadius: "50%",
-                      background: "rgba(255, 255, 255, 0.10)",
+                      width: "100%",
+                      aspectRatio: "2/3",
+                      borderRadius: "14px",
+                      border: "1.5px dashed rgba(255, 255, 255, 0.22)",
+                      background: "rgba(255, 255, 255, 0.04)",
+                      backdropFilter: "blur(16px)",
+                      WebkitBackdropFilter: "blur(16px)",
                       display: "flex",
+                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: "22px",
-                      fontWeight: 600,
+                      gap: "10px",
+                      transition: "all 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
                     }}
                   >
-                    +
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                        background: "rgba(255, 255, 255, 0.10)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "22px",
+                        fontWeight: 600,
+                        color: "#ffffff",
+                      }}
+                    >
+                      +
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#cbd5e1" }}>New List</span>
                   </div>
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: "#cbd5e1" }}>New List</span>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontSize: "14px", fontWeight: 700, color: "transparent", userSelect: "none" }}>&nbsp;</span>
+                    <span style={{ fontSize: "12px", color: "transparent", userSelect: "none" }}>&nbsp;</span>
+                  </div>
                 </div>
 
                 {/* User Created Lists */}
@@ -344,6 +450,7 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                     <div
                       key={list.id}
                       onClick={() => setSelectedList(list)}
+                      className="custom-list-card-item"
                       style={{
                         width: "180px",
                         minWidth: "180px",
@@ -352,11 +459,21 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                         gap: "8px",
                         cursor: "pointer",
                         transition: "transform 0.2s ease",
+                        position: "relative",
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-4px)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        const delBtn = e.currentTarget.querySelector(".list-del-btn") as HTMLElement | null;
+                        if (delBtn) delBtn.style.opacity = "1";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        const delBtn = e.currentTarget.querySelector(".list-del-btn") as HTMLElement | null;
+                        if (delBtn) delBtn.style.opacity = "0";
+                      }}
                     >
                       <div
+                        className="custom-list-card-box"
                         style={{
                           width: "100%",
                           aspectRatio: "2/3",
@@ -368,7 +485,12 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                         }}
                       >
                         {firstPoster ? (
-                          <img src={firstPoster} alt={list.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <img
+                            crossOrigin="anonymous"
+                            src={optimizeImage(firstPoster, "card")}
+                            alt={list.name}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
                         ) : (
                           <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center" }}>
                             <svg width={36} height={36} viewBox="0 0 24 24" fill="none" stroke="rgba(255, 255, 255, 0.4)" strokeWidth="1.8">
@@ -378,6 +500,51 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                             </svg>
                           </div>
                         )}
+
+                        {/* Delete List Button on Card Hover */}
+                        <button
+                          className="list-del-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteCustomList(list.id);
+                            setCustomLists(getCustomLists());
+                            toast.info(`Deleted list "${list.name}"`);
+                          }}
+                          title="Delete List"
+                          style={{
+                            position: "absolute",
+                            top: "8px",
+                            right: "8px",
+                            zIndex: 6,
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "50%",
+                            background: "rgba(14, 16, 22, 0.75)",
+                            backdropFilter: "blur(12px)",
+                            WebkitBackdropFilter: "blur(12px)",
+                            border: "1px solid rgba(255, 255, 255, 0.18)",
+                            color: "#ffffff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.6)",
+                            opacity: 0,
+                            transition: "opacity 0.18s ease, transform 0.18s ease, background 0.18s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#e50914";
+                            e.currentTarget.style.borderColor = "#e50914";
+                            e.currentTarget.style.transform = "scale(1.08)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(14, 16, 22, 0.75)";
+                            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.18)";
+                            e.currentTarget.style.transform = "scale(1)";
+                          }}
+                        >
+                          <CloseIcon size={14} color="#ffffff" />
+                        </button>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         <span style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>{list.name}</span>
@@ -391,30 +558,69 @@ export const MyListPage: React.FC<MyListPageProps> = ({
               </div>
             </div>
 
-            {/* 3. Filter Navigation & Showcase (Screenshots 2 & 7) */}
+            {/* 3. Filter Navigation & Showcase */}
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              {/* Category Pills Row */}
+              {/* Category Pills Row with Sliding Frosted Glass Capsule (Zero Red Effect) */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
-                {/* Left Pills: Saved, Ratings, History, Stats */}
-                <div style={{ display: "flex", gap: "8px" }}>
+                {/* Left Pills Capsule: Saved, Ratings, History, Stats */}
+                <div
+                  style={{
+                    position: "relative",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "4px 6px",
+                    borderRadius: "9999px",
+                    background: "rgba(255, 255, 255, 0.08)",
+                    backdropFilter: "blur(24px) saturate(180%)",
+                    WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                    border: "1px solid rgba(255, 255, 255, 0.16)",
+                    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.25)",
+                  }}
+                >
+                  {/* Sliding Translucent Frosted Pill Indicator (Zero Red!) */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: `${tabIndicator.top}px`,
+                      left: 0,
+                      transform: `translate3d(${tabIndicator.left}px, 0, 0)`,
+                      width: `${tabIndicator.width}px`,
+                      height: `${tabIndicator.height}px`,
+                      borderRadius: "9999px",
+                      background: "rgba(255, 255, 255, 0.18)",
+                      border: "1px solid rgba(255, 255, 255, 0.24)",
+                      boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
+                      opacity: tabIndicator.opacity,
+                      pointerEvents: "none",
+                      transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
+                      willChange: "transform, width",
+                      zIndex: 1,
+                    }}
+                  />
+
                   {(["saved", "ratings", "history", "stats"] as const).map((tab) => {
                     const isActive = activeTab === tab;
                     return (
                       <button
                         key={tab}
+                        ref={(el) => {
+                          tabRefs.current[tab] = el;
+                        }}
                         onClick={() => setActiveTab(tab)}
                         style={{
+                          position: "relative",
+                          zIndex: 2,
                           padding: "8px 20px",
-                          borderRadius: "999px",
-                          background: isActive ? "#e50914" : "rgba(255, 255, 255, 0.08)",
-                          border: isActive ? "1px solid #e50914" : "1px solid rgba(255, 255, 255, 0.14)",
-                          color: "#ffffff",
+                          borderRadius: "9999px",
+                          background: "transparent",
+                          border: "none",
+                          color: isActive ? "#ffffff" : "rgba(255, 255, 255, 0.72)",
                           fontSize: "13.5px",
                           fontWeight: isActive ? 700 : 500,
                           cursor: "pointer",
-                          boxShadow: isActive ? "0 4px 14px rgba(229, 9, 20, 0.45)" : "none",
                           textTransform: "capitalize",
-                          transition: "all 0.15s ease",
+                          transition: "color 0.15s ease",
                         }}
                       >
                         {tab}
@@ -423,24 +629,65 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                   })}
                 </div>
 
-                {/* Right Filters: All / Movies / Shows + Sort */}
+                {/* Right Filters: All / Movies / Shows + Custom Frosted Dropdown */}
                 {activeTab !== "stats" && (
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                    <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.07)", borderRadius: "999px", padding: "3px" }}>
+                  <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    {/* All / Movies / Shows Capsule with Sliding Indicator */}
+                    <div
+                      style={{
+                        position: "relative",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "2px",
+                        padding: "4px 5px",
+                        borderRadius: "9999px",
+                        background: "rgba(255, 255, 255, 0.08)",
+                        backdropFilter: "blur(20px)",
+                        WebkitBackdropFilter: "blur(20px)",
+                        border: "1px solid rgba(255, 255, 255, 0.14)",
+                      }}
+                    >
+                      {/* Sliding Pill */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: `${typeIndicator.top}px`,
+                          left: 0,
+                          transform: `translate3d(${typeIndicator.left}px, 0, 0)`,
+                          width: `${typeIndicator.width}px`,
+                          height: `${typeIndicator.height}px`,
+                          borderRadius: "9999px",
+                          background: "rgba(255, 255, 255, 0.20)",
+                          border: "1px solid rgba(255, 255, 255, 0.25)",
+                          boxShadow: "0 2px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.4)",
+                          opacity: typeIndicator.opacity,
+                          pointerEvents: "none",
+                          transition: "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                          willChange: "transform, width",
+                          zIndex: 1,
+                        }}
+                      />
+
                       {(["all", "movie", "tv"] as const).map((t) => (
                         <button
                           key={t}
+                          ref={(el) => {
+                            typeRefs.current[t] = el;
+                          }}
                           onClick={() => setTypeFilter(t)}
                           style={{
-                            padding: "6px 14px",
-                            borderRadius: "999px",
-                            background: typeFilter === t ? "rgba(255, 255, 255, 0.18)" : "transparent",
+                            position: "relative",
+                            zIndex: 2,
+                            padding: "6px 16px",
+                            borderRadius: "9999px",
+                            background: "transparent",
                             border: "none",
-                            color: typeFilter === t ? "#fff" : "rgba(255, 255, 255, 0.6)",
+                            color: typeFilter === t ? "#ffffff" : "rgba(255, 255, 255, 0.65)",
                             fontSize: "12.5px",
-                            fontWeight: 600,
+                            fontWeight: typeFilter === t ? 700 : 500,
                             cursor: "pointer",
                             textTransform: "capitalize",
+                            transition: "color 0.15s ease",
                           }}
                         >
                           {t === "all" ? "All" : t === "movie" ? "Movies" : "Shows"}
@@ -448,24 +695,120 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                       ))}
                     </div>
 
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as any)}
-                      style={{
-                        background: "rgba(255, 255, 255, 0.08)",
-                        border: "1px solid rgba(255, 255, 255, 0.16)",
-                        color: "#fff",
-                        borderRadius: "999px",
-                        padding: "7px 16px",
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        outline: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <option value="recent">Recently Added</option>
-                      <option value="title">Title</option>
-                    </select>
+                    {/* Custom Pure Crystal Frosted Glass Sort Dropdown (Zero Native Select!) */}
+                    <div style={{ position: "relative" }} ref={sortDropdownRef}>
+                      <button
+                        onClick={() => setSortDropdownOpen((prev) => !prev)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          background: "rgba(255, 255, 255, 0.08)",
+                          border: "1px solid rgba(255, 255, 255, 0.18)",
+                          color: "#ffffff",
+                          borderRadius: "9999px",
+                          padding: "8px 18px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          backdropFilter: "blur(20px)",
+                          WebkitBackdropFilter: "blur(20px)",
+                          boxShadow: "0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.2)",
+                          transition: "all 0.18s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
+                          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.18)";
+                        }}
+                      >
+                        <span>{sortBy === "recent" ? "Recently Added" : sortBy === "title" ? "Title" : "Rating"}</span>
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{
+                            transform: sortDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                            transition: "transform 0.2s ease",
+                            opacity: 0.8,
+                          }}
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </button>
+
+                      {sortDropdownOpen && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 8px)",
+                            right: 0,
+                            minWidth: "165px",
+                            borderRadius: "18px",
+                            background: "linear-gradient(145deg, rgba(255, 255, 255, 0.14) 0%, rgba(18, 22, 32, 0.90) 100%)",
+                            backdropFilter: "blur(32px) saturate(200%)",
+                            WebkitBackdropFilter: "blur(32px) saturate(200%)",
+                            border: "1px solid rgba(255, 255, 255, 0.22)",
+                            padding: "6px",
+                            boxShadow: "0 18px 45px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.35)",
+                            zIndex: 60,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "2px",
+                            animation: "cinemaMenuPop 0.16s cubic-bezier(0.16, 1, 0.3, 1)",
+                          }}
+                        >
+                          {[
+                            { id: "recent", label: "Recently Added" },
+                            { id: "title", label: "Title" },
+                          ].map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                setSortBy(item.id as any);
+                                setSortDropdownOpen(false);
+                              }}
+                              style={{
+                                padding: "8px 12px",
+                                borderRadius: "12px",
+                                background: sortBy === item.id ? "rgba(255, 255, 255, 0.16)" : "transparent",
+                                border: "none",
+                                color: "#ffffff",
+                                fontSize: "13px",
+                                fontWeight: sortBy === item.id ? 700 : 500,
+                                cursor: "pointer",
+                                textAlign: "left",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                transition: "background 0.15s ease",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (sortBy !== item.id) e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                              }}
+                              onMouseLeave={(e) => {
+                                if (sortBy !== item.id) e.currentTarget.style.background = "transparent";
+                              }}
+                            >
+                              <span>{item.label}</span>
+                              {sortBy === item.id && (
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -490,7 +833,7 @@ export const MyListPage: React.FC<MyListPageProps> = ({
                     </div>
                     <div style={statCardStyle}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "28px" }}>🔥</span>
+                        <Flame size={24} color="#f97316" fill="#f97316" />
                         <span style={{ fontSize: "32px", fontWeight: 800, color: "#fff" }}>2</span>
                       </div>
                       <span style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.5)" }}>Days in a row</span>

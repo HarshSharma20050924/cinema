@@ -3,6 +3,7 @@ import { Globe } from "lucide-react";
 import { StarIcon, FilmIcon } from "../../icons";
 import { fetchTMDBDetails } from "../../api/tmdb";
 import { MediaContextMenu } from "./MediaContextMenu";
+import { optimizeImage } from "../../utils/imageOptimizer";
 import type { Post } from "../../types";
 
 export const posterCache = new Map<string, string>();
@@ -30,12 +31,13 @@ export const backdropCache = initBackdropCache();
 export const persistBackdrop = (key: string, url: string) => {
   if (!key || !url) return;
   const k = key.toLowerCase().trim();
-  backdropCache.set(k, url);
+  const optimized = optimizeImage(url, "backdrop");
+  backdropCache.set(k, optimized);
   if (typeof window !== "undefined") {
     try {
       const raw = localStorage.getItem(BACKDROP_CACHE_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
-      parsed[k] = url;
+      parsed[k] = optimized;
       const keys = Object.keys(parsed);
       if (keys.length > 350) {
         delete parsed[keys[0]];
@@ -239,11 +241,15 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     ? (landscapeCandidate || (post.image && post.image.includes("/background/") && !isBogusUrl(post.image) ? post.image : null) || directPoster)
     : (cinemetaPoster || directPoster || validBackdrop || (post.image && !isBogusUrl(post.image) ? post.image.replace(/^http:\/\//i, "https://") : null));
 
-  const activePoster = candidatePoster ? getProxiedUrl(candidatePoster, proxyStep) : null;
+  const optimizedCandidate = candidatePoster
+    ? optimizeImage(candidatePoster, isLandscape ? "backdrop" : "card")
+    : null;
+  const activePoster = optimizedCandidate ? getProxiedUrl(optimizedCandidate, proxyStep) : null;
 
   // Active extracted logo with proxying
   const rawLogo = tmdbLogo || post.logoUrl;
-  const activeLogo = rawLogo ? getProxiedUrl(rawLogo, logoProxyStep) : null;
+  const optimizedLogo = rawLogo ? optimizeImage(rawLogo, "logo") : null;
+  const activeLogo = optimizedLogo ? getProxiedUrl(optimizedLogo, logoProxyStep) : null;
 
   // Fetch wide backdrop, logo, and accurate genre from TMDB for cards
   useEffect(() => {
@@ -276,14 +282,16 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       .then((d) => {
         if (d) {
           if (d.backdropUrl) {
-            persistBackdrop(cacheKey, d.backdropUrl);
-            setTmdbBackdrop(d.backdropUrl);
+            const optBackdrop = optimizeImage(d.backdropUrl, "backdrop");
+            persistBackdrop(cacheKey, optBackdrop);
+            setTmdbBackdrop(optBackdrop);
           } else {
             backdropCache.set(cacheKey, "");
           }
           if (d.logoUrl) {
-            logoCache.set(cacheKey, d.logoUrl);
-            if (isLandscape) setTmdbLogo(d.logoUrl);
+            const optLogo = optimizeImage(d.logoUrl, "logo");
+            logoCache.set(cacheKey, optLogo);
+            if (isLandscape) setTmdbLogo(optLogo);
           } else {
             logoCache.set(cacheKey, "");
           }
@@ -520,6 +528,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     >
       <div
         className="poster-container"
+        data-media-id={String(post.id || post.tmdbId || "")}
         style={{
           position: "relative",
           width: "100%",
@@ -646,17 +655,25 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               width: "32px",
               height: "32px",
               borderRadius: "50%",
-              background: contextMenuOpen ? "#e50914" : "rgba(28, 30, 36, 0.85)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              border: contextMenuOpen ? "1px solid #e50914" : "1px solid rgba(255, 255, 255, 0.18)",
+              background: contextMenuOpen ? "rgba(255, 255, 255, 0.28)" : "rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(24px) saturate(180%)",
+              WebkitBackdropFilter: "blur(24px) saturate(180%)",
+              border: "1px solid rgba(255, 255, 255, 0.24)",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              boxShadow: contextMenuOpen ? "0 4px 14px rgba(229, 9, 20, 0.55)" : "0 4px 14px rgba(0, 0, 0, 0.5)",
-              transition: "transform 0.2s ease, background 0.2s ease, border-color 0.2s ease",
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.35)",
+              transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s ease, border-color 0.18s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.24)";
+              e.currentTarget.style.transform = "scale(1.08)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = contextMenuOpen ? "rgba(255, 255, 255, 0.28)" : "rgba(255, 255, 255, 0.12)";
+              e.currentTarget.style.transform = "scale(1)";
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -741,6 +758,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         {!imgError && activePoster && (
           <img
             ref={imgRef}
+            crossOrigin="anonymous"
             src={activePoster}
             alt={cleanTitle || post.title}
             loading={priority ? "eager" : "lazy"}

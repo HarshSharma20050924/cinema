@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import type { Post } from "../../types";
-import { PlayIcon, PlusIcon, CheckIcon, ArrowLeftIcon } from "../../icons";
+import { PlayIcon, PlusIcon, CheckIcon, ArrowLeftIcon, GlobeIcon, ChevronDownIcon } from "../../icons";
+import { SEARCH_LANGUAGES } from "../../api/tmdb";
+import { toast } from "../../utils/toastService";
+import { optimizeImage } from "../../utils/imageOptimizer";
 
 export interface ComingSoonItem {
   id: string;
@@ -18,6 +21,7 @@ export interface ComingSoonItem {
   genres: string;
   overview: string;
   trailerUrl?: string;
+  originalLanguage?: string;
 }
 
 const TMDB_API_KEY = "cfe422613b250f702980a3bbf9e90716";
@@ -266,7 +270,7 @@ const LandscapeMediaCard: React.FC<LandscapeCardProps> = ({ image, title, logoUr
         }}
       >
         <img
-          src={image}
+          src={optimizeImage(image, "card")}
           alt={title}
           loading="lazy"
           style={{
@@ -311,7 +315,7 @@ const LandscapeMediaCard: React.FC<LandscapeCardProps> = ({ image, title, logoUr
         >
           {logoUrl ? (
             <img
-              src={logoUrl}
+              src={optimizeImage(logoUrl, "logo")}
               alt={title}
               style={{
                 maxHeight: "38px",
@@ -348,6 +352,9 @@ export const ComingSoonPage: React.FC<ComingSoonPageProps> = ({
   onSelectPost,
 }) => {
   const [items, setItems] = useState<ComingSoonItem[]>(INITIAL_COMING_SOON);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const langDropdownRef = useRef<HTMLDivElement>(null);
   const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set());
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     try {
@@ -357,6 +364,125 @@ export const ComingSoonPage: React.FC<ComingSoonPageProps> = ({
       return [];
     }
   });
+
+  // Handle outside click for language dropdown
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) {
+        setIsLangDropdownOpen(false);
+      }
+    };
+    if (isLangDropdownOpen) {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [isLangDropdownOpen]);
+
+  // Fetch upcoming releases specifically for chosen language if not already present
+  useEffect(() => {
+    if (selectedLanguage === "all") return;
+    let mounted = true;
+    async function loadLanguageUpcoming() {
+      try {
+        const todayStr = new Date().toISOString().split("T")[0];
+        let langQuery = selectedLanguage;
+        if (selectedLanguage === "dual" || selectedLanguage === "multi") {
+          langQuery = "hi";
+        }
+        const data = await fetchTmdbData(
+          `/discover/movie?primary_release_date.gte=${todayStr}&with_original_language=${langQuery}&sort_by=popularity.desc&page=1`
+        );
+        if (data && Array.isArray(data.results) && data.results.length > 0 && mounted) {
+          const now = new Date();
+          const extra: ComingSoonItem[] = [];
+          for (const m of data.results) {
+            if (!m || !m.id || !m.release_date || (!m.backdrop_path && !m.poster_path)) continue;
+            const d = new Date(m.release_date);
+            if (isNaN(d.getTime())) continue;
+            const diffTime = d.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays <= 0) continue;
+
+            const month = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+            const day = String(d.getDate());
+            const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+            const monthYearHeader = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            const countdown =
+              diffDays > 0
+                ? diffDays <= 45
+                  ? `In ${diffDays} days`
+                  : `In ${Math.ceil(diffDays / 30)} months`
+                : "In Theaters";
+
+            const genres = Array.isArray(m.genre_ids)
+              ? m.genre_ids.map((id: number) => TMDB_GENRES[id]).filter(Boolean).slice(0, 3).join(" • ")
+              : "Action • Adventure";
+
+            const backdropUrl = m.backdrop_path
+              ? `https://image.tmdb.org/t/p/original${m.backdrop_path}`
+              : `https://image.tmdb.org/t/p/original${m.poster_path}`;
+
+            const image = m.backdrop_path
+              ? `https://image.tmdb.org/t/p/w780${m.backdrop_path}`
+              : `https://image.tmdb.org/t/p/w780${m.poster_path}`;
+
+            extra.push({
+              id: `tmdb-${m.id}`,
+              tmdbId: m.id,
+              title: m.title || m.name,
+              day,
+              month,
+              weekday,
+              countdown,
+              monthYearHeader,
+              releaseDate: m.release_date,
+              image,
+              backdropUrl,
+              genres: genres || "Cinema",
+              overview: m.overview || "An upcoming theatrical release promising unforgettable spectacle.",
+              originalLanguage: m.original_language || selectedLanguage,
+            });
+          }
+
+          if (extra.length > 0 && mounted) {
+            setItems((prev) => {
+              const seen = new Set(prev.map((i) => i.id));
+              const merged = [...prev];
+              for (const e of extra) {
+                if (!seen.has(e.id)) {
+                  seen.add(e.id);
+                  merged.push(e);
+                }
+              }
+              merged.sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime());
+              return merged;
+            });
+          }
+        }
+      } catch (_) {}
+    }
+    loadLanguageUpcoming();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedLanguage]);
+
+  // Filter items according to selected language
+  const filteredItems = useMemo(() => {
+    if (selectedLanguage === "all") return items;
+    if (selectedLanguage === "dual") {
+      return items.filter((i) => i.originalLanguage === "hi" || i.originalLanguage === "en");
+    }
+    if (selectedLanguage === "multi") {
+      return items.filter((i) => ["hi", "ta", "te", "ml", "kn"].includes(i.originalLanguage || ""));
+    }
+    return items.filter((i) => i.originalLanguage === selectedLanguage);
+  }, [items, selectedLanguage]);
+
+  const currentLanguageLabel =
+    SEARCH_LANGUAGES.find((l) => l.code === selectedLanguage)?.label || "Any language";
 
   // Dynamic TMDB Fetcher for Live Upcoming Releases
   useEffect(() => {
@@ -451,6 +577,7 @@ export const ComingSoonPage: React.FC<ComingSoonPageProps> = ({
               overview:
                 m.overview ||
                 "An upcoming theatrical release promising unforgettable spectacle, gripping drama, and unforgettable cinematic adventure.",
+              originalLanguage: m.original_language || "en",
             });
           } catch (_) {}
         }
@@ -561,37 +688,174 @@ export const ComingSoonPage: React.FC<ComingSoonPageProps> = ({
         <span>Back to Home</span>
       </button>
 
-      {/* Main Page Header */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "32px" }}>
-        <h1
-          style={{
-            fontSize: "clamp(38px, 4.5vw, 54px)",
-            fontWeight: 900,
-            letterSpacing: "-0.025em",
-            margin: 0,
-            color: "#e50914",
-            fontFamily: "var(--font-main, sans-serif)",
-            textShadow: "0 2px 20px rgba(0, 0, 0, 0.95), 0 0 40px rgba(229, 9, 20, 0.25)",
-          }}
-        >
-          Coming Soon
-        </h1>
-        <p
-          style={{
-            fontSize: "15px",
-            color: "rgba(255, 255, 255, 0.75)",
-            margin: 0,
-            fontWeight: 500,
-            textShadow: "0 1px 8px rgba(0, 0, 0, 0.9)",
-          }}
-        >
-          In theaters over the next few months.
-        </p>
+      {/* Main Page Header with Language Selector Tab (Matches search page) */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+          gap: "16px",
+          marginBottom: "32px",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <h1
+            style={{
+              fontSize: "clamp(38px, 4.5vw, 54px)",
+              fontWeight: 900,
+              letterSpacing: "-0.025em",
+              margin: 0,
+              color: "#e50914",
+              fontFamily: "var(--font-main, sans-serif)",
+              textShadow: "0 2px 20px rgba(0, 0, 0, 0.95), 0 0 40px rgba(229, 9, 20, 0.25)",
+            }}
+          >
+            Coming Soon
+          </h1>
+          <p
+            style={{
+              fontSize: "15px",
+              color: "rgba(255, 255, 255, 0.75)",
+              margin: 0,
+              fontWeight: 500,
+              textShadow: "0 1px 8px rgba(0, 0, 0, 0.9)",
+            }}
+          >
+            In theaters over the next few months.
+          </p>
+        </div>
+
+        {/* Language Selector Dropdown (Matching search page exactly) */}
+        <div style={{ position: "relative" }} ref={langDropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsLangDropdownOpen((prev) => !prev)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "7px 18px",
+              borderRadius: "999px",
+              background: isLangDropdownOpen || selectedLanguage !== "all"
+                ? "rgba(255, 255, 255, 0.14)"
+                : "rgba(255, 255, 255, 0.06)",
+              border: isLangDropdownOpen || selectedLanguage !== "all"
+                ? "1px solid rgba(255, 255, 255, 0.25)"
+                : "1px solid rgba(255, 255, 255, 0.14)",
+              color: "#ffffff",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: "pointer",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.25)",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
+            }}
+            onMouseLeave={(e) => {
+              if (!isLangDropdownOpen && selectedLanguage === "all") {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+              }
+            }}
+          >
+            <GlobeIcon size={14} color="#ffffff" />
+            <span>{currentLanguageLabel}</span>
+            <ChevronDownIcon size={12} color="rgba(255, 255, 255, 0.7)" />
+          </button>
+
+          {/* Dropdown Menu (Pure Crystal Frosted Glass) */}
+          {isLangDropdownOpen && (
+            <div
+              style={{
+                position: "absolute",
+                right: 0,
+                top: "calc(100% + 8px)",
+                width: "220px",
+                maxHeight: "340px",
+                overflowY: "auto",
+                background: "rgba(10, 14, 22, 0.55)",
+                backdropFilter: "blur(32px) saturate(200%)",
+                WebkitBackdropFilter: "blur(32px) saturate(200%)",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                borderRadius: "18px",
+                boxShadow: "0 24px 60px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.15)",
+                padding: "6px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "3px",
+                zIndex: 1100,
+              }}
+            >
+              {SEARCH_LANGUAGES.map((lang) => {
+                const isSelected = selectedLanguage === lang.code;
+                return (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={() => {
+                      setSelectedLanguage(lang.code);
+                      setIsLangDropdownOpen(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "9px 12px",
+                      borderRadius: "12px",
+                      background: isSelected ? "#e50914" : "transparent",
+                      border: isSelected ? "1px solid #e50914" : "none",
+                      color: "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: isSelected ? 700 : 500,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      boxShadow: isSelected ? "0 4px 14px rgba(229, 9, 20, 0.45)" : "none",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = "transparent";
+                      }
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>{lang.label}</span>
+                    {isSelected && <CheckIcon size={14} color="#ffffff" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Vertical Timeline List (Dynamic month-by-month grouping) */}
       <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-        {items.map((item, idx) => {
+        {filteredItems.length === 0 ? (
+          <div
+            style={{
+              padding: "48px 24px",
+              textAlign: "center",
+              background: "rgba(255, 255, 255, 0.04)",
+              backdropFilter: "blur(16px)",
+              WebkitBackdropFilter: "blur(16px)",
+              borderRadius: "20px",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              color: "rgba(255, 255, 255, 0.7)",
+              fontSize: "15px",
+            }}
+          >
+            No upcoming titles found for {currentLanguageLabel}. Try selecting "Any language".
+          </div>
+        ) : filteredItems.map((item, idx) => {
           const isReminded = remindedIds.has(item.id);
           const isSaved = watchlist.includes(item.id);
 
@@ -614,7 +878,7 @@ export const ComingSoonPage: React.FC<ComingSoonPageProps> = ({
             idx === 0 || items[idx - 1].monthYearHeader !== item.monthYearHeader;
 
           return (
-            <React.Fragment key={item.id}>
+            <React.Fragment key={`${item.id}-${idx}`}>
               {showMonthHeader && (
                 <h2
                   style={{
@@ -861,7 +1125,7 @@ export const ComingSoonPage: React.FC<ComingSoonPageProps> = ({
                     {/* Calendar Button */}
                     <button
                       title="Add to Calendar"
-                      onClick={() => alert(`Added ${item.title} to your release calendar!`)}
+                      onClick={() => toast.success(`Added "${item.title}" to your release calendar!`)}
                       style={{
                         width: "36px",
                         height: "36px",

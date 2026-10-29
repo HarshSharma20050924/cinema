@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { CloseIcon, FilmIcon } from "../../icons";
 import {
   getContinueWatchingList,
   removeContinueWatching,
   clearAllContinueWatching,
+  restoreContinueWatchingList,
   type ContinueWatchingItem,
 } from "../../utils/continueWatchingService";
 import { ContinueWatchingCard } from "./ContinueWatchingShelf";
+import { toast, showUndoToast, showToast } from "../../utils/toastService";
 
 export interface ContinueWatchingModalProps {
   isOpen: boolean;
@@ -20,6 +22,8 @@ export const ContinueWatchingModal: React.FC<ContinueWatchingModalProps> = ({
   onResume,
 }) => {
   const [items, setItems] = useState<ContinueWatchingItem[]>([]);
+  const [disappearingIds, setDisappearingIds] = useState<Set<string>>(new Set());
+  const pendingTimers = useRef<{ [key: string]: ReturnType<typeof setTimeout> }>({});
 
   const loadItems = () => {
     setItems(getContinueWatchingList());
@@ -43,9 +47,35 @@ export const ContinueWatchingModal: React.FC<ContinueWatchingModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleRemove = (id: string, e: React.MouseEvent) => {
+  const handleRemove = (id: string, e: React.MouseEvent, cardEl?: HTMLElement | null) => {
     e.stopPropagation();
-    removeContinueWatching(id);
+    const item = items.find((it) => it.id === id);
+    if (!item) return;
+
+    setDisappearingIds((prev) => new Set([...prev, id]));
+
+    showUndoToast(`Removed "${item.title}"`, () => {
+      if (pendingTimers.current[id]) {
+        clearTimeout(pendingTimers.current[id]);
+        delete pendingTimers.current[id];
+      }
+      setDisappearingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      showToast(`Restored "${item.title}"`, "info");
+    }, 5);
+
+    pendingTimers.current[id] = setTimeout(() => {
+      removeContinueWatching(id);
+      setDisappearingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      delete pendingTimers.current[id];
+    }, 5000);
   };
 
   const handleClearAll = () => {
@@ -244,6 +274,7 @@ export const ContinueWatchingModal: React.FC<ContinueWatchingModalProps> = ({
                 }}
                 onRemove={handleRemove}
                 width={280}
+                isDisappearing={disappearingIds.has(item.id)}
               />
             ))
           )}

@@ -14,6 +14,9 @@ import {
 import { fetchTMDBDetails, type TMDBDetails } from "../../api/tmdb";
 import { parseTitleAndYear } from "../media/MediaCard";
 import { cleanHeroTitle } from "../hero/HeroSpotlight";
+import { optimizeImage } from "../../utils/imageOptimizer";
+import { isItemSaved, toggleSavedItem } from "../../utils/userListsService";
+import { toast } from "../../utils/toastService";
 
 const TMDB_API_KEY = "cfe422613b250f702980a3bbf9e90716";
 const BASE_URL = "https://api.themoviedb.org/3";
@@ -295,7 +298,27 @@ export const GenreShowcasePage: React.FC<GenreShowcasePageProps> = ({
   }, [activeSlides]);
 
   const currentTmdb = slideDetails[currentSlide?.title || ""];
-  const currentLogo = currentSlide?.logoUrl || currentTmdb?.logoUrl;
+  const currentLogo = optimizeImage(currentSlide?.logoUrl || currentTmdb?.logoUrl, "logo");
+
+  // Keep watchlist status reactive and in sync
+  useEffect(() => {
+    if (!currentSlide) return;
+    setIsSaved(isItemSaved(currentSlide));
+    const handleSavedUpdated = () => setIsSaved(isItemSaved(currentSlide));
+    window.addEventListener("cinema:saved_updated", handleSavedUpdated);
+    return () => window.removeEventListener("cinema:saved_updated", handleSavedUpdated);
+  }, [currentSlide]);
+
+  const handleToggleWatchlist = () => {
+    if (!currentSlide) return;
+    const added = toggleSavedItem(currentSlide);
+    setIsSaved(added);
+    if (added) {
+      toast.success("Added to Watchlist", currentSlide.title);
+    } else {
+      toast.info("Removed from Watchlist", currentSlide.title);
+    }
+  };
 
   // 2. Fetch Live Genre Catalog from TMDB
   useEffect(() => {
@@ -327,8 +350,8 @@ export const GenreShowcasePage: React.FC<GenreShowcasePageProps> = ({
             title: r.title || r.name,
             year: (r.release_date || r.first_air_date || "").slice(0, 4),
             rating: r.vote_average ? r.vote_average.toFixed(1) : "7.5",
-            image: `${IMG_BASE_W500}${r.poster_path}`,
-            backdropUrl: `${IMG_BASE_ORIGINAL}${r.backdrop_path}`,
+            image: optimizeImage(`${IMG_BASE_W500}${r.poster_path}`, "card"),
+            backdropUrl: optimizeImage(`${IMG_BASE_ORIGINAL}${r.backdrop_path}`, "backdrop"),
             description: r.overview,
             genres: genreTitle,
             link: `/search?q=${encodeURIComponent(r.title || r.name)}`,
@@ -752,12 +775,24 @@ export const GenreShowcasePage: React.FC<GenreShowcasePageProps> = ({
               <img
                 src={currentLogo}
                 alt={currentSlide.title}
+                onClick={() => onSelectPost(currentSlide)}
+                title="View Details"
                 style={{
                   maxHeight: "135px",
                   maxWidth: "min(480px, 88vw)",
                   objectFit: "contain",
                   marginBottom: "6px",
                   filter: "drop-shadow(0 4px 24px rgba(0, 0, 0, 0.95))",
+                  cursor: "pointer",
+                  transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.04)";
+                  e.currentTarget.style.opacity = "0.9";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.opacity = "1";
                 }}
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
@@ -765,6 +800,8 @@ export const GenreShowcasePage: React.FC<GenreShowcasePageProps> = ({
               />
             ) : (
               <h1
+                onClick={() => onSelectPost(currentSlide)}
+                title="View Details"
                 style={{
                   fontFamily: "var(--font-display, 'Space Grotesk', -apple-system, sans-serif)",
                   fontSize: (currentSlide?.title || "").length > 25 ? "clamp(30px, 4.2vw, 50px)" : "clamp(48px, 6.5vw, 84px)",
@@ -777,6 +814,16 @@ export const GenreShowcasePage: React.FC<GenreShowcasePageProps> = ({
                   margin: 0,
                   maxWidth: "680px",
                   wordBreak: "break-word",
+                  cursor: "pointer",
+                  transition: "color 0.2s ease, transform 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "#ff3b30";
+                  e.currentTarget.style.transform = "translateX(4px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "#ffffff";
+                  e.currentTarget.style.transform = "translateX(0)";
                 }}
               >
                 {cleanHeroTitle(currentSlide.title)}
@@ -910,7 +957,7 @@ export const GenreShowcasePage: React.FC<GenreShowcasePageProps> = ({
               >
                 <button
                   title={isSaved ? "Saved to Watchlist" : "Add to Watchlist"}
-                  onClick={() => setIsSaved(!isSaved)}
+                  onClick={handleToggleWatchlist}
                   style={{
                     width: "42px",
                     height: "42px",

@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   ],
   defaultPlayer: "web",
   customPlayerScheme: "vlc://",
-  isConfigured: false,
+  isConfigured: true,
 };
 
 export const launchExternalPlayer = (

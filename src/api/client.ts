@@ -36,17 +36,12 @@ const TTL = {
   STREAMS: 3 * 60 * 1000,
 };
 
-export const RENDER_CLUSTER = [
-  "https://cinema-4h7t.onrender.com",
-  "https://cinema-1-zjrx.onrender.com",
-  "https://cinema-2-mg14.onrender.com",
-  "https://cinema-3-euoh.onrender.com",
-  "https://cinema-4-260y.onrender.com",
-];
+export const RENDER_CLUSTER: string[] = [];
 
-let clusterIndex = Math.floor(Math.random() * RENDER_CLUSTER.length);
+let clusterIndex = 0;
 
 export function getBalancedRenderCluster(): string[] {
+  if (RENDER_CLUSTER.length === 0) return [];
   const start = clusterIndex % RENDER_CLUSTER.length;
   clusterIndex++;
   return [...RENDER_CLUSTER.slice(start), ...RENDER_CLUSTER.slice(0, start)];

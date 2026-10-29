@@ -49,7 +49,7 @@ export const BrowseByProviderShelf: React.FC<BrowseByProviderShelfProps> = ({
       >
         <h2
           style={{
-            fontSize: "22px",
+            fontSize: "15px",
             fontWeight: 800,
             color: "#ffffff",
             margin: 0,
@@ -57,7 +57,7 @@ export const BrowseByProviderShelf: React.FC<BrowseByProviderShelfProps> = ({
             fontFamily: "var(--font-main)",
           }}
         >
-          Browse by Provider
+          Browse by Provider-(Under Development but all movies and series still available of this provider you can browse )
         </h2>
       </div>
 

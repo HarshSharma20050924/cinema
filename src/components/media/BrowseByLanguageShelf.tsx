@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { CINEMA_LANGUAGES, type LanguageItem } from "../../data/languagesData";
+import { optimizeImage } from "../../utils/imageOptimizer";
 
 interface LanguageCardProps {
   language: LanguageItem;
@@ -69,7 +70,7 @@ const LanguageCard: React.FC<LanguageCardProps> = ({
       >
         {/* Background Image with 3D Counter-Parallax Movement */}
         <img
-          src={language.image}
+          src={optimizeImage(language.image, "card")}
           alt={language.name}
           loading="lazy"
           onError={(e) => {

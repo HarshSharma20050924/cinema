@@ -55,12 +55,7 @@ async function startServer() {
     }
 
     // 🛡️ 24/7 Render Cluster Mutual Keep-Alive (Prevents idle sleep across all 5 nodes)
-    try {
-      const { startRenderKeepAlive } = require('./services/renderKeepAlive.cjs');
-      startRenderKeepAlive();
-    } catch (err) {
-      console.warn('Render keepalive notice:', err.message);
-    }
+    // Render keepalive removed
   });
 }
 

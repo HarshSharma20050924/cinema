@@ -13,6 +13,11 @@ import {
   VolumeXIcon,
 } from "../../icons";
 import type { TMDBDetails } from "../../api/tmdb";
+import type { MediaPost } from "../../types";
+import { MediaContextMenu } from "../media/MediaContextMenu";
+import { isUserSignedIn } from "../../utils/profileService";
+import { toast } from "../../utils/toastService";
+import { isItemSaved, toggleSavedItem } from "../../utils/userListsService";
 
 export interface DetailsHeroProps {
   backdropImage: string;
@@ -91,6 +96,29 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
   const [isExpandedSynopsis, setIsExpandedSynopsis] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isWatchlisted, setIsWatchlisted] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | undefined>(undefined);
+
+  const mediaPostItem = React.useMemo<MediaPost>(() => ({
+    id: String(tmdb?.id || resolvedImdbId || displayTitle),
+    tmdbId: tmdb?.id,
+    imdbId: resolvedImdbId || undefined,
+    title: displayTitle,
+    image: posterImage,
+    backdrop: backdropImage,
+    type: isSeries ? "tv" : "movie",
+    year: year || (tmdb as any)?.release_date?.slice(0, 4) || (tmdb as any)?.first_air_date?.slice(0, 4),
+    rating: realRating || rating || undefined,
+  }), [tmdb, resolvedImdbId, displayTitle, posterImage, backdropImage, isSeries, year, realRating, rating]);
+
+  useEffect(() => {
+    setIsWatchlisted(isItemSaved(mediaPostItem.id || mediaPostItem.tmdbId));
+    const handleSavedUpdated = () => {
+      setIsWatchlisted(isItemSaved(mediaPostItem.id || mediaPostItem.tmdbId));
+    };
+    window.addEventListener("cinema:saved_items_updated", handleSavedUpdated);
+    return () => window.removeEventListener("cinema:saved_items_updated", handleSavedUpdated);
+  }, [mediaPostItem]);
 
   // Content rating (e.g. TV-14, PG-13, R)
   const contentRating = tmdb?.contentRating || (isSeries ? "TV-14" : "PG-13");
@@ -337,11 +365,11 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
         display: "flex",
         alignItems: "flex-end",
         marginTop: "-72px",
-        padding: isFullscreen ? "115px 48px 60px 48px" : "115px 48px 56px 48px",
+        padding: "115px 48px 110px 48px",
         overflow: "visible",
         backgroundColor: "transparent",
         transition:
-          "height 0.65s cubic-bezier(0.16, 1, 0.3, 1), min-height 0.65s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.65s cubic-bezier(0.16, 1, 0.3, 1), padding 0.65s cubic-bezier(0.16, 1, 0.3, 1)",
+          "height 0.65s cubic-bezier(0.22, 1, 0.36, 1), min-height 0.65s cubic-bezier(0.22, 1, 0.36, 1), max-height 0.65s cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
       {/* Background Container - Smooth Mask Fade (Matches Home hero, eliminates divider completely) */}
@@ -351,19 +379,16 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
           top: 0,
           left: 0,
           right: 0,
-          bottom: isFullscreen ? "0px" : "-140px",
+          bottom: "-140px",
           width: "100%",
           zIndex: 1,
           pointerEvents: "none",
           overflow: "hidden",
-          WebkitMaskImage: isFullscreen
-            ? "none"
-            : "linear-gradient(to bottom, black 0%, black 45%, rgba(0,0,0,0.5) 75%, transparent 100%)",
-          maskImage: isFullscreen
-            ? "none"
-            : "linear-gradient(to bottom, black 0%, black 45%, rgba(0,0,0,0.5) 75%, transparent 100%)",
-          transition:
-            "bottom 0.65s cubic-bezier(0.16, 1, 0.3, 1), -webkit-mask-image 0.65s ease, mask-image 0.65s ease",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, black 0%, black 45%, rgba(0,0,0,0.5) 75%, transparent 100%)",
+          maskImage:
+            "linear-gradient(to bottom, black 0%, black 45%, rgba(0,0,0,0.5) 75%, transparent 100%)",
+          transition: "bottom 0.65s ease",
         }}
       >
         {/* Full-width cinematic backdrop */}
@@ -403,9 +428,8 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
               objectPosition: "center 18%",
               filter: "none",
               opacity: backdropLoaded ? 1 : 0.85,
-              transform: isFullscreen ? "scale(1.04)" : "scale(1)",
-              transition:
-                "opacity 0.35s ease, transform 0.65s cubic-bezier(0.16, 1, 0.3, 1)",
+              transform: "scale(1)",
+              transition: "opacity 0.35s ease",
               animation: "cinemaHeroKenBurns 25s ease-in-out infinite alternate",
             }}
           />
@@ -573,6 +597,7 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
           gap: "48px",
           width: "100%",
           flexWrap: "wrap",
+          marginBottom: isFullscreen ? "0px" : "36px",
           opacity: isFullscreen ? 0.05 : 1,
           transform: isFullscreen ? "translateY(24px)" : "translateY(0)",
           transition:
@@ -953,9 +978,17 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
             {/* 4. Circular Action Button: Add to Watchlist (+) */}
             <button
               type="button"
-              onClick={() => setIsWatchlisted(!isWatchlisted)}
-              title={isWatchlisted ? "Remove from List" : "Add to My List"}
-              aria-label="Add to List"
+              onClick={() => {
+                const nowSaved = toggleSavedItem(mediaPostItem);
+                setIsWatchlisted(nowSaved);
+                if (nowSaved) {
+                  toast.success(`Added "${displayTitle}" to Watchlist`);
+                } else {
+                  toast.info(`Removed "${displayTitle}" from Watchlist`);
+                }
+              }}
+              title={isWatchlisted ? "Remove from Watchlist" : "Add to Watchlist"}
+              aria-label="Add to Watchlist"
               style={{
                 width: "44px",
                 height: "44px",
@@ -988,7 +1021,14 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
             {/* 5. Circular Action Button: Like (ThumbsUp) */}
             <button
               type="button"
-              onClick={() => setIsLiked(!isLiked)}
+              onClick={() => {
+                if (!isUserSignedIn()) {
+                  toast.info("Sign up to like movies and personalize your experience");
+                  window.dispatchEvent(new CustomEvent("cinema:open_create_account"));
+                  return;
+                }
+                setIsLiked(!isLiked);
+              }}
               title={isLiked ? "Liked" : "Like"}
               aria-label="Like"
               style={{
@@ -1020,10 +1060,15 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
               <ThumbsUpIcon size={16} fill={isLiked ? "#ff4d4d" : "none"} color={isLiked ? "#ff4d4d" : "#ffffff"} />
             </button>
 
-            {/* 6. Circular Action Button: More (...) */}
+            {/* 6. Circular Action Button: More (...) -> Opens MediaContextMenu */}
             <button
               type="button"
-              onClick={() => onToggleTab("download")}
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
+                setMenuPos({ x: rect.right, y: rect.bottom + 6 });
+                setContextMenuOpen((prev) => !prev);
+              }}
               title="More options"
               aria-label="More options"
               style={{
@@ -1052,6 +1097,32 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
             >
               <MoreHorizontalIcon size={18} color="#ffffff" />
             </button>
+
+            {contextMenuOpen && (
+              <MediaContextMenu
+                post={{
+                  id: tmdb?.id || String(displayTitle),
+                  tmdbId: tmdb?.id,
+                  title: displayTitle,
+                  image: posterImage,
+                  backdrop: backdropImage,
+                  type: isSeries ? "tv" : "movie",
+                  year: year || (tmdb as any)?.release_date?.slice(0, 4) || (tmdb as any)?.first_air_date?.slice(0, 4),
+                  rating: realRating || rating,
+                } as any}
+                isOpen={contextMenuOpen}
+                onClose={() => setContextMenuOpen(false)}
+                onPlay={() => {
+                  setContextMenuOpen(false);
+                  if (onPlayPrimary) onPlayPrimary();
+                }}
+                onOpenDownloads={() => {
+                  setContextMenuOpen(false);
+                  onToggleTab("download");
+                }}
+                position={menuPos}
+              />
+            )}
 
             {/* 7. Circular Action Button: Mute / Sound Toggle */}
             <button

@@ -2,72 +2,54 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Hls from "hls.js";
 import { launchExternalPlayer } from "../../hooks/useSettings";
 import { fetchTMDBDetails, fetchTMDBSeasonDetails } from "../../api/tmdb";
-import { saveContinueWatching } from "../../utils/continueWatchingService";
+import { saveContinueWatching, getContinueWatchingList } from "../../utils/continueWatchingService";
+import {
+  formatTime,
+  computeEstimatedEndTime,
+  cleanAudioName,
+  isStrictTitleMatch,
+} from "./utils/playerUtils";
+import {
+  BackIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  PlayIcon,
+  PauseIcon,
+  Rewind10Icon,
+  Forward10Icon,
+  VolumeHighIcon,
+  VolumeMuteIcon,
+  SubtitlesIcon,
+  ServerIcon,
+  AspectRatioIcon,
+  BookmarkIcon,
+  SettingsGearIcon,
+  PipIcon,
+  FullscreenIcon,
+  FullscreenExitIcon,
+  WatchPartyIcon,
+  SpeedIcon,
+  ChatBubbleIcon,
+  LinkChainIcon,
+  CheckIcon,
+  CrossIcon,
+  AlertCircleIcon,
+  RefreshCwIcon,
+  SlidersIcon,
+  SunIcon,
+  MoonIcon,
+  StarIcon,
+  DragHandleIcon,
+  CloudServersIcon,
+  EpisodesDrawerIcon,
+  FilmIcon,
+} from "./components/PlayerIcons";
+import { PlayerRecommendedCard } from "./components/PlayerRecommendedCard";
+import { PlayerSettingsFlyout, type ActiveMenuType } from "./components/PlayerSettingsFlyout";
+import { PlayerBottomControls } from "./components/PlayerBottomControls";
+import { PlayerEpisodesDrawer } from "./components/PlayerEpisodesDrawer";
 
-const cleanAudioName = (raw: string): string => {
-  if (!raw) return "Original Audio";
-  let cleaned = raw
-    .replace(/\s*·\s*Season\s*\d+/gi, "")
-    .replace(/\s*-\s*Season\s*\d+/gi, "")
-    .replace(/\s*Season\s*\d+/gi, "")
-    .replace(/\b(dub|dubbed|dubbing)\b/gi, "")
-    .replace(/[^a-zA-Z0-9\s()]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleaned || cleaned.toLowerCase() === "dub") return "Original Audio";
-  return cleaned;
-};
-
-export function isStrictTitleMatch(candidateTitle: string, queryTitle: string, expectedYear?: number | string): boolean {
-  if (!candidateTitle || !queryTitle) return false;
-
-  const normalize = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/\[.*?\]|\(.*?\)/g, "")
-      .replace(/[^a-z0-9\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-  const stopWords = new Set([
-    "the", "a", "an", "of", "and", "in", "to", "movie", "full", "hindi", "dubbed",
-    "dual", "audio", "season", "episode", "part", "hd", "hq", "org", "web", "dl", "rip"
-  ]);
-
-  const cleanCand = normalize(candidateTitle);
-  const cleanQuery = normalize(queryTitle);
-
-  if (cleanCand === cleanQuery) return true;
-
-  const queryTokens = cleanQuery.split(" ").filter((t) => t.length > 1 && !stopWords.has(t));
-  const candTokens = cleanCand.split(" ").filter((t) => t.length > 1 && !stopWords.has(t));
-
-  if (queryTokens.length === 0) return cleanCand.includes(cleanQuery);
-
-  // All primary query tokens MUST be matched in candidate tokens
-  const allMatched = queryTokens.every((token) => candTokens.includes(token));
-  if (!allMatched) return false;
-
-  // STRICT CHECK: Reject if candidate has 2 or more extra major distinguishing words not in query
-  const extraCandTokens = candTokens.filter((t) => !queryTokens.includes(t) && isNaN(Number(t)));
-  if (extraCandTokens.length >= 2 && queryTokens.length <= 2) {
-    return false;
-  }
-
-  // Check Year discrepancy if year is present in candidate title and expectedYear
-  const candYearMatch = candidateTitle.match(/\b(19\d\d|20\d\d)\b/);
-  if (candYearMatch && expectedYear) {
-    const candYear = parseInt(candYearMatch[1], 10);
-    const expYear = typeof expectedYear === "number" ? expectedYear : parseInt(String(expectedYear), 10);
-    if (!isNaN(candYear) && !isNaN(expYear)) {
-      if (Math.abs(candYear - expYear) > 1) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
+export { isStrictTitleMatch, formatTime, computeEstimatedEndTime, cleanAudioName };
 
 export interface VideoPlayerModalProps {
   playbackUrl: string | null;
@@ -87,431 +69,6 @@ export interface VideoPlayerModalProps {
   onSelectEpisode?: (seasonNum: number, episodeNum: number) => void;
   onSelectMedia?: (media: any) => void;
   onClose: () => void;
-}
-
-// -------------------------------------------------------------
-// Sleek Minimalist SVG Icons matching CNO.TO aesthetic exactly
-// -------------------------------------------------------------
-const BackIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 12H5M12 19l-7-7 7-7" />
-  </svg>
-);
-
-const ChevronRightIcon: React.FC<{ size?: number; color?: string }> = ({ size = 16, color = "rgba(255, 255, 255, 0.45)" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
-);
-
-const CloseIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-
-const PlayIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-    <polygon points="6 3 20 12 6 21 6 3" />
-  </svg>
-);
-
-const PauseIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-    <rect x="6" y="4" width="4" height="16" rx="1.5" />
-    <rect x="14" y="4" width="4" height="16" rx="1.5" />
-  </svg>
-);
-
-const Rewind10Icon: React.FC<{ size?: number }> = ({ size = 24 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 5L7 9l4 4" />
-    <path d="M7 9h8a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H8" />
-    <text x="12" y="16" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" textAnchor="middle" fontFamily="sans-serif">10</text>
-  </svg>
-);
-
-const Forward10Icon: React.FC<{ size?: number }> = ({ size = 24 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M13 5l4 4-4 4" />
-    <path d="M17 9H9a5 5 0 0 0-5 5v1a5 5 0 0 0 5 5h7" />
-    <text x="12" y="16" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" textAnchor="middle" fontFamily="sans-serif">10</text>
-  </svg>
-);
-
-const VolumeHighIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-  </svg>
-);
-
-const VolumeMuteIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-    <line x1="23" y1="9" x2="17" y2="15" />
-    <line x1="17" y1="9" x2="23" y2="15" />
-  </svg>
-);
-
-const SubtitlesIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="5" width="18" height="14" rx="3" />
-    <path d="M7 15h2M15 15h2M7 11h4M13 11h4" strokeWidth="2.4" />
-  </svg>
-);
-
-const ServerIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="6" rx="2" />
-    <rect x="3" y="14" width="18" height="6" rx="2" />
-    <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="3" />
-    <line x1="7" y1="17" x2="7.01" y2="17" strokeWidth="3" />
-  </svg>
-);
-
-const AspectRatioIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="5" width="20" height="14" rx="2.5" />
-    <line x1="6" y1="5" x2="6" y2="19" strokeWidth="1.5" strokeDasharray="2 2" />
-    <line x1="18" y1="5" x2="18" y2="19" strokeWidth="1.5" strokeDasharray="2 2" />
-  </svg>
-);
-
-const BookmarkIcon: React.FC<{ size?: number }> = ({ size = 19 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-  </svg>
-);
-
-const SettingsGearIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-);
-
-const PipIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" />
-    <rect x="12" y="11" width="8" height="6" rx="1" fill="currentColor" fillOpacity="0.4" />
-  </svg>
-);
-
-const FullscreenIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-  </svg>
-);
-
-const FullscreenExitIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
-  </svg>
-);
-
-const WatchPartyIcon: React.FC<{ size?: number }> = ({ size = 21 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-
-const SpeedIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-
-const ChatBubbleIcon: React.FC<{ size?: number }> = ({ size = 21 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-  </svg>
-);
-
-const LinkChainIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-  </svg>
-);
-
-const CheckIcon: React.FC<{ size?: number; color?: string }> = ({ size = 14, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
-
-const CrossIcon: React.FC<{ size?: number; color?: string }> = ({ size = 14, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-
-const AlertCircleIcon: React.FC<{ size?: number; color?: string }> = ({ size = 20, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="12" />
-    <line x1="12" y1="16" x2="12.01" y2="16" />
-  </svg>
-);
-
-const RefreshCwIcon: React.FC<{ size?: number; color?: string }> = ({ size = 16, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="23 4 23 10 17 10" />
-    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-  </svg>
-);
-
-const SlidersIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="4" y1="21" x2="4" y2="14" />
-    <line x1="4" y1="10" x2="4" y2="3" />
-    <line x1="12" y1="21" x2="12" y2="12" />
-    <line x1="12" y1="8" x2="12" y2="3" />
-    <line x1="20" y1="21" x2="20" y2="16" />
-    <line x1="20" y1="12" x2="20" y2="3" />
-    <line x1="1" y1="14" x2="7" y2="14" />
-    <line x1="9" y1="8" x2="15" y2="8" />
-    <line x1="17" y1="16" x2="23" y2="16" />
-  </svg>
-);
-
-const SunIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="5" />
-    <line x1="12" y1="1" x2="12" y2="3" />
-    <line x1="12" y1="21" x2="12" y2="23" />
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-    <line x1="1" y1="12" x2="3" y2="12" />
-    <line x1="21" y1="12" x2="23" y2="12" />
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-  </svg>
-);
-
-const MoonIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-  </svg>
-);
-
-const StarIcon: React.FC<{ size?: number; color?: string }> = ({ size = 14, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-  </svg>
-);
-
-const DragHandleIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" opacity={0.35}>
-    <circle cx="9" cy="6" r="1.5" />
-    <circle cx="15" cy="6" r="1.5" />
-    <circle cx="9" cy="12" r="1.5" />
-    <circle cx="15" cy="12" r="1.5" />
-    <circle cx="9" cy="18" r="1.5" />
-    <circle cx="15" cy="18" r="1.5" />
-  </svg>
-);
-
-const CloudServersIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
-  </svg>
-);
-
-const EpisodesDrawerIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="5" width="18" height="14" rx="2" />
-    <path d="M7 15h4M7 9h10M7 12h10" />
-  </svg>
-);
-
-
-// -------------------------------------------------------------
-// Formatters
-// -------------------------------------------------------------
-function formatTime(seconds: number): string {
-  if (isNaN(seconds) || seconds < 0) return "0:00";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  }
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function computeEstimatedEndTime(remainingSeconds: number): string {
-  if (isNaN(remainingSeconds) || remainingSeconds <= 0) return "";
-  const endDate = new Date(Date.now() + remainingSeconds * 1000);
-  let hours = endDate.getHours();
-  const minutes = endDate.getMinutes().toString().padStart(2, "0");
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12 || 12;
-  return `Ends ${hours}:${minutes} ${ampm}`;
-}
-
-const PlayerRecommendedCard: React.FC<{
-  item: any;
-  onSelect: (item: any) => void;
-}> = ({ item, onSelect }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    setTilt({
-      x: (y / (rect.height / 2)) * -8,
-      y: (x / (rect.width / 2)) * 8,
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-    setTilt({ x: 0, y: 0 });
-  };
-
-  const posterImg = item.poster_path || item.backdrop_path || item.image;
-  const releaseYear = (item.release_date || item.first_air_date || "").slice(0, 4);
-  const title = item.title || item.name || "Movie";
-
-  return (
-    <div
-      onClick={() => onSelect(item)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{
-        cursor: "pointer",
-        perspective: "1000px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        userSelect: "none",
-        zIndex: isHovered ? 10 : 1,
-      }}
-    >
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          aspectRatio: "2/3",
-          borderRadius: "14px",
-          overflow: "hidden",
-          backgroundColor: "#0c0c0c",
-          border: "1px solid rgba(255, 255, 255, 0.10)",
-          boxShadow: isHovered
-            ? "0 22px 44px rgba(0, 0, 0, 0.95)"
-            : "0 4px 14px rgba(0, 0, 0, 0.5)",
-          transform: isHovered
-            ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(1.035, 1.035, 1.035)`
-            : "rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)",
-          transformStyle: "preserve-3d",
-          transition: isHovered
-            ? "transform 0.08s ease-out, box-shadow 0.25s ease"
-            : "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease",
-        }}
-      >
-        {posterImg ? (
-          <img
-            src={posterImg}
-            alt={title}
-            loading="lazy"
-            decoding="async"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-              transform: isHovered
-                ? `scale(1.10) translate3d(${tilt.y * -0.5}px, ${tilt.x * 0.5}px, 0px)`
-                : "scale(1.0) translate3d(0px, 0px, 0px)",
-              transition: isHovered ? "transform 0.08s ease-out" : "transform 0.4s ease",
-            }}
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "rgba(255,255,255,0.25)",
-            }}
-          >
-            <FilmIcon size={32} />
-          </div>
-        )}
-
-        {/* Portrait Card Overlay on Hover (Matching Home MediaCard) */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            justifyContent: "flex-end",
-            padding: "16px 14px",
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.5) 65%, rgba(0,0,0,0.92) 100%)",
-            opacity: isHovered ? 1 : 0,
-            transform: isHovered ? "translateY(0)" : "translateY(6px)",
-            transition: "opacity 0.25s ease, transform 0.25s ease",
-            pointerEvents: "none",
-            zIndex: 3,
-          }}
-        >
-          {/* Movie Title */}
-          <div
-            style={{
-              fontSize: "14px",
-              fontWeight: 800,
-              color: "#ffffff",
-              lineHeight: 1.22,
-              marginBottom: "4px",
-              textShadow: "0 2px 10px rgba(0, 0, 0, 0.95)",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              wordBreak: "break-word",
-            }}
-          >
-            {title}
-          </div>
-
-          {/* Year */}
-          {releaseYear && (
-            <span
-              style={{
-                fontSize: "11.5px",
-                fontWeight: 700,
-                color: "#cbd5e1",
-                letterSpacing: "0.3px",
-                textShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
-              }}
-            >
-              {releaseYear}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 };
 
 export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
@@ -538,6 +95,9 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const scrubberRef = useRef<HTMLDivElement | null>(null);
   const isDraggingScrubberRef = useRef<boolean>(false);
+  const isSeekingRef = useRef<boolean>(false);
+  const targetSeekTimeRef = useRef<number | null>(null);
+  const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const arrowTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -734,6 +294,31 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const lastSavedTimeRef = useRef(0);
   const pendingSeekTimeRef = useRef<number | null>(null);
 
+  // Resolve saved continue watching progress if not explicitly provided as prop
+  const effectiveInitialTime = useMemo(() => {
+    if (initialTime && initialTime > 4) return initialTime;
+    try {
+      const cwList = getContinueWatchingList();
+      const match = cwList.find(
+        (c) =>
+          (tmdbId && c.tmdbId === tmdbId && c.season === season && c.episode === episode) ||
+          (c.title && title && c.title.toLowerCase().trim() === title.toLowerCase().trim() && c.season === season && c.episode === episode)
+      );
+      if (match && match.currentTime > 4) {
+        return match.currentTime;
+      }
+    } catch (_) {}
+    return 0;
+  }, [initialTime, tmdbId, title, season, episode]);
+
+  const pendingResumeRef = useRef<number>(effectiveInitialTime);
+  useEffect(() => {
+    if (effectiveInitialTime > 4) {
+      pendingResumeRef.current = effectiveInitialTime;
+      hasResumedRef.current = false;
+    }
+  }, [effectiveInitialTime]);
+
   // Automatic progress persistence to Continue Watching Service
   const saveCurrentProgress = useCallback(() => {
     const video = videoRef.current;
@@ -741,6 +326,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const curr = video.currentTime;
     const dur = (video.duration && !isNaN(video.duration) && video.duration > 0) ? video.duration : (duration || 0);
     if (curr < 4 || isNaN(curr)) return;
+    // Do not overwrite saved progress with initial 0 frame before resume completes!
+    if (!hasResumedRef.current && (pendingResumeRef.current > 4 || effectiveInitialTime > 4)) return;
     if (Math.abs(curr - lastSavedTimeRef.current) < 2) return;
     lastSavedTimeRef.current = curr;
 
@@ -761,12 +348,37 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       tmdbId,
       post,
     });
-  }, [title, poster, backdrop, playbackUrl, season, episode, tmdbId, post, duration, initialEpisodes]);
+  }, [title, poster, backdrop, playbackUrl, season, episode, tmdbId, post, duration, initialEpisodes, effectiveInitialTime]);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage((curr) => (curr === msg ? null : curr)), 2500);
   }, []);
+
+  // Reliable resume execution that waits until video is buffered to seek
+  const attemptResume = useCallback(() => {
+    if (hasResumedRef.current) return;
+    const target = pendingResumeRef.current > 4 ? pendingResumeRef.current : (effectiveInitialTime > 4 ? effectiveInitialTime : 0);
+    if (target <= 4) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.readyState >= 1) {
+      try {
+        isSeekingRef.current = true;
+        video.currentTime = target;
+        setCurrentTime(target);
+        hasResumedRef.current = true;
+        pendingResumeRef.current = 0;
+        showToast(`Resumed from ${formatTime(target)}`);
+        setTimeout(() => {
+          isSeekingRef.current = false;
+        }, 400);
+      } catch (e) {
+        console.warn("[Player] Resume seek error:", e);
+      }
+    }
+  }, [effectiveInitialTime, showToast]);
 
   // Compute safe proxied URL with anti-hotlinking headers so CDN doesn't block player
   const getPlayableUrl = useCallback((rawUrl: string, headers?: Record<string, string>) => {
@@ -840,21 +452,38 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     // Failover helper: records failure and advances to the next available server in the cascade
     const handleServerFail = (idx: number, reason: string) => {
       if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
+      // If video has already buffered or is currently playing, ignore transient fail
+      if (video && (video.readyState >= 2 || video.currentTime > 1 || !video.paused)) {
+        setPlayerStatus("ready");
+        return;
+      }
       setServerStatuses((prev) => ({ ...prev, [idx]: "failed" }));
       const currentList = serverListRef.current;
       if (idx + 1 < currentList.length) {
         const next = currentList[idx + 1];
-        showToast(`Server ${idx + 1} unavailable (${reason}). Switching to ${next.name}...`);
+        showToast(`Connecting to ${next.name}...`);
         connectToServer(idx + 1, true);
       } else {
-        setPlayerStatus("error");
+        // If discovery might still be ongoing, wait a brief moment before showing error
+        setTimeout(() => {
+          if (video && (video.readyState >= 2 || video.currentTime > 1 || !video.paused)) {
+            setPlayerStatus("ready");
+          } else {
+            const updatedList = serverListRef.current;
+            if (idx + 1 < updatedList.length) {
+              connectToServer(idx + 1, true);
+            } else {
+              setPlayerStatus("error");
+            }
+          }
+        }, 3500);
       }
     };
 
-    // Auto failover timeout: Allow 12 seconds for initial connection & buffer negotiation
+    // Auto failover timeout: Allow 25 seconds for initial connection, cold-start proxy & buffer negotiation
     serverProbeTimeoutRef.current = setTimeout(() => {
       handleServerFail(serverIdx, "Timeout");
-    }, 12000);
+    }, 25000);
 
     if (!safeUrl || !safeUrl.trim()) {
       handleServerFail(serverIdx, "Invalid stream URL");
@@ -863,19 +492,27 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
     const isM3u8 = safeUrl.includes(".m3u8") || safeUrl.includes("/hls/") || safeUrl.includes("/stream/");
 
+    const targetResume = (effectiveInitialTime > 4 && !hasResumedRef.current)
+      ? effectiveInitialTime
+      : (previousTime > 2 ? previousTime : 0);
+
     if (isM3u8 && Hls.isSupported()) {
       const hls = new Hls({
+        startPosition: targetResume > 0 ? targetResume : -1,
         enableWorker: true,
-        lowLatencyMode: false, // VoD movies must use deep buffer ahead, not low-latency live mode
-        backBufferLength: 90,
-        maxBufferLength: 60, // 60 seconds buffer ahead
-        maxMaxBufferLength: 600, // up to 10 minutes cache
-        maxBufferSize: 60 * 1000 * 1000, // 60MB max buffer
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 2,
-        nudgeOffset: 0.1,
-        nudgeMaxRetry: 5,
-        maxFragLookUpTolerance: 0.25,
+        lowLatencyMode: false,
+        backBufferLength: 120,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 600,
+        maxBufferSize: 60 * 1000 * 1000,
+        maxBufferHole: 3.0, // Allow buffer gaps during seeks without triggering stall errors
+        highBufferWatchdogPeriod: 0, // Disable watchdog so seeks to unbuffered chunks don't cause fatal stalls
+        nudgeOffset: 0.2,
+        nudgeMaxRetry: 10,
+        maxFragLookUpTolerance: 0.5,
+        liveDurationInfinity: false,
+        fragLoadingTimeOut: 30000,
+        manifestLoadingTimeOut: 25000,
       });
 
       hls.loadSource(safeUrl);
@@ -923,19 +560,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         // Transition from "Fetching Media" -> "Starting" state
         setPlayerStatus("starting");
 
-        const targetResume = (initialTime && initialTime > 4 && !hasResumedRef.current)
-          ? initialTime
-          : (previousTime > 2 ? previousTime : 0);
-
         if (targetResume > 0) {
-          try {
-            video.currentTime = targetResume;
-            setCurrentTime(targetResume);
-            hasResumedRef.current = true;
-            if (initialTime && initialTime > 4) {
-              showToast(`Resumed from ${formatTime(targetResume)}`);
-            }
-          } catch {}
+          attemptResume();
         }
 
         if (!userPausedRef.current || forcePlay) {
@@ -976,8 +602,30 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
       hls.on(Hls.Events.ERROR, (_ev, data) => {
         if (data.fatal) {
-          hls.destroy();
-          handleServerFail(serverIdx, "Stream Error");
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR: {
+              const cur = video.currentTime;
+              console.warn("[HLS] Recovering media error at time:", cur);
+              hls.recoverMediaError();
+              if (cur > 1) {
+                setTimeout(() => {
+                  if (videoRef.current) {
+                    try {
+                      videoRef.current.currentTime = cur;
+                    } catch (_) {}
+                  }
+                }, 150);
+              }
+              break;
+            }
+            default:
+              hls.destroy();
+              handleServerFail(serverIdx, "Stream Error");
+              break;
+          }
         }
       });
     } else {
@@ -997,19 +645,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         setServerStatuses((prev) => ({ ...prev, [serverIdx]: "success" }));
         setPlayerStatus("starting");
 
-        const targetResume = (initialTime && initialTime > 4 && !hasResumedRef.current)
-          ? initialTime
-          : (previousTime > 2 ? previousTime : 0);
-
         if (targetResume > 0) {
-          try {
-            video.currentTime = targetResume;
-            setCurrentTime(targetResume);
-            hasResumedRef.current = true;
-            if (initialTime && initialTime > 4) {
-              showToast(`Resumed from ${formatTime(targetResume)}`);
-            }
-          } catch {}
+          attemptResume();
         }
 
         if (!userPausedRef.current || forcePlay) {
@@ -1035,7 +672,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         video.addEventListener("error", onError, { once: true });
       }
     }
-  }, [getPlayableUrl, showToast, initialTime]);
+  }, [getPlayableUrl, showToast, effectiveInitialTime]);
 
   // Smooth audio track switching between MovieBox dubs and HLS tracks
   const switchAudioTrack = useCallback(async (track: {
@@ -2015,6 +1652,30 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     }
   }, [playbackUrl, connectToServer]);
 
+  // Core high-accuracy seek dispatcher supporting instant timeline jumping
+  const performSeek = useCallback((targetTime: number) => {
+    const video = videoRef.current;
+    if (!video || isNaN(targetTime) || targetTime < 0) return;
+
+    isSeekingRef.current = true;
+    targetSeekTimeRef.current = targetTime;
+    setIsBuffering(true);
+    setCurrentTime(targetTime);
+    lastSavedTimeRef.current = targetTime;
+
+    try {
+      video.currentTime = targetTime;
+    } catch (_) {}
+
+    if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+    // Generous fallback timeout: onSeeked will clear this earlier upon stream arrival
+    seekTimeoutRef.current = setTimeout(() => {
+      isSeekingRef.current = false;
+      targetSeekTimeRef.current = null;
+      setIsBuffering(false);
+    }, 4000);
+  }, []);
+
   // Video event handlers
   useEffect(() => {
     const video = videoRef.current;
@@ -2026,6 +1687,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       setPlayerStatus("ready");
     };
     const onPause = () => {
+      if (isSeekingRef.current || isDraggingScrubberRef.current) return;
       userPausedRef.current = true;
       setIsPlaying(false);
     };
@@ -2033,15 +1695,53 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const onPlaying = () => {
       setIsBuffering(false);
       setPlayerStatus("ready");
+      if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = setTimeout(() => {
+        isSeekingRef.current = false;
+      }, 350);
+    };
+    const onSeeking = () => {
+      setIsBuffering(true);
+    };
+    const onSeeked = () => {
+      setIsBuffering(false);
+      if (video) {
+        const cur = video.currentTime;
+        if (cur > 0.5) {
+          setCurrentTime(cur);
+        }
+      }
+      if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = setTimeout(() => {
+        isSeekingRef.current = false;
+        targetSeekTimeRef.current = null;
+      }, 150);
     };
     const onTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
-      if (video.currentTime > 0) {
-        setPlayerStatus("ready");
-      }
-      if (video.buffered.length > 0 && video.duration > 0) {
-        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-        setBufferedPercent(Math.min(100, (bufferedEnd / video.duration) * 100));
+      if (isDraggingScrubberRef.current || isSeekingRef.current) return;
+      if (video) {
+        const cur = video.currentTime;
+        // Emergency fallback: If video started playback from 0:00 despite pending resume, force seek immediately!
+        if (!hasResumedRef.current && (pendingResumeRef.current > 4 || effectiveInitialTime > 4) && cur < 3) {
+          attemptResume();
+          return;
+        }
+
+        // Ignore stale pre-seek frame updates until seeked completes
+        if (targetSeekTimeRef.current !== null && Math.abs(cur - targetSeekTimeRef.current) > 8) {
+          return;
+        }
+        setCurrentTime(cur);
+        if (cur > 0) {
+          setPlayerStatus("ready");
+        }
+        if (video.buffered.length > 0 && video.duration > 0) {
+          const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+          setBufferedPercent(Math.min(100, (bufferedEnd / video.duration) * 100));
+        }
+        if (Math.abs(cur - lastSavedTimeRef.current) >= 3) {
+          saveCurrentProgress();
+        }
       }
     };
     const onDurationChange = () => setDuration(video.duration || 0);
@@ -2049,19 +1749,29 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       setIsVideoEnded(true);
     };
 
+    video.addEventListener("loadedmetadata", attemptResume);
+    video.addEventListener("loadeddata", attemptResume);
+    video.addEventListener("canplay", attemptResume);
+    video.addEventListener("playing", attemptResume);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("waiting", onWaiting);
-    video.addEventListener("playing", onPlaying);
+    video.addEventListener("seeking", onSeeking);
+    video.addEventListener("seeked", onSeeked);
     video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("durationchange", onDurationChange);
     video.addEventListener("ended", onEnded);
 
     return () => {
+      video.removeEventListener("loadedmetadata", attemptResume);
+      video.removeEventListener("loadeddata", attemptResume);
+      video.removeEventListener("canplay", attemptResume);
+      video.removeEventListener("playing", attemptResume);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
-      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("seeking", onSeeking);
+      video.removeEventListener("seeked", onSeeked);
       video.removeEventListener("timeupdate", onTimeUpdate);
       video.removeEventListener("durationchange", onDurationChange);
       video.removeEventListener("ended", onEnded);
@@ -2139,8 +1849,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         case "j": {
           e.preventDefault();
           const targetT = Math.max(0, video.currentTime - 10);
-          video.currentTime = targetT;
-          setCurrentTime(targetT);
+          performSeek(targetT);
           setArrowSeekPreviewTime(targetT);
           if (previewVideoRef.current) previewVideoRef.current.currentTime = targetT;
           if (arrowTimerRef.current) clearTimeout(arrowTimerRef.current);
@@ -2154,8 +1863,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           const safeDur = getSafeDuration();
           const targetT = safeDur > 0 ? Math.min(safeDur, video.currentTime + 10) : video.currentTime + 10;
           if (!isNaN(targetT) && targetT >= 0) {
-            video.currentTime = targetT;
-            setCurrentTime(targetT);
+            performSeek(targetT);
             setArrowSeekPreviewTime(targetT);
             if (previewVideoRef.current) previewVideoRef.current.currentTime = targetT;
             if (arrowTimerRef.current) clearTimeout(arrowTimerRef.current);
@@ -2266,21 +1974,17 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     [getSafeDuration]
   );
 
-  const handleScrubberSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleScrubberSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     isDraggingScrubberRef.current = false;
+    setIsDraggingScrubber(false);
     const res = updateScrubberPosition(e.clientX);
-    const video = videoRef.current;
-    if (res && video && res.time >= 0) {
-      try {
-        video.currentTime = res.time;
-        setCurrentTime(res.time);
-      } catch (_) {}
-      pendingSeekTimeRef.current = null;
+    if (res && res.time >= 0) {
+      performSeek(res.time);
     }
-  };
+  }, [updateScrubberPosition, performSeek]);
 
-  const handleScrubberMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleScrubberMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     isDraggingScrubberRef.current = true;
     setIsDraggingScrubber(true);
@@ -2289,7 +1993,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       setCurrentTime(res.time);
       pendingSeekTimeRef.current = res.time;
     }
-  };
+  }, [updateScrubberPosition]);
 
   const handleScrubberMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     updateScrubberPosition(e.clientX);
@@ -2308,13 +2012,9 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const handleGlobalUp = () => {
       isDraggingScrubberRef.current = false;
       setIsDraggingScrubber(false);
-      const video = videoRef.current;
       const targetT = pendingSeekTimeRef.current;
-      if (video && targetT !== null && !isNaN(targetT) && targetT >= 0) {
-        try {
-          video.currentTime = targetT;
-          setCurrentTime(targetT);
-        } catch (_) {}
+      if (targetT !== null && !isNaN(targetT) && targetT >= 0) {
+        performSeek(targetT);
         pendingSeekTimeRef.current = null;
       }
     };
@@ -2349,6 +2049,62 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     showToast("Launching in VLC Media Player...");
     setActiveMenu("none");
   };
+
+  const togglePlay = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      if (video.paused) {
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+    }
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const newMuted = !isMuted;
+    video.muted = newMuted;
+    setIsMuted(newMuted);
+    if (!newMuted && video.volume === 0) {
+      video.volume = 0.5;
+      setVolume(0.5);
+    }
+  }, [isMuted]);
+
+  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const video = videoRef.current;
+    const val = parseFloat(e.target.value);
+    setVolume(val);
+    if (video) {
+      video.volume = val;
+      video.muted = val === 0;
+      setIsMuted(val === 0);
+    }
+  }, []);
+
+  const handleSkip = useCallback((delta: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const safeDur = getSafeDuration();
+    const cur = isSeekingRef.current ? currentTime : video.currentTime;
+    const targetT = safeDur > 0 ? Math.max(0, Math.min(safeDur, cur + delta)) : Math.max(0, cur + delta);
+    performSeek(targetT);
+    showToast(`${delta > 0 ? "+" : ""}${delta}s (${formatTime(targetT)})`);
+  }, [getSafeDuration, currentTime, performSeek, showToast]);
+
+  const togglePip = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (document.pictureInPictureEnabled) {
+        await video.requestPictureInPicture();
+      }
+    } catch (_) {}
+  }, []);
 
   // Picture filters: CSS filters applied directly on video element
   const getFilterStyle = (): string => {
@@ -2457,32 +2213,6 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         playsInline
         preload="auto"
         muted={isMuted}
-        onPlay={() => {
-          setIsPlaying(true);
-          setPlayerStatus("ready");
-        }}
-        onPlaying={() => {
-          setIsPlaying(true);
-          setPlayerStatus("ready");
-        }}
-        onPause={() => {
-          setIsPlaying(false);
-          saveCurrentProgress();
-        }}
-        onTimeUpdate={() => {
-          if (isDraggingScrubberRef.current) return;
-          if (videoRef.current) {
-            const cur = videoRef.current.currentTime;
-            setCurrentTime(cur);
-            if (videoRef.current.duration) setDuration(videoRef.current.duration);
-            if (cur > 0 && playerStatus !== "ready") {
-              setPlayerStatus("ready");
-            }
-            if (Math.abs(cur - lastSavedTimeRef.current) >= 3) {
-              saveCurrentProgress();
-            }
-          }
-        }}
         style={{
           position: "absolute",
           top: 0,
@@ -2620,13 +2350,13 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           <div
             className="cinema-player-error-card"
             style={{
-              background: "rgba(14, 16, 22, 0.78)",
-              border: "1px solid rgba(255, 255, 255, 0.14)",
-              backdropFilter: "blur(24px)",
-              WebkitBackdropFilter: "blur(24px)",
-              borderRadius: "20px",
+              background: "rgba(255, 255, 255, 0.12)",
+              border: "1px solid rgba(255, 255, 255, 0.24)",
+              backdropFilter: "blur(32px) saturate(200%)",
+              WebkitBackdropFilter: "blur(32px) saturate(200%)",
+              borderRadius: "24px",
               padding: "24px 32px",
-              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.85)",
+              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -2636,14 +2366,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             <button
               onClick={() => {
                 setPlayerStatus("fetching");
-                setServerStatuses({ 0: "trying" });
-                connectToServer(0);
+                setServerStatuses({});
+                showToast("Reconnecting to stream...");
+                connectToServer(0, false);
               }}
               style={{
                 padding: "11px 28px",
                 borderRadius: "999px",
-                background: "rgba(255, 255, 255, 0.10)",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
+                background: "rgba(255, 255, 255, 0.14)",
+                border: "1px solid rgba(255, 255, 255, 0.28)",
                 color: "#ffffff",
                 fontSize: "14px",
                 fontWeight: 600,
@@ -2721,7 +2452,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           transition: "opacity 0.3s ease",
         }}
       >
-        {/* Back Button with Pure Crystal Transparent Frosted Glass */}
+        {/* Back Button with Exact Reference Transparent Frosted Glass */}
         <button
           onClick={() => {
             saveCurrentProgress();
@@ -2733,23 +2464,23 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             gap: "8px",
             padding: "8px 18px",
             borderRadius: "9999px",
-            background: "rgba(255, 255, 255, 0.12)",
-            backdropFilter: "blur(28px) saturate(180%)",
-            WebkitBackdropFilter: "blur(28px) saturate(180%)",
-            border: "1px solid rgba(255, 255, 255, 0.24)",
-            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
+            background: "rgba(36, 42, 52, 0.68)",
+            backdropFilter: "blur(36px) saturate(190%)",
+            WebkitBackdropFilter: "blur(36px) saturate(190%)",
+            border: "1px solid rgba(255, 255, 255, 0.14)",
+            boxShadow: "0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.2)",
             color: "#ffffff",
             cursor: "pointer",
             transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.22)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+            e.currentTarget.style.background = "rgba(48, 56, 70, 0.85)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
             e.currentTarget.style.transform = "scale(1.04)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.24)";
+            e.currentTarget.style.background = "rgba(36, 42, 52, 0.68)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)";
             e.currentTarget.style.transform = "scale(1)";
           }}
           title="Back to Details (Esc)"
@@ -2758,20 +2489,20 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           <span style={{ fontSize: "13px", fontWeight: 600 }}>Back</span>
         </button>
 
-        {/* Center Floating Title Pill with Pure Crystal Transparent Frosted Glass */}
+        {/* Center Floating Title Pill with Exact Reference Transparent Frosted Glass */}
         {title && (
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: "10px",
-              padding: "7px 20px",
+              padding: "8px 22px",
               borderRadius: "9999px",
-              background: "rgba(255, 255, 255, 0.12)",
-              backdropFilter: "blur(28px) saturate(180%)",
-              WebkitBackdropFilter: "blur(28px) saturate(180%)",
-              border: "1px solid rgba(255, 255, 255, 0.24)",
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
+              background: "rgba(36, 42, 52, 0.68)",
+              backdropFilter: "blur(36px) saturate(190%)",
+              WebkitBackdropFilter: "blur(36px) saturate(190%)",
+              border: "1px solid rgba(255, 255, 255, 0.14)",
+              boxShadow: "0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.2)",
               maxWidth: "50%",
             }}
           >
@@ -2796,7 +2527,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                   background: "rgba(255, 255, 255, 0.16)",
                   padding: "2px 9px",
                   borderRadius: "999px",
-                  border: "1px solid rgba(255, 255, 255, 0.28)",
+                  border: "1px solid rgba(255, 255, 255, 0.24)",
                   boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.3)",
                   whiteSpace: "nowrap",
                 }}
@@ -2807,1689 +2538,92 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           </div>
         )}
 
-        {/* Right Action Icons: Watch Party + Comments */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button
-            onClick={handleCopyWatchParty}
-            style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "50%",
-              background: "rgba(255, 255, 255, 0.12)",
-              backdropFilter: "blur(28px) saturate(180%)",
-              WebkitBackdropFilter: "blur(28px) saturate(180%)",
-              border: "1px solid rgba(255, 255, 255, 0.24)",
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
-              color: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.24)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
-              e.currentTarget.style.transform = "scale(1.08)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.24)";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-            title="Start Watch Party"
-          >
-            <WatchPartyIcon size={19} />
-          </button>
-
-          <button
-            onClick={() => showToast("Subtitles & Audio are ready.")}
-            style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "50%",
-              background: "rgba(255, 255, 255, 0.12)",
-              backdropFilter: "blur(28px) saturate(180%)",
-              WebkitBackdropFilter: "blur(28px) saturate(180%)",
-              border: "1px solid rgba(255, 255, 255, 0.24)",
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1.5px rgba(255, 255, 255, 0.4)",
-              color: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.24)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
-              e.currentTarget.style.transform = "scale(1.08)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.24)";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-            title="Discussion & Comments"
-          >
-            <ChatBubbleIcon size={19} />
-          </button>
-        </div>
+        {/* Right Action Spacer (Maintains center title alignment) */}
+        <div style={{ width: "40px" }} />
       </div>
-
-      {/* ------------------------------------------------------------- */}
-      {/* 9. SETTINGS FLYOUT MENU with Pure Crystal Frosted Glass        */}
-      {/* ------------------------------------------------------------- */}
-      {activeMenu !== "none" && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "95px",
-            right: "24px",
-            width: "330px",
-            maxWidth: "calc(100vw - 32px)",
-            background: "rgba(255, 255, 255, 0.12)",
-            border: "1px solid rgba(255, 255, 255, 0.24)",
-            borderRadius: "24px",
-            boxShadow: "0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.35)",
-            backdropFilter: "blur(32px) saturate(200%)",
-            WebkitBackdropFilter: "blur(32px) saturate(200%)",
-            padding: "8px 0",
-            zIndex: 65,
-            animation: "fadeIn 0.18s ease-out",
-            overflow: "hidden",
-          }}
-        >
-          {/* 1. TOP-LEVEL SETTINGS MENU (Matching User Screenshot media_1793183781750.png) */}
-          {activeMenu === "settings" && (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {/* Header */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 18px 12px 18px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                <div style={{ width: 24 }} />
-                <span style={{ fontSize: "15px", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
-                  Settings
-                </span>
-                <button
-                  onClick={() => setActiveMenu("none")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    cursor: "pointer",
-                    padding: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: "6px",
-                    transition: "color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255, 255, 255, 0.6)")}
-                >
-                  <CloseIcon size={16} />
-                </button>
-              </div>
-
-              {/* Group 1: Media Properties Card */}
-              <div
-                style={{
-                  margin: "12px 14px 10px 14px",
-                  background: "rgba(255, 255, 255, 0.04)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Quality */}
-                <button
-                  onClick={() => setActiveMenu("quality")}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "12px 16px",
-                    background: "none",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "background 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <span>Quality</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", color: "#94a3b8" }}>
-                      {selectedQuality === -1
-                        ? qualityLevels.length > 0
-                          ? `Auto · ${qualityLevels[0]?.name || "1080p"}`
-                          : "Auto · 1080p"
-                        : qualityLevels.find((q) => q.id === selectedQuality)?.name || "1080p"}
-                    </span>
-                    <ChevronRightIcon size={15} />
-                  </div>
-                </button>
-
-                <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.06)", margin: "0 14px" }} />
-
-                {/* Subtitles */}
-                <button
-                  onClick={() => setActiveMenu("subtitles")}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "12px 16px",
-                    background: "none",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "background 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <span>Subtitles</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", color: "#94a3b8" }}>
-                      {subtitlesEnabled && selectedSubtitle !== -1
-                        ? subtitlesList.find((s) => s.id === selectedSubtitle)?.name || "English"
-                        : "English"}
-                    </span>
-                    <ChevronRightIcon size={15} />
-                  </div>
-                </button>
-
-                <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.06)", margin: "0 14px" }} />
-
-                {/* Audio */}
-                <button
-                  onClick={() => setActiveMenu("audio")}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "12px 16px",
-                    background: "none",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "background 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <span>Audio</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", color: "#94a3b8" }}>
-                      {audioTracks.find((a) => a.id === selectedAudioTrack)?.name || "Original"}
-                    </span>
-                    <ChevronRightIcon size={15} />
-                  </div>
-                </button>
-
-                <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.06)", margin: "0 14px" }} />
-
-                {/* Playback speed */}
-                <button
-                  onClick={() => setActiveMenu("speed")}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "12px 16px",
-                    background: "none",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "background 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <span>Playback speed</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", color: "#94a3b8" }}>{playbackRate}×</span>
-                    <ChevronRightIcon size={15} />
-                  </div>
-                </button>
-              </div>
-
-              {/* Group 2: Playback settings Card */}
-              <div
-                style={{
-                  margin: "0 14px 14px 14px",
-                  background: "rgba(255, 255, 255, 0.04)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  overflow: "hidden",
-                }}
-              >
-                <button
-                  onClick={() => setActiveMenu("playback_settings")}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "13px 16px",
-                    background: "none",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "background 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <span>Playback settings</span>
-                  <ChevronRightIcon size={15} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 2. PLAYBACK SETTINGS SUBMENU (Video fit, Volume boost, Brightness, Sleep timer) */}
-          {activeMenu === "playback_settings" && (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {/* Header */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 18px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                <button
-                  onClick={() => setActiveMenu("settings")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    background: "none",
-                    border: "none",
-                    color: "#cbd5e1",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                >
-                  <BackIcon size={16} />
-                  <span>Back</span>
-                </button>
-                <span
-                  style={{
-                    fontSize: "15px",
-                    fontWeight: 700,
-                    color: "#ffffff",
-                  }}
-                >
-                  Playback settings
-                </span>
-                <button
-                  onClick={() => setActiveMenu("none")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    cursor: "pointer",
-                    padding: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: "6px",
-                  }}
-                >
-                  <CloseIcon size={16} />
-                </button>
-              </div>
-
-              {/* Volume boost section */}
-              <div style={{ padding: "14px 18px 10px 18px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "10px",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 700,
-                  }}
-                >
-                  <VolumeHighIcon size={17} />
-                  <span>Volume boost</span>
-                </div>
-                <div
-                  style={{
-                    background: "rgba(255, 255, 255, 0.04)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "14px",
-                    padding: "14px 16px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#ffffff" }}>Gain</span>
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: volumeBoost > 100 ? "#e50914" : "#94a3b8" }}>
-                      {volumeBoost}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={100}
-                    max={300}
-                    step={5}
-                    value={volumeBoost}
-                    onChange={(e) => handleBoostChange(Number(e.target.value))}
-                    style={{
-                      width: "100%",
-                      accentColor: "#e50914",
-                      height: "4px",
-                      cursor: "pointer",
-                      marginBottom: "8px",
-                    }}
-                  />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "rgba(255,255,255,0.45)" }}>
-                    <span>100%</span>
-                    <span>300%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Video fit section */}
-              <div style={{ padding: "0 18px 12px 18px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "10px",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 700,
-                  }}
-                >
-                  <AspectRatioIcon size={17} />
-                  <span>Video fit</span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    background: "rgba(255, 255, 255, 0.04)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "12px",
-                    padding: "4px",
-                    gap: "4px",
-                  }}
-                >
-                  {(["fit", "fill", "stretch"] as const).map((mode) => {
-                    const active = videoFit === mode;
-                    return (
-                      <button
-                        key={mode}
-                        onClick={() => {
-                          setVideoFit(mode);
-                          showToast(`Video fit: ${mode.toUpperCase()}`);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: "9px 0",
-                          borderRadius: "8px",
-                          border: active ? "1px solid #e50914" : "1px solid transparent",
-                          background: active ? "#e50914" : "transparent",
-                          color: "#ffffff",
-                          fontSize: "13.5px",
-                          fontWeight: active ? 700 : 500,
-                          cursor: "pointer",
-                          transition: "all 0.15s ease",
-                          textTransform: "capitalize",
-                          boxShadow: active ? "0 4px 14px rgba(229, 9, 20, 0.45)" : "none",
-                        }}
-                      >
-                        {mode}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Brightness section */}
-              <div style={{ padding: "0 18px 14px 18px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "10px",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 700,
-                  }}
-                >
-                  <SunIcon size={17} />
-                  <span>Brightness</span>
-                </div>
-                <div
-                  style={{
-                    background: "rgba(255, 255, 255, 0.04)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "14px",
-                    padding: "14px 16px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#ffffff" }}>Level</span>
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: "#ffffff" }}>{brightnessLevel}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={50}
-                    max={200}
-                    step={5}
-                    value={brightnessLevel}
-                    onChange={(e) => setBrightnessLevel(Number(e.target.value))}
-                    style={{
-                      width: "100%",
-                      accentColor: "#e50914",
-                      height: "4px",
-                      cursor: "pointer",
-                      marginBottom: "8px",
-                    }}
-                  />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "rgba(255,255,255,0.45)" }}>
-                    <span>50%</span>
-                    <span>200%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sleep timer link */}
-              <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", padding: "6px 14px 10px 14px" }}>
-                <button
-                  onClick={() => setActiveMenu("sleep")}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "11px 14px",
-                    background: "rgba(255, 255, 255, 0.04)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "12px",
-                    color: "#ffffff",
-                    fontSize: "13.5px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <MoonIcon size={16} /> Sleep timer
-                  </span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontSize: "12.5px", color: "#8b949e" }}>
-                      {sleepTimerMinutes ? `${sleepTimerMinutes}m` : "Off"}
-                    </span>
-                    <ChevronRightIcon size={14} />
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 3. PLAYBACK SPEED */}
-          {activeMenu === "speed" && (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 18px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                <button
-                  onClick={() => setActiveMenu("settings")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    background: "none",
-                    border: "none",
-                    color: "#cbd5e1",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                >
-                  <BackIcon size={16} />
-                  <span>Back</span>
-                </button>
-                <span style={{ fontSize: "15px", fontWeight: 700, color: "#ffffff" }}>
-                  Playback speed
-                </span>
-                <button
-                  onClick={() => setActiveMenu("none")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    cursor: "pointer",
-                    padding: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <CloseIcon size={16} />
-                </button>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", padding: "8px 12px", gap: "2px" }}>
-                {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => {
-                  const active = playbackRate === rate;
-                  return (
-                    <button
-                      key={rate}
-                      onClick={() => {
-                        setPlaybackRate(rate);
-                        if (videoRef.current) videoRef.current.playbackRate = rate;
-                        setActiveMenu("none");
-                        showToast(`Speed: ${rate}x`);
-                      }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "11px 16px",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: active ? "rgba(229, 9, 20, 0.16)" : "transparent",
-                        color: active ? "#ffffff" : "#cbd5e1",
-                        fontSize: "14.5px",
-                        fontWeight: active ? 700 : 500,
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <span style={{ color: active ? "#e50914" : "#ffffff", fontWeight: active ? 700 : 500 }}>
-                        {rate === 1 ? "1× (Normal)" : `${rate}×`}
-                      </span>
-                      {active && <CheckIcon size={16} color="#e50914" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-
-
-          {/* 5. QUALITY FLYOUT */}
-          {activeMenu === "quality" && (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 18px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                <button
-                  onClick={() => setActiveMenu("settings")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    background: "none",
-                    border: "none",
-                    color: "#cbd5e1",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                >
-                  <BackIcon size={16} />
-                  <span>Back</span>
-                </button>
-                <span style={{ fontSize: "15px", fontWeight: 700, color: "#ffffff" }}>
-                  Quality
-                </span>
-                <button
-                  onClick={() => setActiveMenu("none")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    cursor: "pointer",
-                    padding: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <CloseIcon size={16} />
-                </button>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", padding: "8px 12px", gap: "2px" }}>
-                <button
-                  onClick={() => {
-                    setSelectedQuality(-1);
-                    if (hlsRef.current) hlsRef.current.currentLevel = -1;
-                    setActiveMenu("none");
-                    showToast("Quality: Auto (Adaptive)");
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "11px 16px",
-                    borderRadius: "10px",
-                    border: "none",
-                    background: selectedQuality === -1 ? "rgba(255, 255, 255, 0.12)" : "transparent",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: selectedQuality === -1 ? 700 : 500,
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedQuality !== -1) e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedQuality !== -1) e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <span style={{ color: "#ffffff", fontWeight: selectedQuality === -1 ? 700 : 500 }}>
-                    Auto {qualityLevels.length > 0 ? `(Currently ${qualityLevels[0]?.name || "1080p"})` : "(1080p)"}
-                  </span>
-                  {selectedQuality === -1 && <CheckIcon size={16} color="#ffffff" />}
-                </button>
-                {qualityLevels.map((lvl) => {
-                  const active = selectedQuality === lvl.id;
-                  return (
-                    <button
-                      key={lvl.id}
-                      onClick={() => {
-                        setSelectedQuality(lvl.id);
-                        if (hlsRef.current && lvl.serverIdx === undefined) {
-                          hlsRef.current.currentLevel = lvl.id;
-                        } else {
-                          const targetIdx = lvl.serverIdx !== undefined ? lvl.serverIdx : lvl.id;
-                          if (serverList[targetIdx]) {
-                            const curTime = videoRef.current?.currentTime || 0;
-                            connectToServer(targetIdx);
-                            setTimeout(() => {
-                              if (videoRef.current && curTime > 0) videoRef.current.currentTime = curTime;
-                            }, 400);
-                          }
-                        }
-                        setActiveMenu("none");
-                        showToast(`Quality: ${lvl.name}`);
-                      }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "11px 16px",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: active ? "rgba(255, 255, 255, 0.12)" : "transparent",
-                        color: "#ffffff",
-                        fontSize: "14px",
-                        fontWeight: active ? 700 : 500,
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!active) e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      <span style={{ color: "#ffffff", fontWeight: active ? 700 : 500 }}>{lvl.name}</span>
-                      {active && <CheckIcon size={16} color="#ffffff" />}
-                    </button>
-                  );
-                })}
-
-                {/* + Load More Qualities Option */}
-                <button
-                  disabled={isLoadingMoreQualities}
-                  onClick={handleLoadMoreQualities}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    width: "100%",
-                    padding: "10px 16px",
-                    borderRadius: "10px",
-                    border: "1px solid rgba(255, 255, 255, 0.14)",
-                    background: "rgba(255, 255, 255, 0.08)",
-                    color: "#ffffff",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    cursor: isLoadingMoreQualities ? "default" : "pointer",
-                    marginTop: "8px",
-                    transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoadingMoreQualities) {
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isLoadingMoreQualities) {
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                      e.currentTarget.style.transform = "translateY(0px)";
-                    }
-                  }}
-                >
-                  <RefreshCwIcon
-                    size={14}
-                    style={{
-                      animation: isLoadingMoreQualities ? "spin 1s linear infinite" : "none",
-                      color: "#ffffff",
-                    }}
-                  />
-                  {isLoadingMoreQualities ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                      <span>Fetching All Qualities</span>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                        <span className="cinema-dot cinema-dot-1" />
-                        <span className="cinema-dot cinema-dot-2" />
-                        <span className="cinema-dot cinema-dot-3" />
-                      </span>
-                    </span>
-                  ) : (
-                    <span>+ Load More Qualities</span>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 6. AUDIO FLYOUT (Upfront populated tracks with instant switch) */}
-          {activeMenu === "audio" && (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 18px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                <button
-                  onClick={() => setActiveMenu("settings")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    background: "none",
-                    border: "none",
-                    color: "#cbd5e1",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                >
-                  <BackIcon size={16} />
-                  <span>Back</span>
-                </button>
-                <span style={{ fontSize: "15px", fontWeight: 700, color: "#ffffff" }}>
-                  Audio tracks
-                </span>
-                <button
-                  onClick={() => setActiveMenu("none")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    cursor: "pointer",
-                    padding: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <CloseIcon size={16} />
-                </button>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", padding: "8px 12px", gap: "2px", maxHeight: "300px", overflowY: "auto" }}>
-                {audioTracks.length === 0 ? (
-                  <div style={{ padding: "14px 16px", color: "rgba(255,255,255,0.6)", fontSize: "13.5px", textAlign: "center" }}>
-                    Original / Default Audio (Single Track)
-                  </div>
-                ) : (
-                  audioTracks.map((track) => {
-                    const active = selectedAudioTrack === track.id;
-                    return (
-                      <button
-                        key={track.id}
-                        onClick={() => {
-                          switchAudioTrack(track);
-                          setActiveMenu("none");
-                        }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "11px 16px",
-                          borderRadius: "10px",
-                          border: "none",
-                          background: active ? "rgba(255, 255, 255, 0.12)" : "transparent",
-                          color: "#ffffff",
-                          fontSize: "14px",
-                          fontWeight: active ? 700 : 500,
-                          cursor: "pointer",
-                          textAlign: "left",
-                          transition: "all 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!active) e.currentTarget.style.background = "transparent";
-                        }}
-                      >
-                        <span style={{ color: "#ffffff", fontWeight: active ? 700 : 500 }}>
-                          {cleanAudioName(track.name)}
-                        </span>
-                        {active && <CheckIcon size={16} color="#ffffff" />}
-                      </button>
-                    );
-                  })
-                )}
-
-                <button
-                  onClick={handleLoadMoreAudios}
-                  disabled={isLoadingMoreAudios}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    border: "1px solid rgba(255, 255, 255, 0.14)",
-                    background: "rgba(255, 255, 255, 0.08)",
-                    color: "#ffffff",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    cursor: isLoadingMoreAudios ? "default" : "pointer",
-                    marginTop: "8px",
-                    transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoadingMoreAudios) {
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isLoadingMoreAudios) {
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                      e.currentTarget.style.transform = "translateY(0px)";
-                    }
-                  }}
-                >
-                  <RefreshCwIcon
-                    size={14}
-                    style={{
-                      animation: isLoadingMoreAudios ? "spin 1s linear infinite" : "none",
-                      color: "#ffffff",
-                    }}
-                  />
-                  {isLoadingMoreAudios ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                      <span>Fetching All Audios</span>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                        <span className="cinema-dot cinema-dot-1" />
-                        <span className="cinema-dot cinema-dot-2" />
-                        <span className="cinema-dot cinema-dot-3" />
-                      </span>
-                    </span>
-                  ) : (
-                    <span>+ Load More Audio</span>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 7. SUBTITLES FLYOUT */}
-          {activeMenu === "subtitles" && (
-            <div style={{ display: "flex", flexDirection: "column", maxHeight: "460px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 18px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <button
-                    onClick={() => setActiveMenu("settings")}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      background: "none",
-                      border: "none",
-                      color: "#cbd5e1",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  >
-                    <BackIcon size={16} />
-                    <span>Back</span>
-                  </button>
-                  <span style={{ fontSize: "15px", fontWeight: 700, color: "#ffffff", marginLeft: "12px" }}>
-                    Subtitles
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      padding: "5px 12px",
-                      borderRadius: "999px",
-                      background: "rgba(255, 255, 255, 0.1)",
-                      border: "1px solid rgba(255, 255, 255, 0.14)",
-                      color: "#ffffff",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Upload
-                  </button>
-                  <button
-                    onClick={() => setActiveMenu("none")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "rgba(255, 255, 255, 0.6)",
-                      cursor: "pointer",
-                      padding: "4px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <CloseIcon size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept=".vtt,.srt"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file || !videoRef.current) return;
-                  const url = URL.createObjectURL(file);
-                  const newTrack = {
-                    id: subtitlesList.length,
-                    name: file.name.replace(/\.[^/.]+$/, ""),
-                    file: url,
-                  };
-                  setSubtitlesList((prev) => [...prev, newTrack]);
-                  setSelectedSubtitle(newTrack.id);
-                  setSubtitlesEnabled(true);
-                  const trackEl = document.createElement("track");
-                  trackEl.kind = "subtitles";
-                  trackEl.label = newTrack.name;
-                  trackEl.srclang = "en";
-                  trackEl.src = url;
-                  trackEl.default = true;
-                  videoRef.current.appendChild(trackEl);
-                  trackEl.track.mode = "showing";
-                  showToast(`Subtitles: ${newTrack.name}`);
-                  setActiveMenu("none");
-                }}
-              />
-
-              <div style={{ padding: "8px 14px" }}>
-                <input
-                  type="text"
-                  placeholder="Search language..."
-                  value={subtitleSearch}
-                  onChange={(e) => setSubtitleSearch(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: "8px",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    color: "#ffffff",
-                    fontSize: "13px",
-                    outline: "none",
-                  }}
-                />
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", padding: "4px 12px", gap: "2px", overflowY: "auto", maxHeight: "280px" }}>
-                {subtitlesList
-                  .filter((s) => !subtitleSearch.trim() || s.name.toLowerCase().includes(subtitleSearch.toLowerCase()))
-                  .map((sub) => {
-                    const active = selectedSubtitle === sub.id;
-                    return (
-                      <button
-                        key={sub.id}
-                        onClick={() => {
-                          setSelectedSubtitle(sub.id);
-                          setSubtitlesEnabled(sub.id !== -1);
-                          if (videoRef.current) {
-                            const tracks = videoRef.current.textTracks;
-                            for (let i = 0; i < tracks.length; i++) {
-                              tracks[i].mode = sub.id !== -1 && i === sub.id ? "showing" : "disabled";
-                            }
-                          }
-                          setActiveMenu("none");
-                          showToast(`Subtitles: ${sub.name}`);
-                        }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "10px 14px",
-                          borderRadius: "10px",
-                          border: "none",
-                          background: active ? "rgba(229, 9, 20, 0.16)" : "transparent",
-                          color: active ? "#ffffff" : "#cbd5e1",
-                          fontSize: "13.5px",
-                          fontWeight: active ? 700 : 500,
-                          cursor: "pointer",
-                          textAlign: "left",
-                        }}
-                      >
-                        <span style={{ color: active ? "#e50914" : "#ffffff" }}>{sub.name}</span>
-                        {active && <CheckIcon size={16} color="#e50914" />}
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-
-          {/* 8. SLEEP TIMER FLYOUT */}
-          {activeMenu === "sleep" && (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 18px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                <button
-                  onClick={() => setActiveMenu("playback_settings")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    background: "none",
-                    border: "none",
-                    color: "#cbd5e1",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                >
-                  <BackIcon size={16} />
-                  <span>Back</span>
-                </button>
-                <span style={{ fontSize: "15px", fontWeight: 700, color: "#ffffff" }}>
-                  Sleep timer
-                </span>
-                <button
-                  onClick={() => setActiveMenu("none")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    cursor: "pointer",
-                    padding: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <CloseIcon size={16} />
-                </button>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", padding: "8px 12px", gap: "2px" }}>
-                {[
-                  { val: null, label: "Off" },
-                  { val: 15, label: "15 Minutes" },
-                  { val: 30, label: "30 Minutes" },
-                  { val: 45, label: "45 Minutes" },
-                  { val: 60, label: "1 Hour" },
-                ].map((s) => {
-                  const active = sleepTimerMinutes === s.val;
-                  return (
-                    <button
-                      key={s.label}
-                      onClick={() => {
-                        setSleepTimerMinutes(s.val);
-                        if (s.val) {
-                          setTimeout(() => {
-                            if (videoRef.current) videoRef.current.pause();
-                            showToast("Sleep timer: Paused playback");
-                          }, s.val * 60 * 1000);
-                        }
-                        setActiveMenu("none");
-                        showToast(`Sleep Timer: ${s.label}`);
-                      }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "11px 16px",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: active ? "rgba(229, 9, 20, 0.16)" : "transparent",
-                        color: active ? "#ffffff" : "#cbd5e1",
-                        fontSize: "14px",
-                        fontWeight: active ? 700 : 500,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ color: active ? "#e50914" : "#ffffff" }}>{s.label}</span>
-                      {active && <CheckIcon size={16} color="#e50914" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* 10. BOTTOM CONTROLS BAR (Screenshots 1 & 2)                   */}
-      {/* ------------------------------------------------------------- */}
-      <div
-        className="cinema-player-controls-bottom"
-        style={{
-          position: "absolute",
-          bottom: "24px",
-          left: "24px",
-          right: "24px",
-          maxWidth: "1280px",
-          margin: "0 auto",
-          zIndex: 40,
-          background: "rgba(255, 255, 255, 0.10)",
-          backdropFilter: "blur(28px) saturate(180%)",
-          WebkitBackdropFilter: "blur(28px) saturate(180%)",
-          border: "1px solid rgba(255, 255, 255, 0.22)",
-          boxShadow: "0 16px 40px rgba(0, 0, 0, 0.35), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.4)",
-          padding: "14px 22px 14px",
-          borderRadius: "24px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
-          opacity: controlsVisible || !isPlaying ? 1 : 0,
-          pointerEvents: controlsVisible || !isPlaying ? "auto" : "none",
-          transition: "opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-          transform: controlsVisible || !isPlaying ? "translateY(0)" : "translateY(12px)",
+      {/* 9. SETTINGS FLYOUT MENU */}
+      <PlayerSettingsFlyout
+        activeMenu={activeMenu}
+        setActiveMenu={setActiveMenu}
+        selectedQuality={selectedQuality}
+        setSelectedQuality={setSelectedQuality}
+        qualityLevels={qualityLevels}
+        subtitlesEnabled={subtitlesEnabled}
+        setSubtitlesEnabled={setSubtitlesEnabled}
+        subtitlesList={subtitlesList}
+        setSubtitlesList={setSubtitlesList}
+        selectedSubtitle={selectedSubtitle}
+        setSelectedSubtitle={setSelectedSubtitle}
+        audioTracks={audioTracks}
+        selectedAudioTrack={selectedAudioTrack}
+        playbackRate={playbackRate}
+        setPlaybackRate={setPlaybackRate}
+        videoFit={videoFit}
+        setVideoFit={setVideoFit}
+        volumeBoost={volumeBoost}
+        handleBoostChange={handleBoostChange}
+        brightnessLevel={brightnessLevel}
+        setBrightnessLevel={setBrightnessLevel}
+        sleepTimerMinutes={sleepTimerMinutes}
+        setSleepTimerMinutes={setSleepTimerMinutes}
+        videoRef={videoRef}
+        hlsRef={hlsRef}
+        serverList={serverList}
+        connectToServer={connectToServer}
+        currentServerIdx={currentServerIdx}
+        switchAudioTrack={switchAudioTrack}
+        subtitleSearch={subtitleSearch}
+        setSubtitleSearch={setSubtitleSearch}
+        isLoadingMoreQualities={isLoadingMoreQualities}
+        handleLoadMoreQualities={handleLoadMoreQualities}
+        isLoadingMoreAudios={isLoadingMoreAudios}
+        handleLoadMoreAudios={handleLoadMoreAudios}
+        showToast={showToast}
+      />
+      {/* 10. BOTTOM CONTROLS BAR */}
+      <PlayerBottomControls
+        controlsVisible={controlsVisible}
+        isPlaying={isPlaying}
+        togglePlay={togglePlay}
+        duration={duration}
+        currentTime={currentTime}
+        isHoveringScrubber={isHoveringScrubber}
+        isDraggingScrubber={isDraggingScrubber}
+        setIsHoveringScrubber={setIsHoveringScrubber}
+        arrowSeekPreviewTime={arrowSeekPreviewTime}
+        hoverPercent={hoverPercent}
+        hoverTime={hoverTime}
+        scrubberRef={scrubberRef}
+        bufferedPercent={bufferedPercent}
+        handleScrubberMouseMove={handleScrubberMouseMove}
+        handleScrubberLeave={() => {
+          if (!isDraggingScrubber) setIsHoveringScrubber(false);
         }}
-      >
-        {/* Clean Hover Time Bubble (User Request: poster box removed, only clean time bubble shown) */}
-        {((isHoveringScrubber || isDraggingScrubber) || arrowSeekPreviewTime !== null) && duration > 0 && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "36px",
-              left: `${arrowSeekPreviewTime !== null ? (currentTime / duration) * 100 : hoverPercent * 100}%`,
-              transform: "translateX(-50%)",
-              zIndex: 40,
-              pointerEvents: "none",
-              animation: "fadeIn 0.15s ease-out",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "2px",
-            }}
-          >
-            <div
-              style={{
-                background: "rgba(14, 16, 22, 0.90)",
-                backdropFilter: "blur(16px)",
-                WebkitBackdropFilter: "blur(16px)",
-                border: "1px solid rgba(255, 255, 255, 0.20)",
-                borderRadius: "8px",
-                padding: "4px 10px",
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#ffffff",
-                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.85)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {formatTime(arrowSeekPreviewTime !== null ? arrowSeekPreviewTime : hoverTime)}
-            </div>
-            {/* Arrow pointer */}
-            <div
-              style={{
-                width: 0,
-                height: 0,
-                borderLeft: "5px solid transparent",
-                borderRight: "5px solid transparent",
-                borderTop: "5px solid rgba(255, 255, 255, 0.35)",
-              }}
-            />
-          </div>
-        )}
+        handleScrubberMouseDown={handleScrubberMouseDown}
+        handleScrubberSeek={handleScrubberSeek}
+        handleSkip={handleSkip}
+        isMuted={isMuted}
+        toggleMute={toggleMute}
+        volume={volume}
+        handleVolumeChange={handleVolumeChange}
+        isTvOrAnime={isSeries}
+        showEpisodesDrawer={showEpisodesDrawer}
+        setShowEpisodesDrawer={setShowEpisodesDrawer}
+        subtitlesEnabled={subtitlesEnabled}
+        setSubtitlesEnabled={setSubtitlesEnabled}
+        activeMenu={activeMenu}
+        setActiveMenu={setActiveMenu}
+        isFullscreen={isFullscreen}
+        toggleFullscreen={toggleFullscreen}
+        title={title}
+        season={currentSeason}
+        episode={currentEpisode}
+        togglePip={togglePip}
+        onBookmarkClick={() => showToast("Saved to Watchlist")}
+      />
 
-        {/* Full-width Scrubber / Timeline Bar with Smooth Click & Drag */}
-        <div
-          ref={scrubberRef}
-          onClick={handleScrubberSeek}
-          onMouseDown={handleScrubberMouseDown}
-          onMouseMove={handleScrubberMouseMove}
-          onMouseEnter={() => setIsHoveringScrubber(true)}
-          onMouseLeave={() => {
-            if (!isDraggingScrubber) setIsHoveringScrubber(false);
-          }}
-          style={{
-            position: "relative",
-            width: "100%",
-            height: "28px",
-            display: "flex",
-            alignItems: "center",
-            cursor: "pointer",
-            userSelect: "none",
-          }}
-        >
-          {/* Track Base */}
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              height: isHoveringScrubber || isDraggingScrubber ? "7px" : "3.5px",
-              backgroundColor: "rgba(255, 255, 255, 0.22)",
-              borderRadius: "9999px",
-              overflow: "hidden",
-              transition: "height 0.15s ease",
-            }}
-          >
-            {/* Buffered Bar */}
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: `${bufferedPercent}%`,
-                backgroundColor: "rgba(255, 255, 255, 0.45)",
-                transition: "width 0.2s linear",
-              }}
-            />
-            {/* Hover Highlight Bar */}
-            {isHoveringScrubber && (
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: `${hoverPercent * 100}%`,
-                  backgroundColor: "rgba(255, 255, 255, 0.25)",
-                }}
-              />
-            )}
-            {/* Played Progress Bar (Cinema Red) */}
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: `${getSafeDuration() > 0 ? Math.min(100, Math.max(0, (currentTime / getSafeDuration()) * 100)) : 0}%`,
-                backgroundColor: "#e50914",
-                boxShadow: "0 0 10px rgba(229, 9, 20, 0.5)",
-              }}
-            />
-          </div>
-
-          {/* Scrubber Playhead Handle */}
-          <div
-            style={{
-              position: "absolute",
-              left: `${getSafeDuration() > 0 ? Math.min(100, Math.max(0, (currentTime / getSafeDuration()) * 100)) : 0}%`,
-              transform: "translateX(-50%)",
-              width: isHoveringScrubber || isDraggingScrubber ? "15px" : "12px",
-              height: isHoveringScrubber || isDraggingScrubber ? "15px" : "12px",
-              borderRadius: "50%",
-              backgroundColor: "#ffffff",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.7), 0 0 6px #e50914",
-              pointerEvents: "none",
-              transition: "width 0.15s ease, height 0.15s ease",
-            }}
-          />
-        </div>
-
-        {/* Controls Row */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            width: "100%",
-          }}
-        >
-          {/* Left Controls */}
-          <div className="cinema-player-left-controls" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {/* Play / Pause */}
-            <button
-              className="cinema-ctrl-btn"
-              onClick={() => {
-                if (videoRef.current) {
-                  if (videoRef.current.paused) videoRef.current.play();
-                  else videoRef.current.pause();
-                }
-              }}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: "transparent",
-                border: "none",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                padding: "4px",
-                transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-              }}
-              title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-            >
-              {isPlaying ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
-            </button>
-
-            {/* Rewind 10s */}
-            <button
-              className="cinema-ctrl-btn"
-              onClick={() => {
-                if (videoRef.current) {
-                  const targetT = Math.max(0, videoRef.current.currentTime - 10);
-                  videoRef.current.currentTime = targetT;
-                  setCurrentTime(targetT);
-                  showToast("-10s");
-                }
-              }}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: "transparent",
-                border: "none",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                padding: "4px",
-                transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-              }}
-              title="Rewind 10s (Left Arrow)"
-            >
-              <Rewind10Icon size={23} />
-            </button>
-
-            {/* Forward 10s */}
-            <button
-              className="cinema-ctrl-btn"
-              onClick={() => {
-                if (videoRef.current) {
-                  const safeDur = getSafeDuration();
-                  const targetT = safeDur > 0 ? Math.min(safeDur, videoRef.current.currentTime + 10) : videoRef.current.currentTime + 10;
-                  videoRef.current.currentTime = targetT;
-                  setCurrentTime(targetT);
-                  showToast("+10s");
-                }
-              }}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: "transparent",
-                border: "none",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                padding: "4px",
-                transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-              }}
-              title="Forward 10s (Right Arrow)"
-            >
-              <Forward10Icon size={23} />
-            </button>
-
-            {/* Volume Icon */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <button
-                className="cinema-ctrl-btn"
-                onClick={() => {
-                  if (videoRef.current) {
-                    videoRef.current.muted = !videoRef.current.muted;
-                    setIsMuted(videoRef.current.muted);
-                  }
-                }}
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "50%",
-                  background: "transparent",
-                  border: "none",
-                  color: "#ffffff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  padding: "4px",
-                  transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-                }}
-                title={isMuted ? "Unmute (M)" : "Mute (M)"}
-              >
-                {isMuted || volume === 0 ? <VolumeMuteIcon size={20} /> : <VolumeHighIcon size={20} />}
-              </button>
-            </div>
-
-            {/* Timestamp & Ending Indicator: 0:00 / 2:05:33 Ends 1:31 AM • Title */}
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#cbd5e1",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                letterSpacing: "0.02em",
-              }}
-            >
-              <span>{formatTime(currentTime)}</span>
-              <span style={{ color: "rgba(255,255,255,0.4)" }}>/</span>
-              <span>{formatTime(duration)}</span>
-              {estimatedEnd && (
-                <span className="cinema-player-mobile-hide-title" style={{ color: "#94a3b8", marginLeft: "6px" }}>
-                  {estimatedEnd} • <span style={{ color: "#fff" }}>{movieTitle}</span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Right Controls (Screenshot 4) */}
-          {/* Right Controls (Screenshot 4) */}
-          <div className="cinema-player-right-controls" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {/* Episodes Drawer Toggle Button */}
-            {isSeries && (
-              <button
-                className="cinema-ctrl-btn"
-                onClick={() => setShowEpisodesDrawer((prev) => !prev)}
-                style={{
-                  background: showEpisodesDrawer ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)",
-                  border: showEpisodesDrawer ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(255, 255, 255, 0.16)",
-                  color: "#ffffff",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "7px",
-                  borderRadius: "999px",
-                  padding: "6px 14px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  backdropFilter: "blur(12px)",
-                  WebkitBackdropFilter: "blur(12px)",
-                  transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-                }}
-                title="Episode List"
-              >
-                <EpisodesDrawerIcon size={16} />
-                <span>EPISODES</span>
-              </button>
-            )}
-
-
-
-            {/* Subtitles (CC / Subtitles Box Icon) */}
-            <button
-              className="cinema-ctrl-btn"
-              onClick={() => setActiveMenu(activeMenu === "subtitles" ? "none" : "subtitles")}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: activeMenu === "subtitles" || subtitlesEnabled ? "rgba(255, 255, 255, 0.16)" : "transparent",
-                border: "none",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                padding: "4px",
-                transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-              }}
-              title="Subtitles & Captions"
-            >
-              <SubtitlesIcon size={21} />
-            </button>
-
-            {/* Settings (Gear Icon) */}
-            <button
-              className="cinema-ctrl-btn"
-              onClick={() => setActiveMenu(activeMenu === "settings" || activeMenu === "playback_settings" ? "none" : "settings")}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: activeMenu !== "none" ? "rgba(255, 255, 255, 0.16)" : "transparent",
-                border: "none",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                padding: "4px",
-                transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-                transform: activeMenu === "settings" || activeMenu === "playback_settings" ? "rotate(45deg)" : "rotate(0deg)",
-              }}
-              title="Settings"
-            >
-              <SettingsGearIcon size={20} />
-            </button>
-
-            {/* Fullscreen */}
-            <button
-              className="cinema-ctrl-btn"
-              onClick={toggleFullscreen}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: "transparent",
-                border: "none",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                padding: "4px",
-                transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-              }}
-              title="Fullscreen (F)"
-            >
-              {isFullscreen ? <FullscreenExitIcon size={21} /> : <FullscreenIcon size={21} />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Translucent Frosted Glass Scroll Down Arrow Indicator (Positioned at bottom edge) */}
-      {recommendations && recommendations.length > 0 && (
+      {/* Translucent Frosted Glass Scroll Down Arrow Indicator (Positioned at bottom edge, only when controls hidden) */}
+      {recommendations && recommendations.length > 0 && !(controlsVisible || !isPlaying) && (
         <div
           onClick={async () => {
             if (document.fullscreenElement) {
@@ -4512,10 +2646,10 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           }}
           style={{
             position: "absolute",
-            bottom: "6px",
+            bottom: "8px",
             left: "50%",
             transform: "translateX(-50%)",
-            zIndex: 50,
+            zIndex: 30,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
@@ -4661,253 +2795,22 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           </div>
         </div>
       )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* 13. Right-side Episodes Drawer (Frosted Glass UI)              */}
-      {/* ------------------------------------------------------------- */}
-      {showEpisodesDrawer && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            bottom: 0,
-            width: "min(420px, 92vw)",
-            background: "rgba(14, 16, 22, 0.90)",
-            backdropFilter: "blur(28px)",
-            WebkitBackdropFilter: "blur(28px)",
-            borderLeft: "1px solid rgba(255, 255, 255, 0.16)",
-            boxShadow: "-16px 0 45px rgba(0, 0, 0, 0.85)",
-            zIndex: 100,
-            display: "flex",
-            flexDirection: "column",
-            animation: "fadeIn 0.2s ease-out",
-          }}
-        >
-          {/* Drawer Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "20px 22px 14px 22px",
-              borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-            }}
-          >
-            <div>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.01em" }}>
-                Episodes
-              </div>
-              <div style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.5)", marginTop: "2px" }}>
-                Season {currentSeason} · Episode {currentEpisode}
-              </div>
-            </div>
-            <button
-              onClick={() => setShowEpisodesDrawer(false)}
-              style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "50%",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "none",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "background 0.15s ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")}
-            >
-              <CloseIcon size={16} />
-            </button>
-          </div>
-
-          {/* Season Selector Tabs */}
-          {totalSeasonsCount > 1 && (
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                padding: "12px 20px",
-                overflowX: "auto",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-                scrollbarWidth: "none",
-              }}
-            >
-              {Array.from({ length: totalSeasonsCount }, (_, i) => i + 1).map((sNum) => {
-                const isSelected = drawerSeason === sNum;
-                return (
-                  <button
-                    key={sNum}
-                    onClick={() => setDrawerSeason(sNum)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: "999px",
-                      background: isSelected ? "rgba(255, 255, 255, 0.20)" : "rgba(255, 255, 255, 0.08)",
-                      border: isSelected ? "1px solid rgba(255, 255, 255, 0.35)" : "1px solid rgba(255, 255, 255, 0.12)",
-                      color: "#ffffff",
-                      fontSize: "12.5px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                      boxShadow: isSelected ? "0 4px 12px rgba(0, 0, 0, 0.4)" : "none",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    Season {sNum}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Episode List */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "16px 20px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}
-          >
-            {loadingDrawerEpisodes ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "rgba(255, 255, 255, 0.5)", fontSize: "14px" }}>
-                Loading episodes...
-              </div>
-            ) : (
-              (drawerSeasonEpisodes.length > 0
-                ? drawerSeasonEpisodes
-                : (allMovieBoxDubs[0]?.directLinks || []).map((_: any, idx: number) => ({
-                    episode_number: idx + 1,
-                    name: `Episode ${idx + 1}`,
-                  }))
-              ).map((ep: any, idx: number) => {
-                const epNum = ep.episode_number || ep.episodeNumber || idx + 1;
-                const isPlayingEp = drawerSeason === currentSeason && epNum === currentEpisode;
-                const epTitle = ep.name || ep.title || `Episode ${epNum}`;
-                const stillUrl = ep.still_path
-                  ? (ep.still_path.startsWith("http") ? ep.still_path : `https://image.tmdb.org/t/p/w300${ep.still_path}`)
-                  : (ep.image || activeBackdrop || poster);
-
-                return (
-                  <div
-                    key={ep.id || idx}
-                    onClick={() => {
-                      switchEpisode(drawerSeason, epNum);
-                    }}
-                    style={{
-                      display: "flex",
-                      gap: "12px",
-                      padding: "10px",
-                      borderRadius: "14px",
-                      background: isPlayingEp ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.04)",
-                      border: isPlayingEp ? "1px solid rgba(255, 255, 255, 0.28)" : "1px solid rgba(255, 255, 255, 0.08)",
-                      cursor: "pointer",
-                      transition: "all 0.18s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isPlayingEp) e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isPlayingEp) e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
-                      e.currentTarget.style.transform = "translateY(0px)";
-                    }}
-                  >
-                    {/* Thumbnail */}
-                    <div
-                      style={{
-                        position: "relative",
-                        width: "105px",
-                        height: "60px",
-                        borderRadius: "8px",
-                        overflow: "hidden",
-                        flexShrink: 0,
-                        backgroundColor: "#1e2430",
-                      }}
-                    >
-                      {stillUrl ? (
-                        <img
-                          src={stillUrl}
-                          alt={epTitle}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: "11px" }}>
-                          EP {epNum}
-                        </div>
-                      )}
-                      {isPlayingEp && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            background: "rgba(0, 0, 0, 0.6)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#ffffff",
-                          }}
-                        >
-                          <PlayIcon size={16} />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Meta */}
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 700, color: isPlayingEp ? "#ffffff" : "rgba(255, 255, 255, 0.55)", letterSpacing: "0.5px" }}>
-                          EPISODE {epNum}
-                        </span>
-                        {isPlayingEp && (
-                          <span
-                            style={{
-                              fontSize: "9px",
-                              fontWeight: 800,
-                              background: "rgba(255, 255, 255, 0.16)",
-                              border: "1px solid rgba(255, 255, 255, 0.24)",
-                              color: "#ffffff",
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            NOW PLAYING
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 600,
-                          color: "#ffffff",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          marginTop: "2px",
-                        }}
-                      >
-                        {epTitle}
-                      </div>
-                      {ep.runtime && (
-                        <span style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.4)", marginTop: "2px" }}>
-                          {ep.runtime} min
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
-
+      {/* 13. Episodes Drawer */}
+      <PlayerEpisodesDrawer
+        isOpen={showEpisodesDrawer}
+        onClose={() => setShowEpisodesDrawer(false)}
+        currentSeason={currentSeason}
+        currentEpisode={currentEpisode}
+        totalSeasonsCount={totalSeasonsCount}
+        drawerSeason={drawerSeason}
+        setDrawerSeason={setDrawerSeason}
+        loadingDrawerEpisodes={loadingDrawerEpisodes}
+        drawerSeasonEpisodes={drawerSeasonEpisodes}
+        allMovieBoxDubs={allMovieBoxDubs}
+        switchEpisode={switchEpisode}
+        activeBackdrop={activeBackdrop}
+        poster={poster}
+      />
       </div> {/* End 100vh Fullscreen Video Player Viewport */}
 
       {/* 2. Seamless Recommended Movies GRID Below Video Player (When scrolling down) */}

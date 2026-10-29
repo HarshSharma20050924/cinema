@@ -1,5 +1,6 @@
 import { IMDB_RANKINGS, LETTERBOXD_RANKINGS } from "./rankingsData";
-import type { Post } from "../types";
+import type { Post, HomeShelf } from "../types";
+import { optimizeImage } from "../utils/imageOptimizer";
 
 const TMDB_API_KEY = "cfe422613b250f702980a3bbf9e90716";
 const BASE_URL = "https://api.themoviedb.org/3";
@@ -63,7 +64,7 @@ export interface HomeShelf {
 }
 
 // 1. Best Picture Winners
-const BEST_PICTURE_WINNERS: Post[] = [
+export const BEST_PICTURE_WINNERS: Post[] = [
   {
     title: "Oppenheimer",
     year: "2023",
@@ -179,7 +180,7 @@ const BEST_PICTURE_WINNERS: Post[] = [
 ];
 
 // 2. Emmy Award Winners
-const EMMY_AWARD_WINNERS: Post[] = [
+export const EMMY_AWARD_WINNERS: Post[] = [
   {
     title: "Succession",
     year: "2018",
@@ -415,7 +416,7 @@ const PSYCHOLOGICAL_THRILLERS: Post[] = [
 ];
 
 // 5. Palme d'Or Winners
-const PALME_DOR_WINNERS: Post[] = [
+export const PALME_DOR_WINNERS: Post[] = [
   {
     title: "Anora",
     year: "2024",
@@ -593,7 +594,7 @@ export const HALLOWEEN_HORROR: Post[] = [
 ];
 
 // 7. Mindfuck Movies
-const MINDFUCK_MOVIES: Post[] = [
+export const MINDFUCK_MOVIES: Post[] = [
   {
     title: "Interstellar",
     year: "2014",
@@ -660,7 +661,7 @@ const MINDFUCK_MOVIES: Post[] = [
 ];
 
 // 8. Directed by Legends
-const DIRECTED_BY_LEGENDS: Post[] = [
+export const DIRECTED_BY_LEGENDS: Post[] = [
   {
     title: "GoodFellas",
     year: "1990",
@@ -1178,40 +1179,154 @@ export function getInitialTvShelves(): HomeShelf[] {
     {
       id: "top-rated",
       title: "Top Rated Series",
-      items: [
-        {
-          title: "Breaking Bad",
-          year: "2008-2013",
-          rating: "9.5",
-          image: "https://image.tmdb.org/t/p/w500/ztkUQFLlC19CCMYHW9o1zWhJRNq.jpg",
-          backdropUrl: "https://image.tmdb.org/t/p/original/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
-          link: "/search?q=Breaking+Bad",
-        },
-        {
-          title: "Chernobyl",
-          year: "2019",
-          rating: "9.4",
-          image: "https://image.tmdb.org/t/p/w500/hlLXt2tOPT6RRnjiUmoxyG1LTFi.jpg",
-          backdropUrl: "https://image.tmdb.org/t/p/original/uL6AdB508hkgI1bS5oZz7yq8yUe.jpg",
-          link: "/search?q=Chernobyl",
-        },
-        {
-          title: "The Sopranos",
-          year: "1999-2007",
-          rating: "9.2",
-          image: "https://image.tmdb.org/t/p/w500/rTc7ZXdroqjkKivFPvCPX0Ru7uw.jpg",
-          backdropUrl: "https://image.tmdb.org/t/p/original/lHeQ4Xw4kE3z9U5lHn6Y9J2.jpg",
-          link: "/search?q=The+Sopranos",
-        },
-        {
-          title: "Succession",
-          year: "2018-2023",
-          rating: "8.9",
-          image: "https://image.tmdb.org/t/p/w500/z0XiwdrCQ9yVIr4O0pxzaAYRxdW.jpg",
-          backdropUrl: "https://image.tmdb.org/t/p/original/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
-          link: "/search?q=Succession",
-        },
-      ],
+      items: getCachedList("cinema_live_tv_top_rated").length > 0
+        ? getCachedList("cinema_live_tv_top_rated")
+        : [
+            {
+              title: "Breaking Bad",
+              year: "2008-2013",
+              rating: "9.5",
+              image: "https://image.tmdb.org/t/p/w500/ztkUQFLlC19CCMYHW9o1zWhJRNq.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+              link: "/search?q=Breaking+Bad",
+            },
+            {
+              title: "Chernobyl",
+              year: "2019",
+              rating: "9.4",
+              image: "https://image.tmdb.org/t/p/w500/hlLXt2tOPT6RRnjiUmoxyG1LTFi.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/uL6AdB508hkgI1bS5oZz7yq8yUe.jpg",
+              link: "/search?q=Chernobyl",
+            },
+            {
+              title: "Band of Brothers",
+              year: "2001",
+              rating: "9.4",
+              image: "https://image.tmdb.org/t/p/w500/zReG2kG0G9V5N6yW9Z9zV0qYV7Z.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/2rmk7vOx7Z9M0qYV7Z0qYV7Z0qY.jpg",
+              link: "/search?q=Band+of+Brothers",
+            },
+            {
+              title: "The Wire",
+              year: "2002-2008",
+              rating: "9.3",
+              image: "https://image.tmdb.org/t/p/w500/4lbclFySvugI51fwsyxBTOm4DqK.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/og6O1ux5bgZg8A6VqIbgJm7R.jpg",
+              link: "/search?q=The+Wire",
+            },
+            {
+              title: "The Sopranos",
+              year: "1999-2007",
+              rating: "9.2",
+              image: "https://image.tmdb.org/t/p/w500/rTc7ZXdroqjkKivFPvCPX0Ru7uw.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/lHeQ4Xw4kE3z9U5lHn6Y9J2.jpg",
+              link: "/search?q=The+Sopranos",
+            },
+            {
+              title: "Game of Thrones",
+              year: "2011-2019",
+              rating: "9.2",
+              image: "https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg",
+              link: "/search?q=Game+of+Thrones",
+            },
+            {
+              title: "Avatar: The Last Airbender",
+              year: "2005-2008",
+              rating: "9.3",
+              image: "https://image.tmdb.org/t/p/w500/cHFZA8Tlv03n8kpHLFqcZ9uvY41.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/kU3B75TyRiCgE270EyZnHjfivoq.jpg",
+              link: "/search?q=Avatar+The+Last+Airbender",
+            },
+            {
+              title: "Better Call Saul",
+              year: "2015-2022",
+              rating: "9.0",
+              image: "https://image.tmdb.org/t/p/w500/fC2HDm5t0kHVR79visqoMMjbg9U.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/hPea3Qy5Gd6z4GNumRvgRpMMJV.jpg",
+              link: "/search?q=Better+Call+Saul",
+            },
+            {
+              title: "Succession",
+              year: "2018-2023",
+              rating: "8.9",
+              image: "https://image.tmdb.org/t/p/w500/z0XiwdrCQ9yVIr4O0pxzaAYRxdW.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+              link: "/search?q=Succession",
+            },
+            {
+              title: "Sherlock",
+              year: "2010-2017",
+              rating: "9.1",
+              image: "https://image.tmdb.org/t/p/w500/7WTsnMnmA03y1p4dE5i7VTh7P24.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg",
+              link: "/search?q=Sherlock",
+            },
+            {
+              title: "True Detective",
+              year: "2014-",
+              rating: "8.9",
+              image: "https://image.tmdb.org/t/p/w500/cuV2O523hk7gGYUxOGBhHW7Vz7r.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/9yBVqNruk6Ohkrpa32ftnTp9LQW.jpg",
+              link: "/search?q=True+Detective",
+            },
+            {
+              title: "Fargo",
+              year: "2014-",
+              rating: "8.9",
+              image: "https://image.tmdb.org/t/p/w500/7756fV1E8j6h9kR8kGg9vF0qYV7.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/gW5h7pT1W2d0qYV7Z0qYV7Z0qY.jpg",
+              link: "/search?q=Fargo",
+            },
+            {
+              title: "Stranger Things",
+              year: "2016-",
+              rating: "8.7",
+              image: "https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg",
+              link: "/search?q=Stranger+Things",
+            },
+            {
+              title: "Peaky Blinders",
+              year: "2013-2022",
+              rating: "8.8",
+              image: "https://image.tmdb.org/t/p/w500/vUUqzWa2LnHIVqkaKVlVGkVcTTW.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7O0Zf53YfQ1Z7bYw2b53Zf53Y.jpg",
+              link: "/search?q=Peaky+Blinders",
+            },
+            {
+              title: "The Last of Us",
+              year: "2023-",
+              rating: "8.8",
+              image: "https://image.tmdb.org/t/p/w500/uKvVjHNqB5VmOrdxqAt2V7JMrQI.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/uDgy6hyPd82kOHh6I95FLtLnj6p.jpg",
+              link: "/search?q=The+Last+of+Us",
+            },
+            {
+              title: "Severance",
+              year: "2022-",
+              rating: "8.7",
+              image: "https://image.tmdb.org/t/p/w500/jtlIQDnvD2v1hL2f1bK4X0u5o2a.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/9yBVqNruk6Ohkrpa32ftnTp9LQW.jpg",
+              link: "/search?q=Severance",
+            },
+            {
+              title: "Dark",
+              year: "2017-2020",
+              rating: "8.7",
+              image: "https://image.tmdb.org/t/p/w500/apbrbWs8M9lyOpJYU5WXrpFbk1Z.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg",
+              link: "/search?q=Dark",
+            },
+            {
+              title: "Narcos",
+              year: "2015-2017",
+              rating: "8.8",
+              image: "https://image.tmdb.org/t/p/w500/rTmal9fVGwhGF09hkJTZJvUNh8n.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg",
+              link: "/search?q=Narcos",
+            },
+          ],
     },
     {
       id: "docuseries",
@@ -1221,51 +1336,266 @@ export function getInitialTvShelves(): HomeShelf[] {
     {
       id: "comedy",
       title: "Comedy Series",
-      items: [
-        {
-          title: "The Office",
-          year: "2005-2013",
-          image: "https://image.tmdb.org/t/p/w500/qWnJzyZhyy74gjpSjIXWmuk0ifX.jpg",
-          rating: "9.0",
-          link: "/search?q=The+Office",
-        },
-        {
-          title: "Ted Lasso",
-          year: "2020-2023",
-          image: "https://image.tmdb.org/t/p/w500/uRHsiw1wLxPHFXkkv4Ix1s0O6f4.jpg",
-          rating: "8.8",
-          link: "/search?q=Ted+Lasso",
-        },
-        {
-          title: "Fleabag",
-          year: "2016-2019",
-          image: "https://image.tmdb.org/t/p/w500/vFn0nLPcIggPH5LTWWaJ2hcsGlc.jpg",
-          rating: "8.7",
-          link: "/search?q=Fleabag",
-        },
-      ],
+      items: getCachedList("cinema_live_tv_comedy").length > 0
+        ? getCachedList("cinema_live_tv_comedy")
+        : [
+            {
+              title: "The Office",
+              year: "2005-2013",
+              image: "https://image.tmdb.org/t/p/w500/qWnJzyZhyy74gjpSjIXWmuk0ifX.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+              rating: "9.0",
+              link: "/search?q=The+Office",
+            },
+            {
+              title: "Friends",
+              year: "1994-2004",
+              image: "https://image.tmdb.org/t/p/w500/2koX1xLkpTQM4IZebYvKysFW1Nh.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/l0qVZIpXtIo7km9u5YAV0ecJFI.jpg",
+              rating: "8.9",
+              link: "/search?q=Friends",
+            },
+            {
+              title: "Ted Lasso",
+              year: "2020-2023",
+              image: "https://image.tmdb.org/t/p/w500/uRHsiw1wLxPHFXkkv4Ix1s0O6f4.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+              rating: "8.8",
+              link: "/search?q=Ted+Lasso",
+            },
+            {
+              title: "Brooklyn Nine-Nine",
+              year: "2013-2021",
+              image: "https://image.tmdb.org/t/p/w500/hgRMSOt7a1b8qyQR68vU152LOn9.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/o70U50N20k3pA3dK3zW9Z9zV0qY.jpg",
+              rating: "8.4",
+              link: "/search?q=Brooklyn+Nine-Nine",
+            },
+            {
+              title: "Modern Family",
+              year: "2009-2020",
+              image: "https://image.tmdb.org/t/p/w500/klL40q4qHGwZ2vK4f3i0u0u1a.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg",
+              rating: "8.5",
+              link: "/search?q=Modern+Family",
+            },
+            {
+              title: "Fleabag",
+              year: "2016-2019",
+              image: "https://image.tmdb.org/t/p/w500/vFn0nLPcIggPH5LTWWaJ2hcsGlc.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+              rating: "8.7",
+              link: "/search?q=Fleabag",
+            },
+            {
+              title: "Rick and Morty",
+              year: "2013-",
+              image: "https://image.tmdb.org/t/p/w500/gdIrmfgzkqpR0rVkfQ44U24wI.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/uL6AdB508hkgI1bS5oZz7yq8yUe.jpg",
+              rating: "9.1",
+              link: "/search?q=Rick+and+Morty",
+            },
+            {
+              title: "The Bear",
+              year: "2022-",
+              image: "https://image.tmdb.org/t/p/w500/6A7k2iL9u0v9uV8r9yV0qYV7Z0.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg",
+              rating: "8.6",
+              link: "/search?q=The+Bear",
+            },
+            {
+              title: "Parks and Recreation",
+              year: "2009-2015",
+              image: "https://image.tmdb.org/t/p/w500/8bTq1vK8w9kR8kGg9vF0qYV7Z0.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+              rating: "8.6",
+              link: "/search?q=Parks+and+Recreation",
+            },
+            {
+              title: "Silicon Valley",
+              year: "2014-2019",
+              image: "https://image.tmdb.org/t/p/w500/dK1r3n0V9u0u1a7v8kR8kGg9vF.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+              rating: "8.5",
+              link: "/search?q=Silicon+Valley",
+            },
+            {
+              title: "It's Always Sunny in Philadelphia",
+              year: "2005-",
+              image: "https://image.tmdb.org/t/p/w500/8d89q9kR8kGg9vF0qYV7Z0qYV7.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg",
+              rating: "8.8",
+              link: "/search?q=Its+Always+Sunny+in+Philadelphia",
+            },
+            {
+              title: "Schitt's Creek",
+              year: "2015-2020",
+              image: "https://image.tmdb.org/t/p/w500/i31zV7Z0qYV7Z0qYV7Z0qYV7Z0.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg",
+              rating: "8.5",
+              link: "/search?q=Schitts+Creek",
+            },
+            {
+              title: "Community",
+              year: "2009-2015",
+              image: "https://image.tmdb.org/t/p/w500/34q2K9u0v9uV8r9yV0qYV7Z0qY.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+              rating: "8.5",
+              link: "/search?q=Community",
+            },
+            {
+              title: "The Good Place",
+              year: "2016-2020",
+              image: "https://image.tmdb.org/t/p/w500/3G0j8u0v9uV8r9yV0qYV7Z0qYV.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/uL6AdB508hkgI1bS5oZz7yq8yUe.jpg",
+              rating: "8.2",
+              link: "/search?q=The+Good+Place",
+            },
+            {
+              title: "BoJack Horseman",
+              year: "2014-2020",
+              image: "https://image.tmdb.org/t/p/w500/pB95CoCw3bzStU78iV16mNqY6rC.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg",
+              rating: "8.8",
+              link: "/search?q=BoJack+Horseman",
+            },
+            {
+              title: "Barry",
+              year: "2018-2023",
+              image: "https://image.tmdb.org/t/p/w500/7CbgU5d1tK3pA3dK3zW9Z9zV0q.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+              rating: "8.4",
+              link: "/search?q=Barry",
+            },
+          ],
     },
     {
       id: "animation",
       title: "Animation & Anime",
-      items: [
-        {
-          title: "Arcane",
-          year: "2021-",
-          rating: "9.0",
-          image: "https://image.tmdb.org/t/p/w500/87C0wecB8bHb1PsrKBI4kJiEkgV.jpg",
-          backdropUrl: "https://image.tmdb.org/t/p/original/achmETPRJZc9QVXsMPgHwYEyNar.jpg",
-          link: "/search?q=Arcane",
-        },
-        {
-          title: "Cyberpunk: Edgerunners",
-          year: "2022",
-          rating: "8.6",
-          image: "https://image.tmdb.org/t/p/w500/7JsnIvh8J5T3p5m9K2A0Z0B.jpg",
-          backdropUrl: "https://image.tmdb.org/t/p/original/achmETPRJZc9QVXsMPgHwYEyNar.jpg",
-          link: "/search?q=Cyberpunk",
-        },
-      ],
+      items: getCachedList("cinema_live_tv_animation").length > 0
+        ? getCachedList("cinema_live_tv_animation")
+        : [
+            {
+              title: "Arcane",
+              year: "2021-",
+              rating: "9.0",
+              image: "https://image.tmdb.org/t/p/w500/87C0wecB8bHb1PsrKBI4kJiEkgV.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/achmETPRJZc9QVXsMPgHwYEyNar.jpg",
+              link: "/search?q=Arcane",
+            },
+            {
+              title: "Attack on Titan",
+              year: "2013-2023",
+              rating: "9.1",
+              image: "https://image.tmdb.org/t/p/w500/hTP1DtLGFamjfu8WqjnuQdP1n4i.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/8Zutnk5v63xJ24R11w5eC9kS8q.jpg",
+              link: "/search?q=Attack+on+Titan",
+            },
+            {
+              title: "Cyberpunk: Edgerunners",
+              year: "2022",
+              rating: "8.6",
+              image: "https://image.tmdb.org/t/p/w500/7JsnIvh8J5T3p5m9K2A0Z0B.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/achmETPRJZc9QVXsMPgHwYEyNar.jpg",
+              link: "/search?q=Cyberpunk",
+            },
+            {
+              title: "Death Note",
+              year: "2006-2007",
+              rating: "9.0",
+              image: "https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjGhqtBKn19paqL.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg",
+              link: "/search?q=Death+Note",
+            },
+            {
+              title: "Jujutsu Kaisen",
+              year: "2020-",
+              rating: "8.6",
+              image: "https://image.tmdb.org/t/p/w500/fHpHzqL8a0m7z0m8kR8kGg9vF0.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg",
+              link: "/search?q=Jujutsu+Kaisen",
+            },
+            {
+              title: "Demon Slayer: Kimetsu no Yaiba",
+              year: "2019-",
+              rating: "8.6",
+              image: "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH69hmVZuX0P9Q2oN.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+              link: "/search?q=Demon+Slayer",
+            },
+            {
+              title: "Invincible",
+              year: "2021-",
+              rating: "8.7",
+              image: "https://image.tmdb.org/t/p/w500/jWsTkn90H3X2hKk6V8kR8kGg9v.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/uL6AdB508hkgI1bS5oZz7yq8yUe.jpg",
+              link: "/search?q=Invincible",
+            },
+            {
+              title: "Blue Eye Samurai",
+              year: "2023-",
+              rating: "8.8",
+              image: "https://image.tmdb.org/t/p/w500/8d89q9kR8kGg9vF0qYV7Z0qYV7.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+              link: "/search?q=Blue+Eye+Samurai",
+            },
+            {
+              title: "Fullmetal Alchemist: Brotherhood",
+              year: "2009-2010",
+              rating: "9.1",
+              image: "https://image.tmdb.org/t/p/w500/5ZFUEOULaVml7p19UP7Dkhgm9vL.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+              link: "/search?q=Fullmetal+Alchemist",
+            },
+            {
+              title: "One Piece",
+              year: "1999-",
+              rating: "8.9",
+              image: "https://image.tmdb.org/t/p/w500/fcXdJUSDiCqqjQgE28P9982.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg",
+              link: "/search?q=One+Piece",
+            },
+            {
+              title: "Vinland Saga",
+              year: "2019-",
+              rating: "8.8",
+              image: "https://image.tmdb.org/t/p/w500/b1Ox40kR8kGg9vF0qYV7Z0qYV7.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/56v2KjBlU4XaOv9rVYEQypROD7P.jpg",
+              link: "/search?q=Vinland+Saga",
+            },
+            {
+              title: "Castlevania",
+              year: "2017-2021",
+              rating: "8.3",
+              image: "https://image.tmdb.org/t/p/w500/8d89q9kR8kGg9vF0qYV7Z0qYV7.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/7QMsOTMUswlwxJP0rTTZfmz2tX2.jpg",
+              link: "/search?q=Castlevania",
+            },
+            {
+              title: "Hunter x Hunter",
+              year: "2011-2014",
+              rating: "9.0",
+              image: "https://image.tmdb.org/t/p/w500/ucmpFdudm89M7z0m8kR8kGg9vF.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/uL6AdB508hkgI1bS5oZz7yq8yUe.jpg",
+              link: "/search?q=Hunter+x+Hunter",
+            },
+            {
+              title: "Solo Leveling",
+              year: "2024-",
+              rating: "8.5",
+              image: "https://image.tmdb.org/t/p/w500/geCRueV3EljRTr0xtJuVhaR93.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg",
+              link: "/search?q=Solo+Leveling",
+            },
+            {
+              title: "Cowboy Bebop",
+              year: "1998-1999",
+              rating: "8.9",
+              image: "https://image.tmdb.org/t/p/w500/4Y79u0v9uV8r9yV0qYV7Z0qYV7.jpg",
+              backdropUrl: "https://image.tmdb.org/t/p/w1280/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+              link: "/search?q=Cowboy+Bebop",
+            },
+          ],
     },
   ];
 }
@@ -1346,10 +1676,10 @@ export function formatTmdbResults(results: any[], isTv = false, onlyReleased = f
       return {
         title: r.title || r.name,
         year: releaseDate.slice(0, 4),
-        image: r.poster_path ? `${IMG_BASE_W500}${r.poster_path}` : `${IMG_BASE_W500}${r.backdrop_path}`,
+        image: optimizeImage(r.poster_path ? `${IMG_BASE_W500}${r.poster_path}` : `${IMG_BASE_W500}${r.backdrop_path}`, "poster"),
         rating: r.vote_average ? r.vote_average.toFixed(1) : undefined,
         link: `/search?q=${encodeURIComponent(r.title || r.name)}`,
-        backdropUrl: r.backdrop_path ? `https://image.tmdb.org/t/p/original${r.backdrop_path}` : undefined,
+        backdropUrl: r.backdrop_path ? optimizeImage(`https://image.tmdb.org/t/p/w1280${r.backdrop_path}`, "backdrop") : undefined,
         genres,
         overview: r.overview || undefined,
         description: r.overview || undefined,
@@ -1359,7 +1689,7 @@ export function formatTmdbResults(results: any[], isTv = false, onlyReleased = f
     });
 }
 
-// Live fetcher that gracefully updates Trending, Popular, Coming Soon, and Documentaries shelves
+// Live fetcher that gracefully updates Trending, Popular, Coming Soon, Documentaries, and TV shelves
 export async function fetchLiveHomeTrending(): Promise<{
   trendingMovies?: Post[];
   trendingTv?: Post[];
@@ -1370,6 +1700,9 @@ export async function fetchLiveHomeTrending(): Promise<{
   topMoviesToday?: Post[];
   topTvToday?: Post[];
   newTvThisWeek?: Post[];
+  tvTopRated?: Post[];
+  tvComedy?: Post[];
+  tvAnimation?: Post[];
 }> {
   try {
     const todayStr = new Date().toISOString().split("T")[0];
@@ -1383,6 +1716,9 @@ export async function fetchLiveHomeTrending(): Promise<{
       moviesTodayRes,
       tvTodayRes,
       airingRes,
+      topRatedTvRes,
+      comedyTvRes,
+      animationTvRes,
     ] = await Promise.allSettled([
       fetchCuratedTmdb("/trending/movie/week"),
       fetchCuratedTmdb("/trending/tv/week"),
@@ -1393,6 +1729,9 @@ export async function fetchLiveHomeTrending(): Promise<{
       fetchCuratedTmdb("/trending/movie/day"),
       fetchCuratedTmdb("/trending/tv/day"),
       fetchCuratedTmdb("/tv/on_the_air"),
+      fetchCuratedTmdb("/tv/top_rated"),
+      fetchCuratedTmdb("/discover/tv?with_genres=35&sort_by=popularity.desc&vote_count.gte=50"),
+      fetchCuratedTmdb("/discover/tv?with_genres=16&sort_by=popularity.desc&vote_count.gte=50"),
     ]);
 
     const trendingMovies = (() => {
@@ -1572,6 +1911,57 @@ export async function fetchLiveHomeTrending(): Promise<{
       return undefined;
     })();
 
+    const tvTopRated = (() => {
+      if (topRatedTvRes.status === "fulfilled" && Array.isArray(topRatedTvRes.value?.results)) {
+        const list = formatTmdbResults(topRatedTvRes.value.results, true).filter(
+          (m) => !isFakePlaceholder(m.title)
+        );
+        if (list.length > 0) {
+          try {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("cinema_live_tv_top_rated", JSON.stringify(list));
+            }
+          } catch {}
+          return list;
+        }
+      }
+      return undefined;
+    })();
+
+    const tvComedy = (() => {
+      if (comedyTvRes.status === "fulfilled" && Array.isArray(comedyTvRes.value?.results)) {
+        const list = formatTmdbResults(comedyTvRes.value.results, true).filter(
+          (m) => !isFakePlaceholder(m.title)
+        );
+        if (list.length > 0) {
+          try {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("cinema_live_tv_comedy", JSON.stringify(list));
+            }
+          } catch {}
+          return list;
+        }
+      }
+      return undefined;
+    })();
+
+    const tvAnimation = (() => {
+      if (animationTvRes.status === "fulfilled" && Array.isArray(animationTvRes.value?.results)) {
+        const list = formatTmdbResults(animationTvRes.value.results, true).filter(
+          (m) => !isFakePlaceholder(m.title)
+        );
+        if (list.length > 0) {
+          try {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("cinema_live_tv_animation", JSON.stringify(list));
+            }
+          } catch {}
+          return list;
+        }
+      }
+      return undefined;
+    })();
+
     return {
       trendingMovies,
       trendingTv,
@@ -1582,6 +1972,9 @@ export async function fetchLiveHomeTrending(): Promise<{
       topMoviesToday,
       topTvToday,
       newTvThisWeek,
+      tvTopRated,
+      tvComedy,
+      tvAnimation,
     };
   } catch {
     return {};

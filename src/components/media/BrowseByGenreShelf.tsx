@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { optimizeImage } from "../../utils/imageOptimizer";
 
 export interface GenreItem {
   id: string;
@@ -198,7 +199,7 @@ const GenreCard: React.FC<GenreCardProps> = ({ genre, onSelect }) => {
       >
         {/* Background Image with 3D Counter-Parallax Movement */}
         <img
-          src={genre.image}
+          src={optimizeImage(genre.image, "card")}
           alt={genre.name}
           loading="lazy"
           onError={(e) => {

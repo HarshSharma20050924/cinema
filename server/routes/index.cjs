@@ -68,5 +68,20 @@ router.get("/scraper/crawl", handleDeepCrawl);
 router.get("/scraper/extensions", getExtensionCatalog);
 router.post("/scraper/test-custom", testCustomWebsite);
 
+
+// Auth & Profiles (Cloudflare D1 / SQLite)
+const authController = require("../controllers/authController.cjs");
+router.post("/auth/register", authController.register);
+router.post("/auth/login", authController.login);
+router.get("/auth/session", authController.getSession);
+router.post("/auth/logout", authController.logout);
+router.post("/auth/delete-account", authController.deleteAccount);
+
+router.get("/profiles", authController.getProfiles);
+router.post("/profiles", authController.createProfile);
+router.put("/profiles/:id", authController.updateProfile);
+router.delete("/profiles/:id", authController.deleteProfile);
+
 module.exports = router;
+
 

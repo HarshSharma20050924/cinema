@@ -2,7 +2,16 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import type { Post } from "../../types";
 import { MediaCard } from "../media/MediaCard";
 import { ArrowLeftIcon } from "../../icons";
-import { formatTmdbResults, isFakePlaceholder } from "../../data/homeCuratedService";
+import {
+  formatTmdbResults,
+  isFakePlaceholder,
+  BEST_PICTURE_WINNERS,
+  EMMY_AWARD_WINNERS,
+  PALME_DOR_WINNERS,
+  MINDFUCK_MOVIES,
+  DIRECTED_BY_LEGENDS,
+} from "../../data/homeCuratedService";
+import { IMDB_RANKINGS, LETTERBOXD_RANKINGS, type RankedItem } from "../../data/rankingsData";
 
 interface CatalogFilterBrowsePageProps {
   initialTitle: string;
@@ -81,12 +90,36 @@ const TMDB_TV_GENRE_MAP: Record<string, number> = {
   Western: 37,
 };
 
-// Exact Sort list from Screenshot 1
+const rankedToPost = (item: RankedItem): Post => ({
+  id: String(item.tmdbId || item.id || item.imdbId),
+  title: item.title,
+  type: item.type === "tv" ? "tv" : "movie",
+  year: String(item.year || ""),
+  rating: String(item.imdbRating || item.letterboxdRating || "8.5"),
+  poster: item.poster,
+  backdrop: item.backdrop || item.poster,
+  genres: Array.isArray(item.genres) ? item.genres.join(", ") : "",
+  plot: item.overview,
+  runtime: item.runtime,
+  director: item.director,
+});
+
+// Exact Sort list with Curated Collections
 const SORT_OPTIONS = [
   { label: "Popular", value: "popular" },
   { label: "Top Rated", value: "top_rated" },
   { label: "Newest", value: "newest" },
   { label: "Box Office", value: "box_office" },
+  { label: "IMDb Top 250", value: "imdb_top_250" },
+  { label: "Letterboxd Top 250", value: "letterboxd_top_250" },
+  { label: "Oscar Best Picture Winners", value: "best_picture_winners" },
+  { label: "Emmy Award Winners", value: "emmy_award_winners" },
+  { label: "Palme d'Or Winners", value: "palme_dor_winners" },
+  { label: "Critically Acclaimed", value: "critically_acclaimed" },
+  { label: "Mind-Bending Movies", value: "mind_bending_movies" },
+  { label: "Highest Rated on Letterboxd", value: "highest_rated_letterboxd" },
+  { label: "Highest Rated on IMDb", value: "highest_rated_imdb" },
+  { label: "Directed by Legends", value: "directed_by_legends" },
 ];
 
 // Initial dynamic service provider seeds (fetched & updated dynamically from TMDB + user extensions)
@@ -137,9 +170,10 @@ const LENGTH_OPTIONS = [
 // Exact Rating list from Screenshot 5
 const RATING_OPTIONS = [
   "Any rating",
-  "6+ stars",
-  "7+ stars",
+  "9+ stars",
   "8+ stars",
+  "7+ stars",
+  "6+ stars",
 ];
 
 // Exact Language list from Screenshot 6 + user languages (Tamil, Telugu, Malayalam, Kannada, Dual Audio, Multi Audio)
@@ -249,13 +283,47 @@ const CnoDropdownMenu: React.FC<{
   );
 };
 
+export function resolveInitialSort(title?: string | null): string {
+  if (!title) return "popular";
+  const t = title.toLowerCase().trim();
+  if (t.includes("letterboxd top 250") || t.includes("top 250 letterboxd")) return "letterboxd_top_250";
+  if (t.includes("imdb top 250") || t.includes("top 250") || t.includes("top250")) return "imdb_top_250";
+  if (t.includes("best picture") || t.includes("oscar")) return "best_picture_winners";
+  if (t.includes("emmy") || t.includes("emery")) return "emmy_award_winners";
+  if (t.includes("palme") || t.includes("cannes")) return "palme_dor_winners";
+  if (
+    t.includes("mind-bending") ||
+    t.includes("mind bending") ||
+    t.includes("mindfuck") ||
+    t.includes("mind-fucking") ||
+    t.includes("mindfucking")
+  )
+    return "mind_bending_movies";
+  if (t.includes("legend") || t.includes("directed by legends") || t.includes("directors"))
+    return "directed_by_legends";
+  if (t.includes("highest rated on letterboxd") || t.includes("highest rated letterboxd"))
+    return "highest_rated_letterboxd";
+  if (t.includes("highest rated on imdb") || t.includes("highest rated imdb"))
+    return "highest_rated_imdb";
+  if (t.includes("critically acclaimed") || t.includes("acclaimed"))
+    return "critically_acclaimed";
+  if (t.includes("box office") || t.includes("boxoffice") || t.includes("blockbuster"))
+    return "box_office";
+  if (t.includes("top rated") || t.includes("top-rated")) return "top_rated";
+  if (t.includes("trending") || t.includes("newest")) return "newest";
+  return "popular";
+}
+
 export function resolveInitialGenre(title?: string | null): string {
   if (!title) return "Any genre";
+  // If shelf or title is a curated ranking/collection, keep genre as Any genre so all titles are visible
+  if (resolveInitialSort(title) !== "popular") return "Any genre";
+
   const clean = title.toLowerCase().trim();
   if (clean === "anime" || clean === "all anime") return "Any genre";
   if (clean.includes("docu")) return "Documentary";
   if (clean.includes("horror")) return "Horror";
-  if (clean.includes("thrill") || clean.includes("mindfuck") || clean.includes("psychological")) return "Thriller";
+  if (clean.includes("thrill") || clean.includes("psychological")) return "Thriller";
   if (clean.includes("scifi") || clean.includes("sci-fi") || clean.includes("science")) return "Science Fiction";
   if (clean.includes("anim")) return "Animation";
   if (clean.includes("action")) return "Action";
@@ -287,38 +355,93 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
     return resolveInitialGenre(initialGenre || initialTitle);
   });
   const [selectedSort, setSelectedSort] = useState<string>(() => {
-    const t = (initialTitle || "").toLowerCase();
-    if (t.includes("trending")) return "newest";
-    return "popular";
+    return resolveInitialSort(initialTitle);
   });
   const [selectedService, setSelectedService] = useState<string>("any");
   const [selectedYear, setSelectedYear] = useState<string>("Any year");
   const [selectedLength, setSelectedLength] = useState<string>("Any length");
-  const [selectedRating, setSelectedRating] = useState<string>("Any rating");
+  const [selectedRating, setSelectedRating] = useState<string>(() => {
+    const t = (initialTitle || "").toLowerCase();
+    if (t.includes("top rated") || t.includes("top-rated")) return "9+ stars";
+    return "Any rating";
+  });
   const [selectedLanguage, setSelectedLanguage] = useState<string>("any");
   const [hideWatched, setHideWatched] = useState<boolean>(false);
   const [mediaType, setMediaType] = useState<"movies" | "tv" | "anime">(() => {
     const t = (initialTitle || "").toLowerCase();
     if (t.includes("anime")) return "anime";
-    if (t.includes("tv") || t.includes("series") || t.includes("show") || t.includes("episodes")) return "tv";
+    if (
+      t.includes("tv") ||
+      t.includes("series") ||
+      t.includes("show") ||
+      t.includes("episodes") ||
+      t.includes("emmy") ||
+      t.includes("emery")
+    )
+      return "tv";
     return "movies";
   });
 
-  // Switch mediaType and genre dynamically if navigating into categories
+  // Switch mediaType, sort, and genre dynamically if navigating into categories
   useEffect(() => {
     const t = (initialTitle || "").toLowerCase();
     const resolvedG = resolveInitialGenre(initialGenre || initialTitle);
     if (resolvedG !== "Any genre") {
       setSelectedGenre(resolvedG);
     }
+    const resolvedS = resolveInitialSort(initialTitle);
+    if (resolvedS !== "popular") {
+      setSelectedSort(resolvedS);
+    }
+    if (t.includes("top rated") || t.includes("top-rated")) {
+      setSelectedRating("9+ stars");
+      setSelectedSort("top_rated");
+    }
     if (t.includes("anime")) {
       setMediaType("anime");
-    } else if (t.includes("tv") || t.includes("series") || t.includes("show") || t.includes("episodes")) {
+    } else if (
+      t.includes("tv") ||
+      t.includes("series") ||
+      t.includes("show") ||
+      t.includes("episodes") ||
+      t.includes("emmy") ||
+      t.includes("emery")
+    ) {
       setMediaType("tv");
     } else if (t.includes("movie") || t.includes("film")) {
       setMediaType("movies");
     }
   }, [initialTitle, initialGenre]);
+
+  // Sliding pill indicator for [ Movies | TV Shows | Anime ]
+  const mediaTypeContainerRef = useRef<HTMLDivElement>(null);
+  const mediaTypeBtnRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+  const [sliderStyle, setSliderStyle] = useState<{ left: number; width: number; opacity: number }>({
+    left: 0,
+    width: 0,
+    opacity: 0,
+  });
+
+  const updateSlider = useCallback(() => {
+    const activeBtn = mediaTypeBtnRefs.current[mediaType];
+    if (activeBtn) {
+      setSliderStyle({
+        left: activeBtn.offsetLeft,
+        width: activeBtn.offsetWidth,
+        opacity: 1,
+      });
+    }
+  }, [mediaType]);
+
+  useEffect(() => {
+    updateSlider();
+    const raf = requestAnimationFrame(updateSlider);
+    window.addEventListener("resize", updateSlider);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateSlider);
+    };
+  }, [updateSlider]);
 
   // Dynamic services (not hardcoded)
   const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>(() => {
@@ -443,7 +566,56 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
       try {
         const todayStr = new Date().toISOString().split("T")[0];
         const isTv = mediaType === "tv" || mediaType === "anime";
-        const endpoint = isTv ? "/discover/tv" : "/discover/movie";
+        const effectiveIsTv = isTv || selectedSort === "emmy_award_winners";
+
+        // Curated Collections canonical seeds (IMDb Top 250, Letterboxd, Best Picture, Palme d'Or, etc.)
+        let curatedList: Post[] = [];
+        if (selectedSort === "imdb_top_250") {
+          const raw = effectiveIsTv ? IMDB_RANKINGS.filter((r) => r.type === "tv") : IMDB_RANKINGS.filter((r) => r.type !== "tv");
+          curatedList = raw.map(rankedToPost);
+        } else if (selectedSort === "letterboxd_top_250") {
+          curatedList = LETTERBOXD_RANKINGS.map(rankedToPost);
+        } else if (selectedSort === "best_picture_winners") {
+          curatedList = BEST_PICTURE_WINNERS;
+        } else if (selectedSort === "emmy_award_winners") {
+          curatedList = EMMY_AWARD_WINNERS;
+        } else if (selectedSort === "palme_dor_winners") {
+          curatedList = PALME_DOR_WINNERS;
+        } else if (selectedSort === "mind_bending_movies") {
+          curatedList = MINDFUCK_MOVIES;
+        } else if (selectedSort === "directed_by_legends") {
+          curatedList = DIRECTED_BY_LEGENDS;
+        } else if (selectedSort === "highest_rated_letterboxd") {
+          curatedList = LETTERBOXD_RANKINGS.slice().sort((a, b) => (b.letterboxdRating || 0) - (a.letterboxdRating || 0)).map(rankedToPost);
+        } else if (selectedSort === "highest_rated_imdb") {
+          curatedList = IMDB_RANKINGS.slice().sort((a, b) => (b.imdbRating || 0) - (a.imdbRating || 0)).map(rankedToPost);
+        } else if (selectedSort === "critically_acclaimed") {
+          const raw = IMDB_RANKINGS.filter((r) => r.imdbRating >= 8.5).slice(0, 60);
+          curatedList = raw.map(rankedToPost);
+        }
+
+        if (curatedList.length > 0) {
+          if (selectedGenre !== "Any genre") {
+            curatedList = curatedList.filter((p) => p.genres && p.genres.toLowerCase().includes(selectedGenre.toLowerCase()));
+          }
+
+          if (selectedYear !== "Any year") {
+            curatedList = curatedList.filter((p) => {
+              const y = parseInt(p.year || "0", 10);
+              if (selectedYear === "2020s") return y >= 2020 && y <= 2029;
+              if (selectedYear === "2010s") return y >= 2010 && y <= 2019;
+              if (selectedYear === "2000s") return y >= 2000 && y <= 2009;
+              if (selectedYear === "1990s") return y >= 1990 && y <= 1999;
+              if (selectedYear === "1980s") return y >= 1980 && y <= 1989;
+              if (selectedYear === "1970s") return y >= 1970 && y <= 1979;
+              if (selectedYear === "1960s") return y >= 1960 && y <= 1969;
+              if (selectedYear === "Before 1960") return y < 1960;
+              return true;
+            });
+          }
+        }
+
+        const endpoint = effectiveIsTv ? "/discover/tv" : "/discover/movie";
         const params = new URLSearchParams();
         params.set("api_key", TMDB_API_KEY);
         params.set("page", String(targetPage));
@@ -454,22 +626,57 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
           params.set("with_original_language", "ja"); // Japanese
         }
 
-        // 1. Sort configuration
+        // 1. Sort configuration (Dynamically maps every custom & curated sort so infinite discovery keeps streaming!)
         if (selectedSort === "popular") {
           params.set("sort_by", "popularity.desc");
-          params.set("vote_count.gte", isTv ? "10" : "30");
-          if (!isTv) params.set("primary_release_date.lte", todayStr);
-        } else if (selectedSort === "top_rated") {
+          params.set("vote_count.gte", effectiveIsTv ? "10" : "30");
+          if (!effectiveIsTv) params.set("primary_release_date.lte", todayStr);
+        } else if (
+          selectedSort === "top_rated" ||
+          selectedSort === "imdb_top_250" ||
+          selectedSort === "highest_rated_imdb"
+        ) {
           params.set("sort_by", "vote_average.desc");
-          params.set("vote_count.gte", isTv ? "50" : "150");
-          if (!isTv) params.set("primary_release_date.lte", todayStr);
+          params.set("vote_count.gte", effectiveIsTv ? "30" : "300");
+          if (!effectiveIsTv) params.set("primary_release_date.lte", todayStr);
+        } else if (
+          selectedSort === "letterboxd_top_250" ||
+          selectedSort === "highest_rated_letterboxd"
+        ) {
+          params.set("sort_by", "vote_average.desc");
+          params.set("vote_count.gte", effectiveIsTv ? "30" : "200");
+          if (!effectiveIsTv) params.set("primary_release_date.lte", todayStr);
+        } else if (selectedSort === "mind_bending_movies") {
+          params.set("with_genres", "9648,878"); // Mystery + Sci-Fi
+          params.set("sort_by", "vote_average.desc");
+          params.set("vote_count.gte", "80");
+          if (!effectiveIsTv) params.set("primary_release_date.lte", todayStr);
+        } else if (
+          selectedSort === "best_picture_winners" ||
+          selectedSort === "critically_acclaimed"
+        ) {
+          params.set("sort_by", "vote_average.desc");
+          params.set("vote_count.gte", effectiveIsTv ? "40" : "350");
+          if (!effectiveIsTv) params.set("primary_release_date.lte", todayStr);
+        } else if (selectedSort === "palme_dor_winners") {
+          params.set("with_genres", "18"); // Drama / Art / Festival
+          params.set("sort_by", "vote_average.desc");
+          params.set("vote_count.gte", "120");
+          if (!effectiveIsTv) params.set("primary_release_date.lte", todayStr);
+        } else if (selectedSort === "emmy_award_winners") {
+          params.set("sort_by", "vote_average.desc");
+          params.set("vote_count.gte", "120");
+        } else if (selectedSort === "directed_by_legends") {
+          params.set("sort_by", "vote_average.desc");
+          params.set("vote_count.gte", "280");
+          if (!effectiveIsTv) params.set("primary_release_date.lte", todayStr);
         } else if (selectedSort === "newest") {
-          params.set("sort_by", isTv ? "first_air_date.desc" : "primary_release_date.desc");
-          params.set(isTv ? "first_air_date.lte" : "primary_release_date.lte", todayStr);
+          params.set("sort_by", effectiveIsTv ? "first_air_date.desc" : "primary_release_date.desc");
+          params.set(effectiveIsTv ? "first_air_date.lte" : "primary_release_date.lte", todayStr);
           params.set("vote_count.gte", "5");
         } else if (selectedSort === "box_office") {
-          params.set("sort_by", isTv ? "popularity.desc" : "revenue.desc");
-          if (!isTv) params.set("primary_release_date.lte", todayStr);
+          params.set("sort_by", effectiveIsTv ? "popularity.desc" : "revenue.desc");
+          if (!effectiveIsTv) params.set("primary_release_date.lte", todayStr);
         }
 
         // 2. Genre configuration
@@ -534,7 +741,10 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
         }
 
         // 6. Rating configuration
-        if (selectedRating === "8+ stars") {
+        if (selectedRating === "9+ stars") {
+          params.set("vote_average.gte", isTv ? "8.0" : "8.5");
+          params.set("vote_count.gte", isTv ? "25" : "200");
+        } else if (selectedRating === "8+ stars") {
           params.set("vote_average.gte", "8.0");
         } else if (selectedRating === "7+ stars") {
           params.set("vote_average.gte", "7.0");
@@ -608,7 +818,7 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
         }
 
         // If another request started while this one was in flight, discard stale data
-        if (activeRequestIdRef.current !== requestId) return;
+        lastFetchedPageRef.current = targetPage;
 
         if (json && Array.isArray(json.results)) {
           // Cache successful page 1 results
@@ -618,12 +828,34 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
             } catch (_) {}
           }
 
-          const formatted = formatTmdbResults(json.results, isTv, true).filter(
+          const formatted = formatTmdbResults(json.results, effectiveIsTv, true).filter(
             (m) => !isFakePlaceholder(m.title)
           );
-          setTmdbPosts((prev) => (resetList ? formatted : [...prev, ...formatted]));
+
+          if (resetList) {
+            if (curatedList.length > 0) {
+              const seenTitles = new Set(curatedList.map((c) => (c.title || "").toLowerCase().trim()));
+              const combined = [
+                ...curatedList,
+                ...formatted.filter((m) => !seenTitles.has((m.title || "").toLowerCase().trim())),
+              ];
+              setTmdbPosts(combined);
+            } else {
+              setTmdbPosts(formatted);
+            }
+          } else {
+            setTmdbPosts((prev) => {
+              const existingTitles = new Set(prev.map((p) => (p.title || "").toLowerCase().trim()));
+              const newItems = formatted.filter((m) => !existingTitles.has((m.title || "").toLowerCase().trim()));
+              return [...prev, ...newItems];
+            });
+          }
+
           const totalPages = json.total_pages && json.total_pages > 1 ? json.total_pages : 500;
           setHasMore(json.page < totalPages);
+        } else if (curatedList.length > 0 && resetList) {
+          setTmdbPosts(curatedList);
+          setHasMore(true);
         } else {
           setHasMore(true);
         }
@@ -639,19 +871,43 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
     [mediaType, selectedSort, selectedGenre, selectedService, selectedYear, selectedLength, selectedRating, selectedLanguage, dynamicServices]
   );
 
-  // Trigger fetch when any filter changes
+  const lastFetchedPageRef = useRef<number>(1);
+
+  // Trigger fetch when any filter changes & pre-fetch 2nd page so grid is 40 items full
   useEffect(() => {
+    lastFetchedPageRef.current = 1;
     setPage(1);
     fetchTmdbPage(1, true);
+    const timer = setTimeout(() => {
+      fetchTmdbPage(2, false);
+    }, 450);
+    return () => clearTimeout(timer);
   }, [fetchTmdbPage]);
 
   // Load next page
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
-    const nextPage = page + 1;
+    const nextPage = lastFetchedPageRef.current + 1;
+    lastFetchedPageRef.current = nextPage;
     setPage(nextPage);
     fetchTmdbPage(nextPage, false);
-  };
+  }, [loadingMore, hasMore, fetchTmdbPage]);
+
+  // Infinite scroll IntersectionObserver to auto-load when near bottom
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hasMore || loadingMore || tmdbLoading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { rootMargin: "450px" }
+    );
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, tmdbLoading, handleLoadMore]);
 
   // Filter out watched if hideWatched is enabled
   const displayedPosts = useMemo(() => {
@@ -866,63 +1122,122 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
             <span>Surprise Me</span>
           </button>
 
-          {/* Segmented Switch: [ Movies | TV Shows | Anime ] */}
+          {/* Segmented Switch: [ Movies | TV Shows | Anime ] with Sliding Frosted Glass Pill */}
           <div
+            ref={mediaTypeContainerRef}
             style={{
+              position: "relative",
               display: "inline-flex",
               alignItems: "center",
-              background: "rgba(255, 255, 255, 0.06)",
-              backdropFilter: "blur(16px)",
-              WebkitBackdropFilter: "blur(16px)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
+              height: "36px",
+              boxSizing: "border-box",
+              background: "rgba(255, 255, 255, 0.08)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255, 255, 255, 0.16)",
               borderRadius: "999px",
               padding: "3px",
+              overflow: "hidden",
             }}
           >
+            {/* Sliding frosted pill indicator */}
+            <div
+              style={{
+                position: "absolute",
+                top: "3px",
+                bottom: "3px",
+                left: `${sliderStyle.left}px`,
+                width: `${sliderStyle.width}px`,
+                borderRadius: "999px",
+                background: "rgba(255, 255, 255, 0.20)",
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.35)",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+                transition: "left 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
+                opacity: sliderStyle.opacity,
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            />
+
             <button
+              ref={(el) => {
+                mediaTypeBtnRefs.current["movies"] = el;
+              }}
               onClick={() => setMediaType("movies")}
               style={{
-                padding: "6px 16px",
+                position: "relative",
+                zIndex: 2,
+                height: "100%",
+                boxSizing: "border-box",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 16px",
                 borderRadius: "999px",
                 border: "none",
-                background: mediaType === "movies" ? "rgba(255, 255, 255, 0.22)" : "transparent",
+                background: "transparent",
                 color: mediaType === "movies" ? "#ffffff" : "rgba(255, 255, 255, 0.6)",
                 fontSize: "12.5px",
                 fontWeight: 700,
                 cursor: "pointer",
-                transition: "all 0.15s ease",
+                transition: "color 0.18s ease",
+                lineHeight: 1,
               }}
             >
               Movies
             </button>
             <button
+              ref={(el) => {
+                mediaTypeBtnRefs.current["tv"] = el;
+              }}
               onClick={() => setMediaType("tv")}
               style={{
-                padding: "6px 16px",
+                position: "relative",
+                zIndex: 2,
+                height: "100%",
+                boxSizing: "border-box",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 16px",
                 borderRadius: "999px",
                 border: "none",
-                background: mediaType === "tv" ? "rgba(255, 255, 255, 0.22)" : "transparent",
+                background: "transparent",
                 color: mediaType === "tv" ? "#ffffff" : "rgba(255, 255, 255, 0.6)",
                 fontSize: "12.5px",
                 fontWeight: 700,
                 cursor: "pointer",
-                transition: "all 0.15s ease",
+                transition: "color 0.18s ease",
+                lineHeight: 1,
               }}
             >
               TV Shows
             </button>
             <button
+              ref={(el) => {
+                mediaTypeBtnRefs.current["anime"] = el;
+              }}
               onClick={() => setMediaType("anime")}
               style={{
-                padding: "6px 16px",
+                position: "relative",
+                zIndex: 2,
+                height: "100%",
+                boxSizing: "border-box",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 16px",
                 borderRadius: "999px",
                 border: "none",
-                background: mediaType === "anime" ? "rgba(255, 255, 255, 0.22)" : "transparent",
+                background: "transparent",
                 color: mediaType === "anime" ? "#ffffff" : "rgba(255, 255, 255, 0.6)",
                 fontSize: "12.5px",
                 fontWeight: 700,
                 cursor: "pointer",
-                transition: "all 0.15s ease",
+                transition: "color 0.18s ease",
+                lineHeight: 1,
               }}
             >
               Anime
@@ -1245,82 +1560,66 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
               ))}
             </div>
 
-            {/* Constant Load More / Discover Titles Button at Bottom */}
-            {displayedPosts.length > 0 && (
-              <div style={{ display: "flex", justifyContent: "center", marginTop: "48px", marginBottom: "32px" }}>
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: "164px",
-                    height: "44px",
-                    padding: "0 32px",
-                    borderRadius: "9999px",
-                    background: "rgba(255, 255, 255, 0.08)",
-                    border: "1px solid rgba(255, 255, 255, 0.16)",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    cursor: loadingMore ? "default" : "pointer",
-                    boxShadow: "none",
-                    outline: "none",
-                    transition: "background 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!loadingMore) {
-                      e.currentTarget.style.background = "#e50914";
-                      e.currentTarget.style.borderColor = "#e50914";
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!loadingMore) {
-                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                      e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.16)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }
-                  }}
-                >
-                  {loadingMore ? (
-                    <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", height: "18px" }}>
-                      <span
-                        style={{
-                          width: "6px",
-                          height: "6px",
-                          borderRadius: "50%",
-                          background: "#ffffff",
-                          animation: "cinemaDotBounce 1.2s infinite ease-in-out",
-                          animationDelay: "0s",
-                        }}
-                      />
-                      <span
-                        style={{
-                          width: "6px",
-                          height: "6px",
-                          borderRadius: "50%",
-                          background: "#ffffff",
-                          animation: "cinemaDotBounce 1.2s infinite ease-in-out",
-                          animationDelay: "0.2s",
-                        }}
-                      />
-                      <span
-                        style={{
-                          width: "6px",
-                          height: "6px",
-                          borderRadius: "50%",
-                          background: "#ffffff",
-                          animation: "cinemaDotBounce 1.2s infinite ease-in-out",
-                          animationDelay: "0.4s",
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <span>Load More Titles</span>
-                  )}
-                </button>
+            {/* Infinite Scroll Sentinel: auto-loads on scroll without manual button click */}
+            {hasMore && (
+              <div
+                ref={loadMoreRef}
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  height: "72px",
+                  marginTop: "32px",
+                  marginBottom: "40px",
+                }}
+              >
+                {loadingMore && (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      padding: "8px 24px",
+                      borderRadius: "999px",
+                      background: "rgba(255, 255, 255, 0.06)",
+                      backdropFilter: "blur(16px)",
+                      WebkitBackdropFilter: "blur(16px)",
+                      border: "1px solid rgba(255, 255, 255, 0.12)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "7px",
+                        height: "7px",
+                        borderRadius: "50%",
+                        background: "#e50914",
+                        animation: "cinemaDotBounce 1.2s infinite ease-in-out",
+                        animationDelay: "0s",
+                      }}
+                    />
+                    <span
+                      style={{
+                        width: "7px",
+                        height: "7px",
+                        borderRadius: "50%",
+                        background: "#e50914",
+                        animation: "cinemaDotBounce 1.2s infinite ease-in-out",
+                        animationDelay: "0.2s",
+                      }}
+                    />
+                    <span
+                      style={{
+                        width: "7px",
+                        height: "7px",
+                        borderRadius: "50%",
+                        background: "#e50914",
+                        animation: "cinemaDotBounce 1.2s infinite ease-in-out",
+                        animationDelay: "0.4s",
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </>

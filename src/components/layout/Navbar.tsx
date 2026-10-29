@@ -16,6 +16,14 @@ import {
 import { NavSearchBar } from "./NavSearchBar";
 import { ProviderDropdown } from "./ProviderDropdown";
 import { downloadManager } from "../../utils/downloadManager";
+import {
+  isUserSignedIn,
+  getActiveProfile,
+  type UserProfile,
+} from "../../utils/profileService";
+import { ProfileAvatar } from "../auth/ProfileAvatar";
+import { ProfileMenuDropdown } from "../auth/ProfileMenuDropdown";
+import { NotificationsPopover } from "../auth/NotificationsPopover";
 import type { Provider } from "../../types";
 
 export interface NavbarProps {
@@ -31,6 +39,9 @@ export interface NavbarProps {
   onOpenSearch?: () => void;
   onGoHome?: () => void;
   onSelectCategoryNav?: (type: "home" | "movies" | "tv" | "anime" | "coming-soon" | "categories" | "rankings" | "downloads" | "mylist") => void;
+  onOpenSignIn?: () => void;
+  onOpenCreateAccount?: () => void;
+  onOpenManageProfiles?: () => void;
   activeNavTab?: string;
   isModalNavbar?: boolean;
   onClose?: () => void;
@@ -50,57 +61,75 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSearch,
   onGoHome,
   onSelectCategoryNav,
+  onOpenSignIn,
+  onOpenCreateAccount,
+  onOpenManageProfiles,
   activeNavTab = "home",
   isModalNavbar = false,
   onClose,
   hasHero = true,
 }) => {
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
-  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeDownloadCount, setActiveDownloadCount] = useState(0);
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const [signedIn, setSignedIn] = useState(() => isUserSignedIn());
+  const [profile, setProfile] = useState<UserProfile>(() => getActiveProfile());
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const isDesktop = typeof window !== "undefined" && Boolean((window as any).CinemaDesktop?.isDesktop);
 
-  // Tab measurement and GPU sliding red pill indicator
-  const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
-  const [indicator, setIndicator] = useState<{
+  const [localTab, setLocalTab] = useState<string>(activeNavTab || "home");
+
+  useEffect(() => {
+    if (activeNavTab) setLocalTab(activeNavTab);
+  }, [activeNavTab]);
+
+  const effectiveActiveTab = searchQuery ? "home" : localTab;
+  const navContainerRef = useRef<HTMLElement | null>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [indicatorStyle, setIndicatorStyle] = useState<{
     left: number;
     top: number;
     width: number;
     height: number;
-    opacity: number;
-  }>({ left: 0, top: 0, width: 0, height: 0, opacity: 0 });
+    ready: boolean;
+  }>({ left: 0, top: 0, width: 0, height: 0, ready: false });
 
   useLayoutEffect(() => {
-    const activeId = activeNavTab === "home" && !searchQuery ? "home" : activeNavTab;
-    const el = tabRefs.current[activeId];
-    if (el) {
-      setIndicator({
-        left: el.offsetLeft,
-        top: el.offsetTop,
-        width: el.offsetWidth,
-        height: el.offsetHeight,
-        opacity: 1,
-      });
-    } else {
-      setIndicator((prev) => ({ ...prev, opacity: 0 }));
-    }
-  }, [activeNavTab, searchQuery]);
-
-  // Click outside listener for Settings popup menu
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
-        setSettingsMenuOpen(false);
+    const update = () => {
+      const activeEl = tabRefs.current[effectiveActiveTab];
+      if (!activeEl) {
+        setIndicatorStyle((prev) => ({ ...prev, ready: false }));
+        return;
       }
+
+      setIndicatorStyle({
+        left: activeEl.offsetLeft,
+        top: activeEl.offsetTop,
+        width: activeEl.offsetWidth,
+        height: activeEl.offsetHeight,
+        ready: true,
+      });
     };
-    if (settingsMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [settingsMenuOpen]);
+
+    update();
+    const t = setTimeout(update, 30);
+    window.addEventListener("resize", update);
+
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", update);
+    };
+  }, [effectiveActiveTab]);
+
+  useEffect(() => {
+    const handleProfileChange = () => {
+      setSignedIn(isUserSignedIn());
+      setProfile(getActiveProfile());
+    };
+    window.addEventListener("cinema:profile_changed", handleProfileChange);
+    return () => window.removeEventListener("cinema:profile_changed", handleProfileChange);
+  }, []);
 
   useEffect(() => {
     return downloadManager.subscribe((tasks) => {
@@ -307,6 +336,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Center Floating Glassmorphic Pill Capsule Nav with Sliding Red Indicator */}
         <nav
+          ref={navContainerRef}
           aria-label="Primary"
           style={{
             position: "absolute",
@@ -314,9 +344,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             transform: "translateX(-50%)",
             display: "flex",
             alignItems: "center",
-            gap: "8px",
+            gap: "12px",
             zIndex: 10,
-            padding: "6px 8px",
+            padding: "6px 10px",
             borderRadius: "9999px",
             background: "linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 22, 32, 0.45) 45%, rgba(8, 10, 16, 0.55) 100%)",
             backdropFilter: "blur(28px) saturate(200%)",
@@ -325,72 +355,109 @@ export const Navbar: React.FC<NavbarProps> = ({
             boxShadow: "0 16px 40px -10px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4)",
           }}
         >
-          {/* Sliding Red Active Indicator with GPU Acceleration */}
+          <style>{`
+            @keyframes cinemaNavIconPop {
+              0% {
+                opacity: 0;
+                transform: scale(0.4);
+              }
+              100% {
+                opacity: 1;
+                transform: scale(1);
+              }
+            }
+            .cinema-nav-tab {
+              transition: background 0.18s ease, color 0.18s ease !important;
+            }
+            .cinema-nav-tab:hover {
+              background: rgba(255, 255, 255, 0.10) !important;
+            }
+          `}</style>
+
+          {/* Inner Relative Track (padding 0 ensures offsetLeft is 100% exact) */}
           <div
             style={{
-              position: "absolute",
-              top: `${indicator.top}px`,
-              left: 0,
-              transform: `translate3d(${indicator.left}px, 0, 0)`,
-              width: `${indicator.width}px`,
-              height: `${indicator.height}px`,
-              borderRadius: "9999px",
-              background: "linear-gradient(135deg, #ff1723 0%, #e50914 100%)",
-              boxShadow: "0 4px 18px rgba(229, 9, 20, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.4)",
-              opacity: indicator.opacity,
-              pointerEvents: "none",
-              transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
-              willChange: "transform, width",
-              zIndex: 1,
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: 0,
             }}
-          />
+          >
+            {/* Sliding Cinema Red Pill */}
+            <div
+              style={{
+                position: "absolute",
+                top: `${indicatorStyle.top}px`,
+                left: 0,
+                transform: `translate3d(${indicatorStyle.left}px, 0, 0)`,
+                width: `${indicatorStyle.width}px`,
+                height: `${indicatorStyle.height}px`,
+                borderRadius: "9999px",
+                background: "linear-gradient(135deg, #ff1723 0%, #e50914 100%)",
+                boxShadow: "0 4px 18px rgba(229, 9, 20, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.4)",
+                transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
+                willChange: "transform, width",
+                pointerEvents: "none",
+                zIndex: 1,
+                opacity: indicatorStyle.ready ? 1 : 0,
+              }}
+            />
 
-          {navItems.map((item) => {
-            const isActive =
-              item.id === "home"
-                ? activeNavTab === "home" && !searchQuery
-                : activeNavTab === item.id;
-            const isHovered = hoveredNav === item.id;
+            {navItems.map((item) => {
+              const isActive = item.id === effectiveActiveTab;
 
-            return (
-              <button
-                key={item.id}
-                ref={(el) => {
-                  tabRefs.current[item.id] = el;
-                }}
-                onClick={item.onClick}
-                onMouseEnter={() => setHoveredNav(item.id)}
-                onMouseLeave={() => setHoveredNav(null)}
-                style={{
-                  position: "relative",
-                  zIndex: 2,
-                  padding: "8px 18px",
-                  borderRadius: "9999px",
-                  background: "transparent",
-                  color: isActive ? "#ffffff" : isHovered ? "#ffffff" : "rgba(255, 255, 255, 0.80)",
-                  fontSize: "14px",
-                  fontWeight: isActive ? 700 : 500,
-                  cursor: "pointer",
-                  border: "none",
-                  outline: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "7px",
-                  userSelect: "none",
-                  whiteSpace: "nowrap",
-                  transition: "color 0.15s ease",
-                }}
-              >
-                {/* Active icon ONLY shown on active tab */}
-                {isActive && item.icon && (
-                  <span style={{ display: "inline-flex", alignItems: "center", color: "#ffffff" }}>
-                    {item.icon}
-                  </span>
-                )}
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={item.id}
+                  className="cinema-nav-tab"
+                  ref={(el) => {
+                    tabRefs.current[item.id] = el;
+                  }}
+                  onClick={() => {
+                    setLocalTab(item.id);
+                    item.onClick();
+                  }}
+                  style={{
+                    position: "relative",
+                    zIndex: 2,
+                    padding: "8px 20px",
+                    borderRadius: "9999px",
+                    background: "transparent",
+                    color: "#ffffff",
+                    fontSize: "13.5px",
+                    fontWeight: isActive ? 700 : 500,
+                    cursor: "pointer",
+                    border: "none",
+                    outline: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "7px",
+                    userSelect: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {/* Dynamic icon: only visible on active tab */}
+                  {isActive && item.icon && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#ffffff",
+                        animation: "cinemaNavIconPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      {item.icon}
+                    </span>
+                  )}
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
           {/* Vertical Divider */}
           <div
@@ -436,242 +503,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <SearchIcon size={17} />
           </button>
-
-          {/* Settings & More Menu Button in Capsule */}
-          <div style={{ position: "relative", zIndex: 2 }} ref={settingsMenuRef}>
-            <button
-              onClick={() => setSettingsMenuOpen((prev) => !prev)}
-              title="Settings & More"
-              style={{
-                width: "38px",
-                height: "38px",
-                borderRadius: "50%",
-                background: settingsMenuOpen ? "rgba(255, 255, 255, 0.18)" : "transparent",
-                border: "none",
-                color: settingsMenuOpen ? "#ffffff" : "rgba(255, 255, 255, 0.85)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "#ffffff";
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-                e.currentTarget.style.transform = "scale(1.08)";
-              }}
-              onMouseLeave={(e) => {
-                if (!settingsMenuOpen) {
-                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.85)";
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.transform = "scale(1)";
-                }
-              }}
-            >
-              <SettingsIcon size={17} />
-            </button>
-
-            {/* Frosted Dropdown for Top 250, Categories, Downloads, and Settings */}
-            {settingsMenuOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 10px)",
-                  right: 0,
-                  minWidth: "220px",
-                  borderRadius: "16px",
-                  background: "rgba(16, 18, 26, 0.88)",
-                  backdropFilter: "blur(24px) saturate(180%)",
-                  WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                  border: "1px solid rgba(255, 255, 255, 0.16)",
-                  boxShadow: "0 20px 48px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15)",
-                  padding: "8px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "4px",
-                  zIndex: 100,
-                  animation: "fadeIn 0.15s ease",
-                }}
-              >
-                <button
-                  onClick={() => {
-                    setSettingsMenuOpen(false);
-                    if (onSelectCategoryNav) onSelectCategoryNav("rankings");
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    background: "transparent",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "13.5px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
-                    e.currentTarget.style.color = "#ffffff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#ffffff";
-                  }}
-                >
-                  <StarIcon size={16} color="#e50914" fill="#e50914" />
-                  <span>Top 250 Rankings</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSettingsMenuOpen(false);
-                    if (onSelectCategoryNav) onSelectCategoryNav("categories");
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    background: "transparent",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "13.5px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
-                    e.currentTarget.style.color = "#ffffff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#ffffff";
-                  }}
-                >
-                  <CategoryIcon size={16} color="#e50914" />
-                  <span>Categories & Genres</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSettingsMenuOpen(false);
-                    if (onSelectCategoryNav) onSelectCategoryNav("downloads");
-                    else if (onOpenDownloads) onOpenDownloads();
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    background: "transparent",
-                    border: "none",
-                    color: "#ffffff",
-                    fontSize: "13.5px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
-                    e.currentTarget.style.color = "#ffffff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#ffffff";
-                  }}
-                >
-                  <DownloadIcon size={16} color="#e50914" />
-                  <span>Downloads</span>
-                  {activeDownloadCount > 0 && (
-                    <span
-                      style={{
-                        marginLeft: "auto",
-                        background: "#e50914",
-                        color: "#fff",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        padding: "2px 6px",
-                        borderRadius: "999px",
-                      }}
-                    >
-                      {activeDownloadCount}
-                    </span>
-                  )}
-                </button>
-
-                <div
-                  style={{
-                    height: "1px",
-                    background: "rgba(255, 255, 255, 0.12)",
-                    margin: "4px 0",
-                  }}
-                />
-
-                <button
-                  onClick={() => {
-                    setSettingsMenuOpen(false);
-                    onOpenSettings();
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    background: "transparent",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.85)",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
-                    e.currentTarget.style.color = "#ffffff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "rgba(255, 255, 255, 0.85)";
-                  }}
-                >
-                  <SettingsIcon size={16} />
-                  <span>Extension & Player Settings</span>
-                </button>
-              </div>
-            )}
-          </div>
         </nav>
 
-        {/* Right Actions: Downloads / Spacer */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "120px", justifyContent: "flex-end" }}>
-
-          {/* Desktop Downloads Button */}
+        {/* Right Corner: Notification, Setting & Sign In / Profile Capsule */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "160px", justifyContent: "flex-end" }}>
+          {/* Downloads button if active downloads */}
           {onOpenDownloads && (isDesktop || activeDownloadCount > 0) && (
             <button
               onClick={onOpenDownloads}
               title="Downloads"
               style={{
                 position: "relative",
-                width: "42px",
-                height: "42px",
-                borderRadius: "999px",
+                width: "40px",
+                height: "40px",
+                borderRadius: "50%",
                 background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -684,16 +531,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)";
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
                 e.currentTarget.style.transform = "scale(1.05)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
                 e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              <DownloadIcon size={17} />
+              <DownloadIcon size={16} />
               {activeDownloadCount > 0 && (
                 <span
                   style={{
@@ -718,8 +563,178 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Modal Close / Back Button */}
+          {/* Right Corner Frosted Glass Capsule */}
+          <div
+            style={{
+              position: "relative",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "5px 8px",
+              borderRadius: "9999px",
+              background: "linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 22, 32, 0.45) 45%, rgba(8, 10, 16, 0.55) 100%)",
+              backdropFilter: "blur(28px) saturate(200%)",
+              WebkitBackdropFilter: "blur(28px) saturate(200%)",
+              border: "1px solid rgba(255, 255, 255, 0.18)",
+              boxShadow: "0 16px 40px -10px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.3)",
+              zIndex: 30,
+            }}
+          >
+            {/* 1. Notifications Button */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => {
+                  setNotificationsOpen((prev) => !prev);
+                  setProfileMenuOpen(false);
+                }}
+                title="Notifications"
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  background: notificationsOpen ? "rgba(255, 255, 255, 0.18)" : "transparent",
+                  border: "none",
+                  color: notificationsOpen ? "#ffffff" : "rgba(255, 255, 255, 0.85)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "#ffffff";
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+                  e.currentTarget.style.transform = "scale(1.06)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!notificationsOpen) {
+                    e.currentTarget.style.color = "rgba(255, 255, 255, 0.85)";
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }
+                }}
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+              </button>
 
+              {/* Notifications Popover */}
+              <NotificationsPopover
+                isOpen={notificationsOpen}
+                onClose={() => setNotificationsOpen(false)}
+              />
+            </div>
+
+            {/* 2. Direct Settings Gear Button */}
+            <button
+              onClick={() => {
+                setNotificationsOpen(false);
+                setProfileMenuOpen(false);
+                onOpenSettings();
+              }}
+              title="Settings"
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                background: "transparent",
+                border: "none",
+                color: "rgba(255, 255, 255, 0.85)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "#ffffff";
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+                e.currentTarget.style.transform = "scale(1.06)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "rgba(255, 255, 255, 0.85)";
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              <SettingsIcon size={17} />
+            </button>
+
+            {/* Vertical Divider */}
+            <div style={{ width: "1px", height: "18px", background: "rgba(255, 255, 255, 0.18)", margin: "0 2px" }} />
+
+            {/* 3. Sign In or Profile Avatar */}
+            <div style={{ position: "relative" }}>
+              {signedIn ? (
+                <button
+                  onClick={() => {
+                    setProfileMenuOpen((prev) => !prev);
+                    setNotificationsOpen(false);
+                  }}
+                  title={profile.name}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "2px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: "50%",
+                    transition: "transform 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                >
+                  <ProfileAvatar
+                    avatarKey={profile.avatar}
+                    size={32}
+                    gradient={profile.avatarColor}
+                  />
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (onOpenSignIn) onOpenSignIn();
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "6px 14px",
+                    borderRadius: "9999px",
+                    background: "#e50914",
+                    border: "1px solid #e50914",
+                    color: "#ffffff",
+                    fontSize: "12.5px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: "0 2px 10px rgba(229, 9, 20, 0.4)",
+                    transition: "all 0.18s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.filter = "brightness(1)")}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <span>Sign In</span>
+                </button>
+              )}
+
+              {/* Profile Menu Dropdown */}
+              <ProfileMenuDropdown
+                isOpen={profileMenuOpen}
+                onClose={() => setProfileMenuOpen(false)}
+                onOpenManageProfiles={() => {
+                  if (onOpenManageProfiles) onOpenManageProfiles();
+                }}
+                onOpenSettings={onOpenSettings}
+              />
+            </div>
+          </div>
         </div>
       </div>
 

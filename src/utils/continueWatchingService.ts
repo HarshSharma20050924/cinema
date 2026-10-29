@@ -11,6 +11,7 @@ export interface ContinueWatchingItem {
   year?: string;
   poster?: string;
   backdrop?: string;
+  logoUrl?: string;
   currentTime: number;
   duration: number;
   progressPercent: number; // 0 to 100
@@ -122,6 +123,14 @@ export function clearAllContinueWatching(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: [] }));
+  } catch {}
+}
+
+export function restoreContinueWatchingList(items: ContinueWatchingItem[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: items }));
   } catch {}
 }
 

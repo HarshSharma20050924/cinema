@@ -311,11 +311,11 @@ export const PersonDetailsModal: React.FC<PersonDetailsModalProps> = ({
     } as any);
   };
 
-  // First movie from Known For (User Request: poster of the first Known For item as blurred ambient background)
-  const firstKnownItem = person?.knownFor?.[0];
+  // First movie from Known For or Credits (User Request: poster/backdrop of first Known For item as hero background & ambient blur)
+  const firstKnownItem = person?.knownFor?.[0] || person?.allCredits?.[0];
   const heroBackdropSrc =
-    firstKnownItem?.poster_path ||
     firstKnownItem?.backdrop_path ||
+    firstKnownItem?.poster_path ||
     person?.heroBackdrop ||
     null;
 
@@ -338,7 +338,7 @@ export const PersonDetailsModal: React.FC<PersonDetailsModalProps> = ({
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* Ambient Blurred Background from the first Known-For movie poster (Exact copy of DetailsModal & App) */}
+      {/* 0. Ambient Blurred Background (Matches Home slides & DetailsModal) */}
       {heroBackdropSrc && (
         <div
           style={{
@@ -350,11 +350,11 @@ export const PersonDetailsModal: React.FC<PersonDetailsModalProps> = ({
             backgroundImage: `url(${heroBackdropSrc})`,
             backgroundSize: "cover",
             backgroundPosition: "center 25%",
-            filter: "blur(80px) saturate(2.2) brightness(0.58)",
+            filter: "blur(75px) saturate(2.2) brightness(0.68)",
             transform: "translate3d(0, 0, 0)",
             pointerEvents: "none",
             zIndex: 0,
-            opacity: 0.85,
+            opacity: 1,
             transition: "opacity 0.6s ease",
           }}
         />
@@ -429,20 +429,125 @@ export const PersonDetailsModal: React.FC<PersonDetailsModalProps> = ({
         </div>
       )}
 
-      {/* 4. PERSON BIO HEADER (Exact Match to Screenshot 3) */}
+      {/* Fallback if person details failed to load */}
+      {!loading && !person && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "55vh",
+            gap: "16px",
+            position: "relative",
+            zIndex: 1,
+            color: "rgba(255, 255, 255, 0.7)",
+          }}
+        >
+          <div style={{ fontSize: "16px", fontWeight: 700 }}>Unable to load person details</div>
+          <button
+            onClick={() => {
+              setLoading(true);
+              fetchTMDBPersonDetails(personId).then((data) => {
+                setPerson(data);
+                setLoading(false);
+              });
+            }}
+            style={{
+              padding: "8px 22px",
+              borderRadius: "999px",
+              background: "#e50914",
+              color: "#ffffff",
+              border: "none",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* 4. PERSON BIO HERO (Cinematic Hero Banner with Smooth Bottom Mask Fade - No Divider Line) */}
       {!loading && person && (
         <div
           style={{
-            width: "100%",
-            maxWidth: "1320px",
-            margin: "0 auto",
-            padding: "56px 48px 32px 48px",
             position: "relative",
+            width: "100%",
+            minHeight: "440px",
+            marginTop: "-72px",
+            padding: "115px 48px 40px 48px",
+            overflow: "visible",
+            backgroundColor: "transparent",
             zIndex: 1,
           }}
         >
+          {/* Hero Cinematic Backdrop with Smooth Bottom Mask Fade (Eliminates divider completely) */}
+          {heroBackdropSrc && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: "-80px",
+                width: "100%",
+                zIndex: 1,
+                pointerEvents: "none",
+                overflow: "hidden",
+                WebkitMaskImage:
+                  "linear-gradient(to bottom, black 0%, black 45%, rgba(0,0,0,0.5) 75%, transparent 100%)",
+                maskImage:
+                  "linear-gradient(to bottom, black 0%, black 45%, rgba(0,0,0,0.5) 75%, transparent 100%)",
+              }}
+            >
+              <img
+                src={heroBackdropSrc}
+                alt={person.name}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center 22%",
+                  opacity: 0.82,
+                  animation: "cinemaHeroKenBurns 25s ease-in-out infinite alternate",
+                }}
+              />
+              {/* Radial vignette backing for crystal text clarity */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background:
+                    "radial-gradient(ellipse at 20% 60%, rgba(6, 8, 12, 0.72) 0%, rgba(6, 8, 12, 0.32) 55%, transparent 85%)",
+                  pointerEvents: "none",
+                }}
+              />
+              {/* Top Navbar fade */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: "72px",
+                  background: "linear-gradient(180deg, rgba(6, 8, 12, 0.45) 0%, transparent 100%)",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
+          )}
+
+          {/* Content Row: Headshot + Details */}
           <div
             style={{
+              position: "relative",
+              zIndex: 2,
+              maxWidth: "1320px",
+              margin: "0 auto",
               display: "flex",
               gap: "36px",
               alignItems: "flex-start",

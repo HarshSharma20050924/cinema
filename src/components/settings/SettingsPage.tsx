@@ -12,20 +12,29 @@ import {
   getAccountEmail,
   setAccountEmail,
   signOutAccount,
-  signInAccount,
+  deleteAccount,
   AVATAR_OPTIONS,
   type UserProfile,
 } from "../../utils/profileService";
+import { showToast as triggerGlobalToast } from "../../utils/toastService";
+import { DownloadPage } from "../download/DownloadPage";
+import { ProfileAvatar } from "../auth/ProfileAvatar";
 
 export interface SettingsPageProps {
   onClose: () => void;
   onOpenProfiles?: () => void;
+  currentBackdrop?: string | null;
+  backdropSlides?: any[];
 }
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
+export const SettingsPage: React.FC<SettingsPageProps> = ({
+  onClose,
+  currentBackdrop,
+  backdropSlides,
+}) => {
   const { settings, updateSettings } = useSettings();
   const [activeCategory, setActiveCategory] = useState<
-    "account" | "appearance" | "playback" | "servers" | "subtitles" | "ads" | "febbox"
+    "account" | "downloads" | "appearance" | "playback" | "servers" | "subtitles" | "ads" | "febbox"
   >("account");
 
   // Profile State from real persistent profileService
@@ -42,6 +51,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const [newEmailInput, setNewEmailInput] = useState("");
   const [newProfileName, setNewProfileName] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0]);
+  const [qualityDropdownOpen, setQualityDropdownOpen] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -62,27 +73,40 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
     return () => window.removeEventListener("cinema:profile_changed", handleUpdate);
   }, []);
 
-  // Ambient instant blurred sliding background (optimized w780 URLs + preloaded)
-  const ambientImages = [
-    "https://image.tmdb.org/t/p/w1280/sHI9xlFRWCJ38AIIfOqnGjuEvXz.jpg",
-    "https://image.tmdb.org/t/p/w1280/m4TUaeqAIf2m4Y49zB1AecQ2b19.jpg",
-    "https://image.tmdb.org/t/p/w1280/yDHYTfA3R0jFYba16jBB1ef8oIt.jpg",
-    "https://image.tmdb.org/t/p/w1280/8YFL5QQVPy3AgrEQxNYVSgiPEbe.jpg",
-  ];
+  // Instant ambient slideshow using backdrops from the active tab the user came from (Zero red effect, zero load lag)
+  const slideUrls = React.useMemo(() => {
+    const urls: string[] = [];
+    if (currentBackdrop && typeof currentBackdrop === "string") {
+      urls.push(currentBackdrop);
+    }
+    if (Array.isArray(backdropSlides)) {
+      backdropSlides.forEach((s: any) => {
+        const bg = s?.backdropUrl || s?.backdrop || s?.image;
+        if (bg && typeof bg === "string" && !urls.includes(bg)) {
+          urls.push(bg);
+        }
+      });
+    }
+    // Clean neutral cinematic fallbacks (never hardcoded red images)
+    if (urls.length === 0) {
+      urls.push(
+        "https://image.tmdb.org/t/p/w1280/m4TUaeqAIf2m4Y49zB1AecQ2b19.jpg",
+        "https://image.tmdb.org/t/p/w1280/yDHYTfA3R0jFYba16jBB1ef8oIt.jpg",
+        "https://image.tmdb.org/t/p/w1280/8YFL5QQVPy3AgrEQxNYVSgiPEbe.jpg"
+      );
+    }
+    return urls;
+  }, [currentBackdrop, backdropSlides]);
+
   const [activeBgIdx, setActiveBgIdx] = useState(0);
 
   useEffect(() => {
-    // Preload ambient images into browser cache immediately
-    ambientImages.forEach((src) => {
-      const img = new Image();
-      img.src = src;
-    });
-
+    if (slideUrls.length <= 1) return;
     const timer = setInterval(() => {
-      setActiveBgIdx((prev) => (prev + 1) % ambientImages.length);
-    }, 9000);
+      setActiveBgIdx((prev) => (prev + 1) % slideUrls.length);
+    }, 8500);
     return () => clearInterval(timer);
-  }, [ambientImages.length]);
+  }, [slideUrls.length]);
 
   // Tab measurement and GPU sliding red pill indicator matching Navbar exactly
   const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
@@ -111,6 +135,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
 
   const categories = [
     { id: "account", label: "Account" },
+    { id: "downloads", label: "Downloads" },
     { id: "appearance", label: "Appearance" },
     { id: "playback", label: "Playback" },
     { id: "servers", label: "Servers" },
@@ -188,17 +213,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
         }
       `}</style>
 
-      {/* Dynamic Instant Ambient Sliding Blurred Backdrop */}
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "radial-gradient(ellipse at 50% 20%, rgba(30, 36, 52, 0.6) 0%, rgba(7, 9, 14, 0.95) 70%)",
-          zIndex: 0,
-          pointerEvents: "none",
-        }}
-      />
-      {ambientImages.map((imgUrl, i) => (
+      {/* Dynamic Instant Blurred Ambient Slideshow (Zero lag, uses current tab's active backdrops) */}
+      {slideUrls.map((imgUrl, i) => (
         <div
           key={imgUrl}
           style={{
@@ -206,16 +222,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
             inset: 0,
             backgroundImage: `url(${imgUrl})`,
             backgroundSize: "cover",
-            backgroundPosition: "center",
-            filter: "blur(65px) brightness(0.28) saturate(180%)",
-            transform: "scale(1.1)",
+            backgroundPosition: "center 30%",
+            filter: "blur(70px) brightness(0.38) saturate(140%)",
+            transform: "scale(1.12)",
             opacity: activeBgIdx === i ? 1 : 0,
-            transition: "opacity 2.5s cubic-bezier(0.16, 1, 0.3, 1)",
+            transition: "opacity 1.6s cubic-bezier(0.16, 1, 0.3, 1)",
             pointerEvents: "none",
             zIndex: 0,
+            willChange: "opacity",
           }}
         />
       ))}
+
+      {/* Atmospheric depth overlay for high text contrast without muddy dark/red glow */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "linear-gradient(180deg, rgba(6, 8, 14, 0.38) 0%, rgba(6, 8, 14, 0.58) 50%, rgba(6, 8, 14, 0.80) 100%)",
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+      />
 
       {/* Toast Notification */}
       {toastMsg && (
@@ -362,23 +390,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
               <div style={cardStyle}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
-                    {/* User Avatar Circle */}
-                    <div
-                      style={{
-                        width: "56px",
-                        height: "56px",
-                        borderRadius: "50%",
-                        background: activeProfile.avatarColor,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "26px",
-                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px rgba(255, 255, 255, 0.3)",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                      }}
-                    >
-                      {activeProfile.avatar}
-                    </div>
+                    {/* User Avatar Vector Orb (No Emojis) */}
+                    <ProfileAvatar
+                      avatarKey={activeProfile.avatar}
+                      size={56}
+                      gradient={activeProfile.avatarColor}
+                    />
                     <div>
                       <h4 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "#fff" }}>
                         {activeProfile.name} {activeProfile.isKids && "(Kids)"}
@@ -497,10 +514,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                   <button
                     className="cinema-settings-danger-btn"
                     onClick={() => {
-                      if (confirm("Are you sure you want to sign out?")) {
-                        signOutAccount();
-                        showToast("Signed out successfully");
-                      }
+                      signOutAccount();
+                      triggerGlobalToast("Signed out successfully", "info");
                     }}
                     style={{
                       ...pillButtonStyle,
@@ -512,8 +527,41 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                     Sign Out
                   </button>
                 </div>
+
+                <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.08)", margin: "4px 0" }} />
+
+                {/* Delete Account Item */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#ff4d4f" }}>Delete Account</h4>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.55)" }}>
+                      Permanently erase your account and profiles from Cloudflare database.
+                    </p>
+                  </div>
+                  <button
+                    className="cinema-settings-danger-btn"
+                    onClick={() => setShowDeleteAccountModal(true)}
+                    style={{
+                      ...pillButtonStyle,
+                      color: "#ff4d4f",
+                      border: "1px solid rgba(255, 77, 79, 0.45)",
+                      background: "rgba(255, 77, 79, 0.12)",
+                    }}
+                  >
+                    Delete Account
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ============================================================= */}
+        {/* TAB: DOWNLOADS                                                */}
+        {/* ============================================================= */}
+        {activeCategory === "downloads" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            <DownloadPage onBack={() => setActiveCategory("account")} />
           </div>
         )}
 
@@ -576,24 +624,119 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                     Preferred stream quality for playback
                   </p>
                 </div>
-                <select
-                  value={settings.preferredQuality || "1080p"}
-                  onChange={(e) => updateSettings({ preferredQuality: e.target.value as any })}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: "9999px",
-                    background: "rgba(255, 255, 255, 0.08)",
-                    border: "1px solid rgba(255, 255, 255, 0.18)",
-                    color: "#fff",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <option value="auto" style={{ background: "#1a1e28" }}>Auto (Best)</option>
-                  <option value="1080p" style={{ background: "#1a1e28" }}>1080p Full HD</option>
-                  <option value="720p" style={{ background: "#1a1e28" }}>720p HD</option>
-                  <option value="4k" style={{ background: "#1a1e28" }}>4K Ultra HD</option>
-                </select>
+                <div style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={() => setQualityDropdownOpen((prev) => !prev)}
+                    style={{
+                      padding: "8px 18px",
+                      borderRadius: "9999px",
+                      background: "rgba(255, 255, 255, 0.08)",
+                      backdropFilter: "blur(20px)",
+                      WebkitBackdropFilter: "blur(20px)",
+                      border: "1px solid rgba(255, 255, 255, 0.18)",
+                      color: "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      boxShadow: "0 4px 14px rgba(0, 0, 0, 0.4)",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")}
+                  >
+                    <span>
+                      {settings.preferredQuality === "auto"
+                        ? "Auto (Best)"
+                        : settings.preferredQuality === "4k"
+                        ? "4K Ultra HD"
+                        : settings.preferredQuality === "720p"
+                        ? "720p HD"
+                        : "1080p Full HD"}
+                    </span>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{
+                        transform: qualityDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: "transform 0.2s ease",
+                      }}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {qualityDropdownOpen && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 8px)",
+                        right: 0,
+                        zIndex: 100,
+                        minWidth: "160px",
+                        background: "rgba(16, 20, 28, 0.96)",
+                        backdropFilter: "blur(32px) saturate(180%)",
+                        WebkitBackdropFilter: "blur(32px) saturate(180%)",
+                        border: "1px solid rgba(255, 255, 255, 0.18)",
+                        borderRadius: "16px",
+                        padding: "6px",
+                        boxShadow: "0 18px 45px rgba(0, 0, 0, 0.8), 0 0 1px 1px rgba(255, 255, 255, 0.08)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "2px",
+                        animation: "cinemaMenuPop 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                      }}
+                    >
+                      {[
+                        { value: "auto", label: "Auto (Best)" },
+                        { value: "1080p", label: "1080p Full HD" },
+                        { value: "720p", label: "720p HD" },
+                        { value: "4k", label: "4K Ultra HD" },
+                      ].map((opt) => {
+                        const isSelected = (settings.preferredQuality || "1080p") === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              updateSettings({ preferredQuality: opt.value as any });
+                              setQualityDropdownOpen(false);
+                            }}
+                            style={{
+                              padding: "9px 14px",
+                              borderRadius: "10px",
+                              border: "none",
+                              background: isSelected ? "#e50914" : "transparent",
+                              color: "#ffffff",
+                              fontSize: "13px",
+                              fontWeight: isSelected ? 700 : 500,
+                              cursor: "pointer",
+                              textAlign: "left",
+                              transition: "background 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = "transparent";
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1279,6 +1422,96 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                 }}
               >
                 Save Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Account Glass Confirmation Modal */}
+      {showDeleteAccountModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100020,
+            background: "rgba(0, 0, 0, 0.78)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            animation: "cinemaFadeIn 0.2s ease",
+          }}
+          onClick={() => setShowDeleteAccountModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              background: "rgba(18, 22, 30, 0.96)",
+              backdropFilter: "blur(36px)",
+              WebkitBackdropFilter: "blur(36px)",
+              border: "1px solid rgba(255, 77, 79, 0.35)",
+              borderRadius: "24px",
+              padding: "28px",
+              boxShadow: "0 28px 70px rgba(0, 0, 0, 0.85)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "18px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "50%",
+                  background: "rgba(239, 68, 68, 0.15)",
+                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#ff4d4f",
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                </svg>
+              </div>
+              <h3 style={{ margin: 0, fontSize: "19px", fontWeight: 800, color: "#fff" }}>
+                Delete Account?
+              </h3>
+            </div>
+            <p style={{ margin: 0, fontSize: "13.5px", color: "rgba(255, 255, 255, 0.7)", lineHeight: "1.5" }}>
+              Are you sure? This will permanently erase your Cinema account, all profiles, synchronized watchlists, and likes from the Cloudflare database. This action cannot be undone.
+            </p>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "6px" }}>
+              <button
+                className="cinema-settings-pill-btn"
+                onClick={() => setShowDeleteAccountModal(false)}
+                style={pillButtonStyle}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setShowDeleteAccountModal(false);
+                  await deleteAccount();
+                  onClose();
+                }}
+                style={{
+                  ...pillButtonStyle,
+                  background: "#e50914",
+                  border: "1px solid #e50914",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                }}
+              >
+                Delete Forever
               </button>
             </div>
           </div>

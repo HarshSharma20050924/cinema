@@ -115,7 +115,14 @@ async function fetchTMDBJson(url: string): Promise<any> {
     if (res.ok) return await res.json();
   } catch (_) {}
 
-  // 3. Cloudflare Pages edge proxy fallback
+  // 3. Cloudflare Worker proxy fallback
+  try {
+    const cfWorkerUrl = url.replace("https://api.themoviedb.org/3", "https://tmdb-proxy.workers.dev/3");
+    const res = await fetch(cfWorkerUrl);
+    if (res.ok) return await res.json();
+  } catch (_) {}
+
+  // 4. Cloudflare Pages edge proxy fallback
   try {
     const cfUrl = `https://cinema-dwh.pages.dev/api/proxy?url=${encodeURIComponent(url)}`;
     const res = await fetch(cfUrl);
@@ -573,11 +580,9 @@ export interface TMDBPersonDetails {
 
 export async function fetchTMDBPersonDetails(personId: number): Promise<TMDBPersonDetails | null> {
   try {
-    const res = await fetch(
-      `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&append_to_response=combined_credits`
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
+    const url = `${BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&append_to_response=combined_credits`;
+    const data = await fetchTMDBJson(url);
+    if (!data) return null;
 
     const rawCredits = data.combined_credits?.cast || [];
 
