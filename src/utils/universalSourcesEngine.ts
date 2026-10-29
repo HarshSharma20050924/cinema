@@ -199,6 +199,7 @@ export function normalizeRawLinks(
 
   let serverCounter = existingCount + 1;
   const isMovieBox = providerName.toLowerCase().includes("moviebox");
+  const qualityServerCounters: Record<string, number> = {};
 
   for (const item of rawStreams) {
     const rawUrl = item.url || (item as any).link || "";
@@ -215,19 +216,21 @@ export function normalizeRawLinks(
     const codec = extractCodecInfo(titleStr) || "WEB-DL";
     const languages = extractAudioLanguages(titleStr);
 
-    // Strictly anonymous Server N
-    const cleanDisplayName = `Server ${serverCounter}`;
+    // Number servers per quality (e.g. 1080p has Server 1: Pixeldrain, Server 2: FastDL, Server 3: GDrive)
+    const srvNum = (qualityServerCounters[quality] || 0) + 1;
+    qualityServerCounters[quality] = srvNum;
+    const cleanDisplayName = `Server ${srvNum}`;
 
     result.push({
-      id: `server-${serverCounter}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `server-${quality}-${srvNum}-${Math.random().toString(36).slice(2, 7)}`,
       serverName: cleanDisplayName,
-      serverNumber: serverCounter,
+      serverNumber: srvNum,
       quality,
       size: size || null,
       codec,
       url: rawUrl,
       provider: isMovieBox ? "MovieBox" : providerName.toLowerCase().includes("hdhub") ? "HDHub4u" : providerName.toLowerCase().includes("4khd") ? "4kHDHub" : providerName,
-      sourceTitle: rawItemTitle || `Option ${serverCounter}`,
+      sourceTitle: rawItemTitle || `Option ${srvNum}`,
       isDirect: !rawUrl.includes(".html") && !rawUrl.includes("drive.google"),
       isTorrent: rawUrl.startsWith("magnet:") || (item as any).type === "torrent",
       languages,

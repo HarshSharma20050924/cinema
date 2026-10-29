@@ -751,10 +751,13 @@ export default function App() {
     if (typeof window !== "undefined") {
       const p = new URLSearchParams(window.location.search).get("play");
       const t = new URLSearchParams(window.location.search).get("title") || "Cinema Stream";
+      const b = new URLSearchParams(window.location.search).get("backdrop") || new URLSearchParams(window.location.search).get("poster");
       if (p) {
         return {
           url: p,
           title: t,
+          backdrop: b || undefined,
+          poster: b || undefined,
         };
       }
     }
@@ -2904,17 +2907,30 @@ export default function App() {
           title={playerModalState?.title || selectedPost?.title || details?.title || "Cinema Stream"}
           backdrop={playerModalState?.backdrop || details?.backdrop || selectedPost?.image}
           poster={playerModalState?.poster || details?.poster || selectedPost?.image}
+          logo={(details as any)?.logoUrl || (details as any)?.logo || (playerModalState as any)?.logo}
           servers={playerModalState?.servers || streams}
           runtime={playerModalState?.runtime || details?.runtime}
           season={playerModalState?.season}
           episode={playerModalState?.episode}
           episodes={playerModalState?.episodes}
           seasonsCount={playerModalState?.seasonsCount}
-          tmdbId={playerModalState?.tmdbId || (selectedPost as any)?.tmdbId}
+          tmdbId={playerModalState?.tmdbId || (selectedPost as any)?.tmdbId || (details as any)?.id}
           onSelectEpisode={(seasonNum, episodeNum) => {
             setPlayerModalState((prev) =>
               prev ? { ...prev, season: seasonNum, episode: episodeNum } : null
             );
+          }}
+          onSelectMedia={(media) => {
+            handleClosePlayer();
+            handleSelectPost({
+              id: String(media.id),
+              title: media.title || media.name || "Movie",
+              image: media.poster_path ? `https://image.tmdb.org/t/p/w500${media.poster_path}` : (media.backdrop_path ? `https://image.tmdb.org/t/p/w780${media.backdrop_path}` : ""),
+              tmdbId: media.id,
+              type: media.media_type || (media.first_air_date ? "tv" : "movie"),
+              releaseDate: media.release_date || media.first_air_date,
+              rating: media.vote_average ? `${media.vote_average.toFixed(1)}/10` : undefined,
+            } as any);
           }}
           onClose={handleClosePlayer}
         />

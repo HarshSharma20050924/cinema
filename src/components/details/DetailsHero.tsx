@@ -259,22 +259,7 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
     };
   }, [trailerKey, isTrailerHidden, trailerFailed]);
 
-  // Watchdog timer: If trailer iframe mounts but fails to start playing within 4s (e.g. geo-blocked / restricted), cleanly hide it!
-  useEffect(() => {
-    if (!isPlayingAutoTrailer || trailerHasPlayed || trailerFailed) return;
-
-    const watchdog = setTimeout(() => {
-      // If after 4s the video hasn't fired playing state (1), it's unavailable or geo-blocked in this region
-      if (!trailerHasPlayed) {
-        setTrailerFailed(true);
-        setIsPlayingAutoTrailer(false);
-      }
-    }, 4000);
-
-    return () => clearTimeout(watchdog);
-  }, [isPlayingAutoTrailer, trailerHasPlayed, trailerFailed]);
-
-  // Listen to YouTube player messages to cleanly fallback on geo-block, unavailable video, or embed restriction
+  // Listen to YouTube player messages to cleanly fallback ONLY on real fatal errors
   useEffect(() => {
     const handleMsg = (e: MessageEvent) => {
       try {
@@ -292,14 +277,10 @@ export const DetailsHero: React.FC<DetailsHeroProps> = ({
           setTrailerHasPlayed(true);
         }
 
-        // Catch YouTube player errors (codes 2, 5, 100, 101, 150)
+        // Catch YouTube fatal player errors (codes 100: not found/private, 101/150: embed restricted)
         if (
-          data?.event === "onError" ||
-          data?.event === "onPlayerError" ||
-          data?.info === "error" ||
-          (typeof data?.info === "number" && [2, 5, 100, 101, 150].includes(data.info)) ||
-          (typeof data?.data === "number" && [2, 5, 100, 101, 150].includes(data.data)) ||
-          (data?.info && typeof data.info === "object" && data.info.playerState === -1)
+          (data?.event === "onError" || data?.event === "onPlayerError") &&
+          [100, 101, 150].includes(Number(data?.info || data?.data))
         ) {
           setTrailerFailed(true);
           setIsPlayingAutoTrailer(false);

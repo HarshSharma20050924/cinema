@@ -32,16 +32,10 @@ export function cleanHeroTitle(raw: string): string {
   return (title || cleaned).trim();
 }
 
+import { optimizeImage } from "../../utils/imageOptimizer";
+
 export const upgradeToHighRes = (url: string | null | undefined): string => {
-  if (!url) return "";
-  const clean = url.trim();
-  if (clean.includes("image.tmdb.org/t/p/")) return clean.replace(/\/w\d+\//, "/original/");
-  if (clean.includes("images.metahub.space/")) {
-    return clean.replace(/\/poster\/(?:small|medium)\//, "/poster/large/").replace(/\/background\/(?:small|medium)\//, "/background/large/");
-  }
-  if (clean.includes("media-amazon.com/images/M/")) return clean.replace(/\._V1_.*?\.(jpg|jpeg|png)$/i, "._V1_FMjpg_UX1920_.$1");
-  if (clean.includes("/wp-content/uploads/")) return clean.replace(/-\d+x\d+(\.(?:webp|jpg|jpeg|png))$/i, "$1");
-  return clean;
+  return optimizeImage(url, "backdrop");
 };
 
 export const HeroSpotlight: React.FC<HeroSpotlightProps> = ({

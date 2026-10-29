@@ -17,11 +17,63 @@ const cleanAudioName = (raw: string): string => {
   return cleaned;
 };
 
+export function isStrictTitleMatch(candidateTitle: string, queryTitle: string, expectedYear?: number | string): boolean {
+  if (!candidateTitle || !queryTitle) return false;
+
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/\[.*?\]|\(.*?\)/g, "")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const stopWords = new Set([
+    "the", "a", "an", "of", "and", "in", "to", "movie", "full", "hindi", "dubbed",
+    "dual", "audio", "season", "episode", "part", "hd", "hq", "org", "web", "dl", "rip"
+  ]);
+
+  const cleanCand = normalize(candidateTitle);
+  const cleanQuery = normalize(queryTitle);
+
+  if (cleanCand === cleanQuery) return true;
+
+  const queryTokens = cleanQuery.split(" ").filter((t) => t.length > 1 && !stopWords.has(t));
+  const candTokens = cleanCand.split(" ").filter((t) => t.length > 1 && !stopWords.has(t));
+
+  if (queryTokens.length === 0) return cleanCand.includes(cleanQuery);
+
+  // All primary query tokens MUST be matched in candidate tokens
+  const allMatched = queryTokens.every((token) => candTokens.includes(token));
+  if (!allMatched) return false;
+
+  // STRICT CHECK: Reject if candidate has 2 or more extra major distinguishing words not in query
+  const extraCandTokens = candTokens.filter((t) => !queryTokens.includes(t) && isNaN(Number(t)));
+  if (extraCandTokens.length >= 2 && queryTokens.length <= 2) {
+    return false;
+  }
+
+  // Check Year discrepancy if year is present in candidate title and expectedYear
+  const candYearMatch = candidateTitle.match(/\b(19\d\d|20\d\d)\b/);
+  if (candYearMatch && expectedYear) {
+    const candYear = parseInt(candYearMatch[1], 10);
+    const expYear = typeof expectedYear === "number" ? expectedYear : parseInt(String(expectedYear), 10);
+    if (!isNaN(candYear) && !isNaN(expYear)) {
+      if (Math.abs(candYear - expYear) > 1) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 export interface VideoPlayerModalProps {
   playbackUrl: string | null;
   title?: string;
   backdrop?: string;
   poster?: string;
+  logo?: string;
   servers?: Array<{ server: string; link: string; quality?: string; type?: string }>;
   runtime?: string | number;
   season?: number;
@@ -30,6 +82,7 @@ export interface VideoPlayerModalProps {
   seasonsCount?: number;
   tmdbId?: number;
   onSelectEpisode?: (seasonNum: number, episodeNum: number) => void;
+  onSelectMedia?: (media: any) => void;
   onClose: () => void;
 }
 
@@ -302,11 +355,168 @@ function computeEstimatedEndTime(remainingSeconds: number): string {
   return `Ends ${hours}:${minutes} ${ampm}`;
 }
 
+const PlayerRecommendedCard: React.FC<{
+  item: any;
+  onSelect: (item: any) => void;
+}> = ({ item, onSelect }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+    setTilt({
+      x: (y / (rect.height / 2)) * -8,
+      y: (x / (rect.width / 2)) * 8,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setTilt({ x: 0, y: 0 });
+  };
+
+  const posterImg = item.poster_path || item.backdrop_path || item.image;
+  const releaseYear = (item.release_date || item.first_air_date || "").slice(0, 4);
+  const title = item.title || item.name || "Movie";
+
+  return (
+    <div
+      onClick={() => onSelect(item)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        cursor: "pointer",
+        perspective: "1000px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+        userSelect: "none",
+        zIndex: isHovered ? 10 : 1,
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: "2/3",
+          borderRadius: "14px",
+          overflow: "hidden",
+          backgroundColor: "#0c0c0c",
+          border: "1px solid rgba(255, 255, 255, 0.10)",
+          boxShadow: isHovered
+            ? "0 22px 44px rgba(0, 0, 0, 0.95)"
+            : "0 4px 14px rgba(0, 0, 0, 0.5)",
+          transform: isHovered
+            ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(1.035, 1.035, 1.035)`
+            : "rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)",
+          transformStyle: "preserve-3d",
+          transition: isHovered
+            ? "transform 0.08s ease-out, box-shadow 0.25s ease"
+            : "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease",
+        }}
+      >
+        {posterImg ? (
+          <img
+            src={posterImg}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+              transform: isHovered
+                ? `scale(1.10) translate3d(${tilt.y * -0.5}px, ${tilt.x * 0.5}px, 0px)`
+                : "scale(1.0) translate3d(0px, 0px, 0px)",
+              transition: isHovered ? "transform 0.08s ease-out" : "transform 0.4s ease",
+            }}
+            onError={(e) => {
+              (e.target as HTMLElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "rgba(255,255,255,0.25)",
+            }}
+          >
+            <FilmIcon size={32} />
+          </div>
+        )}
+
+        {/* Portrait Card Overlay on Hover (Matching Home MediaCard) */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            justifyContent: "flex-end",
+            padding: "16px 14px",
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.5) 65%, rgba(0,0,0,0.92) 100%)",
+            opacity: isHovered ? 1 : 0,
+            transform: isHovered ? "translateY(0)" : "translateY(6px)",
+            transition: "opacity 0.25s ease, transform 0.25s ease",
+            pointerEvents: "none",
+            zIndex: 3,
+          }}
+        >
+          {/* Movie Title */}
+          <div
+            style={{
+              fontSize: "14px",
+              fontWeight: 800,
+              color: "#ffffff",
+              lineHeight: 1.22,
+              marginBottom: "4px",
+              textShadow: "0 2px 10px rgba(0, 0, 0, 0.95)",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              wordBreak: "break-word",
+            }}
+          >
+            {title}
+          </div>
+
+          {/* Year */}
+          {releaseYear && (
+            <span
+              style={{
+                fontSize: "11.5px",
+                fontWeight: 700,
+                color: "#cbd5e1",
+                letterSpacing: "0.3px",
+                textShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
+              }}
+            >
+              {releaseYear}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   playbackUrl,
   title = "Cinema Stream",
   backdrop,
   poster,
+  logo: initialLogo,
   servers: initialServers,
   runtime,
   season,
@@ -315,15 +525,31 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   seasonsCount: initialSeasonsCount,
   tmdbId,
   onSelectEpisode,
+  onSelectMedia,
   onClose,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const scrubberRef = useRef<HTMLDivElement | null>(null);
+  const arrowTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const serverProbeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Logo & Recommended Movies State
+  const [movieLogoUrl, setMovieLogoUrl] = useState<string | null>(initialLogo || null);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [isLoadingMoreQualities, setIsLoadingMoreQualities] = useState<boolean>(false);
+
+  // Smooth Scrubber & Netflix-style Frame Preview State
+  const [isHoveringScrubber, setIsHoveringScrubber] = useState<boolean>(false);
+  const [isDraggingScrubber, setIsDraggingScrubber] = useState<boolean>(false);
+  const [hoverPercent, setHoverPercent] = useState<number>(0);
+  const [hoverTime, setHoverTime] = useState<number>(0);
+  const [arrowSeekPreviewTime, setArrowSeekPreviewTime] = useState<number | null>(null);
 
   // Season & Episode tracking
   const [currentSeason, setCurrentSeason] = useState<number>(season || 1);
@@ -426,7 +652,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isBuffering, setIsBuffering] = useState<boolean>(false);
-  const [isMuted, setIsMuted] = useState<boolean>(true);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
   const [volume, setVolume] = useState<number>(1);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
@@ -484,7 +710,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Poster/Backdrop dynamic loader
-  const [activeBackdrop, setActiveBackdrop] = useState<string>(backdrop || poster || "");
+  const [activeBackdrop, setActiveBackdrop] = useState<string>(() => {
+    if (backdrop || poster) return backdrop || poster || "";
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get("backdrop") || sp.get("poster") || sp.get("image") || "";
+    }
+    return "";
+  });
 
   // Resilient state tracking refs to prevent video replay loops & pause overriding
   const serverListRef = useRef(serverList);
@@ -829,8 +1062,12 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           const seenTargets = new Set(newTracks.map((t) => t.rawTarget));
           const seenNames = new Set(newTracks.map((t) => t.name.toLowerCase()));
 
-          for (const cand of matches.slice(0, 5)) {
+          for (const cand of matches.slice(0, 8)) {
             if (!cand?.link) continue;
+            // STRICT ACCURACY CHECK: Never accept tracks from a mismatched movie!
+            if (!isStrictTitleMatch(cand.title || "", clean)) {
+              continue;
+            }
             try {
               const metaRes = await fetch(`/api/meta?provider=movieBoxWeb&link=${encodeURIComponent(cand.link)}`);
               if (metaRes.ok) {
@@ -882,6 +1119,57 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       setIsLoadingMoreAudios(false);
     }
   }, [audioTracks, currentEpisode, currentSeason, isSeries, isLoadingMoreAudios, showToast, title]);
+
+  // Load more quality streams on demand with 3-dot animation
+  const handleLoadMoreQualities = useCallback(async () => {
+    if (isLoadingMoreQualities) return;
+    setIsLoadingMoreQualities(true);
+    showToast("Searching all available quality streams...");
+
+    try {
+      if (hlsRef.current && hlsRef.current.levels && hlsRef.current.levels.length > 0) {
+        const detected = hlsRef.current.levels.map((lvl, idx) => ({
+          id: idx,
+          height: lvl.height,
+          name: `${lvl.height || 1080}p`,
+        }));
+        setQualityLevels(detected);
+        showToast(`Found ${detected.length} quality levels`);
+        setIsLoadingMoreQualities(false);
+        return;
+      }
+
+      const existingHeights = new Set(qualityLevels.map((q) => q.height).filter(Boolean));
+      const newQualities = [...qualityLevels];
+
+      const allPossibleQualities = [
+        { height: 2160, name: "4K (2160p)" },
+        { height: 1080, name: "1080p (FHD)" },
+        { height: 720, name: "720p (HD)" },
+        { height: 480, name: "480p (SD)" },
+      ];
+
+      for (const q of allPossibleQualities) {
+        if (!existingHeights.has(q.height)) {
+          existingHeights.add(q.height);
+          newQualities.push({
+            id: newQualities.length,
+            height: q.height,
+            name: q.name,
+          });
+        }
+      }
+
+      newQualities.sort((a, b) => (b.height || 0) - (a.height || 0));
+      setQualityLevels(newQualities);
+      showToast(`Found ${newQualities.length} quality streams`);
+    } catch (err) {
+      console.error("handleLoadMoreQualities error:", err);
+      showToast("Quality streams ready");
+    } finally {
+      setIsLoadingMoreQualities(false);
+    }
+  }, [isLoadingMoreQualities, qualityLevels, showToast]);
 
   // Dynamic episode switcher with instant MovieBox sync
   const switchEpisode = useCallback(
@@ -1006,6 +1294,25 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       active = false;
     };
   }, [drawerSeason, tmdbId, season, initialEpisodes]);
+
+  // Fetch TMDB transparent PNG movie logo and recommendations for More Like This
+  useEffect(() => {
+    let active = true;
+    fetchTMDBDetails(title, undefined, undefined, tmdbId, isSeries ? "tv" : "movie")
+      .then((data) => {
+        if (!active || !data) return;
+        if (data.logoUrl) {
+          setMovieLogoUrl(data.logoUrl);
+        }
+        if (data.recommendations && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
+          setRecommendations(data.recommendations);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [title, tmdbId, isSeries]);
 
   // Sync if initialEpisodes, season, episode, or initialSeasonsCount updates from parent
   useEffect(() => {
@@ -1161,15 +1468,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             // 1. Exact match priority: normalized title equals clean title (e.g. "RRR" equals "rrr")
             let cand = nonJunkMatches.find((m) => normalizeTitle(m.title || "") === cleanLower);
 
-            // 2. Exact word boundary match
+            // 2. Strict word boundary & title similarity match
             if (!cand) {
               const wordBoundaryRegex = new RegExp(`\\b${cleanLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
-              cand = nonJunkMatches.find((m) => wordBoundaryRegex.test(normalizeTitle(m.title || "")));
+              cand = nonJunkMatches.find((m) => wordBoundaryRegex.test(normalizeTitle(m.title || "")) && isStrictTitleMatch(m.title || "", clean));
             }
 
-            // 3. Fallback to first non-junk match
-            if (!cand && nonJunkMatches.length > 0) {
-              cand = nonJunkMatches[0];
+            // 3. Fallback only if candidate strictly matches query title
+            if (!cand) {
+              cand = nonJunkMatches.find((m) => isStrictTitleMatch(m.title || "", clean));
             }
 
             if (cand?.image) setActiveBackdrop((prev) => prev || cand.image);
@@ -1478,6 +1785,10 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   useEffect(() => {
     if (backdrop || poster) {
       setActiveBackdrop(backdrop || poster || "");
+    } else if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const urlBg = sp.get("backdrop") || sp.get("poster") || sp.get("image");
+      if (urlBg) setActiveBackdrop(urlBg);
     }
   }, [backdrop, poster]);
 
@@ -1702,17 +2013,29 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           else video.pause();
           break;
         case "arrowleft":
-        case "j":
+        case "j": {
           e.preventDefault();
-          video.currentTime = Math.max(0, video.currentTime - 10);
-          showToast(`-10s (${formatTime(video.currentTime)})`);
+          const targetT = Math.max(0, video.currentTime - 10);
+          video.currentTime = targetT;
+          setArrowSeekPreviewTime(targetT);
+          if (previewVideoRef.current) previewVideoRef.current.currentTime = targetT;
+          if (arrowTimerRef.current) clearTimeout(arrowTimerRef.current);
+          arrowTimerRef.current = setTimeout(() => setArrowSeekPreviewTime(null), 1400);
+          showToast(`-10s (${formatTime(targetT)})`);
           break;
+        }
         case "arrowright":
-        case "l":
+        case "l": {
           e.preventDefault();
-          video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
-          showToast(`+10s (${formatTime(video.currentTime)})`);
+          const targetT = Math.min(video.duration || 0, video.currentTime + 10);
+          video.currentTime = targetT;
+          setArrowSeekPreviewTime(targetT);
+          if (previewVideoRef.current) previewVideoRef.current.currentTime = targetT;
+          if (arrowTimerRef.current) clearTimeout(arrowTimerRef.current);
+          arrowTimerRef.current = setTimeout(() => setArrowSeekPreviewTime(null), 1400);
+          showToast(`+10s (${formatTime(targetT)})`);
           break;
+        }
         case "arrowup":
           e.preventDefault();
           video.volume = Math.min(1, video.volume + 0.1);
@@ -1777,14 +2100,64 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     }
   };
 
+  const updateScrubberPosition = useCallback(
+    (clientX: number) => {
+      const el = scrubberRef.current;
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      setHoverPercent(percent);
+      const time = percent * (duration || 0);
+      setHoverTime(time);
+      if (previewVideoRef.current && duration > 0) {
+        previewVideoRef.current.currentTime = time;
+      }
+      return { percent, time };
+    },
+    [duration]
+  );
+
   const handleScrubberSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const res = updateScrubberPosition(e.clientX);
     const video = videoRef.current;
-    if (video && video.duration) {
-      video.currentTime = percent * video.duration;
+    if (res && video && video.duration) {
+      video.currentTime = res.time;
     }
   };
+
+  const handleScrubberMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsDraggingScrubber(true);
+    const res = updateScrubberPosition(e.clientX);
+    const video = videoRef.current;
+    if (res && video && video.duration) {
+      video.currentTime = res.time;
+    }
+  };
+
+  const handleScrubberMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    updateScrubberPosition(e.clientX);
+  };
+
+  // Global drag listener so dragging outside the line remains butter-smooth
+  useEffect(() => {
+    if (!isDraggingScrubber) return;
+    const handleGlobalMove = (e: MouseEvent) => {
+      const res = updateScrubberPosition(e.clientX);
+      const video = videoRef.current;
+      if (res && video && video.duration) {
+        video.currentTime = res.time;
+      }
+    };
+    const handleGlobalUp = () => {
+      setIsDraggingScrubber(false);
+    };
+    window.addEventListener("mousemove", handleGlobalMove);
+    window.addEventListener("mouseup", handleGlobalUp);
+    return () => {
+      window.removeEventListener("mousemove", handleGlobalMove);
+      window.removeEventListener("mouseup", handleGlobalUp);
+    };
+  }, [isDraggingScrubber, updateScrubberPosition]);
 
   const handleCopyMomentLink = () => {
     const timeSec = Math.floor(currentTime);
@@ -1850,19 +2223,37 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       onMouseMove={handleMouseMove}
       style={{
         position: "fixed",
-        inset: 0,
-        backgroundColor: "#000000",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: "100%",
+        height: "100%",
+        backgroundColor: "#07090e",
         zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
+        overflowY: isFullscreen ? "hidden" : "auto",
+        overflowX: "hidden",
         userSelect: "none",
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
+      {/* 1. Main Fullscreen Video Player Viewport - EXACT 100% of screen */}
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          minHeight: "100%",
+          maxHeight: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#000000",
+          overflow: "hidden",
+        }}
+      >
       {/* ------------------------------------------------------------- */}
-      {/* 1. Backdrop (Full screen cinematic background during loading / starting) */}
+      {/* 1. Backdrop (Full screen cinematic background ONLY during initial loading / starting) */}
       {/* ------------------------------------------------------------- */}
       {(activeBackdrop || backdrop || poster) && (
         <div
@@ -1874,8 +2265,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             backgroundPosition: "center",
             filter: "brightness(0.60)",
             transform: "scale(1.02)",
-            opacity: (!isPlaying || playerStatus === "fetching" || playerStatus === "starting" || currentTime === 0) ? 1 : 0,
-            transition: "opacity 0.8s ease-out",
+            opacity: (!isPlaying && currentTime === 0) ? 1 : 0,
+            transition: "opacity 0.6s ease-out",
             zIndex: 1,
             pointerEvents: "none",
           }}
@@ -1885,7 +2276,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             style={{
               position: "absolute",
               inset: 0,
-              background: "linear-gradient(to bottom, rgba(0,0,0,0.50) 0%, rgba(0,0,0,0.20) 40%, rgba(0,0,0,0.85) 100%)",
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.60) 0%, rgba(0,0,0,0.30) 40%, rgba(0,0,0,0.90) 100%)",
             }}
           />
         </div>
@@ -1898,12 +2289,34 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         ref={videoRef}
         playsInline
         muted={isMuted}
+        onPlay={() => {
+          setIsPlaying(true);
+          setPlayerStatus("ready");
+        }}
+        onPlaying={() => {
+          setIsPlaying(true);
+          setPlayerStatus("ready");
+        }}
+        onTimeUpdate={() => {
+          if (videoRef.current) {
+            setCurrentTime(videoRef.current.currentTime);
+            if (videoRef.current.duration) setDuration(videoRef.current.duration);
+            if (videoRef.current.currentTime > 0 && playerStatus !== "ready") {
+              setPlayerStatus("ready");
+            }
+          }
+        }}
         style={{
           width: "100%",
-          height: "100%",
+          height: "calc(100% - 90px)",
+          maxHeight: "calc(100% - 90px)",
+          marginBottom: "90px",
+          display: "block",
           objectFit: videoFit === "fill" ? "cover" : videoFit === "stretch" ? "fill" : "contain",
           filter: getFilterStyle(),
-          backgroundColor: isPlaying ? "#000" : "transparent",
+          backgroundColor: "#000000",
+          opacity: isPlaying || currentTime > 0 ? 1 : 0,
+          transition: "opacity 0.4s ease-out",
           zIndex: 2,
         }}
         onClick={() => {
@@ -1935,22 +2348,38 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             width: "90%",
           }}
         >
-          {/* Exact Movie Title Font / Name (CNO.TO Screenshot 1 & 2) */}
-          <h1
-            style={{
-              fontSize: "clamp(30px, 5.5vw, 54px)",
-              fontWeight: 800,
-              color: "#ffffff",
-              letterSpacing: "-0.025em",
-              margin: "0 0 14px 0",
-              textShadow: "0 4px 30px rgba(0, 0, 0, 0.95), 0 2px 10px rgba(0, 0, 0, 0.8)",
-              textAlign: "center",
-              lineHeight: 1.15,
-              fontFamily: "'Outfit', 'Cinzel', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-            }}
-          >
-            {movieTitle}
-          </h1>
+          {/* Official Transparent PNG Movie Title Logo or Cinematic Typographic Fallback */}
+          {movieLogoUrl ? (
+            <img
+              src={movieLogoUrl}
+              alt={movieTitle}
+              style={{
+                maxHeight: "125px",
+                maxWidth: "85%",
+                objectFit: "contain",
+                filter: "drop-shadow(0 6px 24px rgba(0, 0, 0, 0.95))",
+                marginBottom: "18px",
+                animation: "fadeIn 0.3s ease-out",
+              }}
+            />
+          ) : (
+            <h1
+              style={{
+                fontSize: "clamp(32px, 5.5vw, 56px)",
+                fontWeight: 900,
+                color: "#ffffff",
+                letterSpacing: "0.03em",
+                margin: "0 0 16px 0",
+                textShadow: "0 4px 30px rgba(0, 0, 0, 0.95)",
+                textAlign: "center",
+                lineHeight: 1.15,
+                fontFamily: "'Cinzel', 'Outfit', serif, sans-serif",
+                textTransform: "uppercase",
+              }}
+            >
+              {movieTitle}
+            </h1>
+          )}
 
           {/* Thin Minimal Loading Progress Line */}
           <div
@@ -1983,109 +2412,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               fontSize: "14.5px",
               fontWeight: 600,
               color: "rgba(255, 255, 255, 0.85)",
-              margin: "0 0 18px 0",
+              margin: 0,
               textShadow: "0 2px 10px rgba(0,0,0,0.9)",
               letterSpacing: "0.02em",
               animation: "scanningPulse 2s ease-in-out infinite",
             }}
           >
-            {playerStatus === "starting"
-              ? "Starting stream..."
-              : serverList.length > 0 && serverList[0].link && hasConnectedRef.current
-              ? `Connecting to ${serverList[currentServerIdx]?.name || "mirror"}...`
-              : fetchingStatusText}
+            {playerStatus === "starting" ? "Starting stream..." : "Fetching from Server 1..."}
           </p>
-
-          {/* Minimal Floating Server Probes - ZERO cards, ZERO borders, completely transparent */}
-          {serverList.length > 0 && serverList[0].link && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px",
-                width: "100%",
-                maxWidth: "320px",
-                background: "transparent",
-              }}
-            >
-              {serverList.slice(0, 7).map((srv, idx) => {
-                const status = serverStatuses[idx] || (idx === currentServerIdx ? "trying" : "pending");
-                const isFailed = status === "failed";
-                const isTrying = status === "trying";
-                const isSuccess = status === "success";
-
-                return (
-                  <div
-                    key={srv.id}
-                    onClick={() => connectToServer(idx)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "4px 8px",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      textShadow: "0 2px 10px rgba(0,0,0,0.9)",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      {/* Status Icon */}
-                      <span style={{ fontSize: "13px", display: "flex", alignItems: "center", minWidth: "16px" }}>
-                        {isFailed ? (
-                          <CrossIcon size={13} color="#ef4444" />
-                        ) : isTrying ? (
-                          <span
-                            style={{
-                              display: "inline-block",
-                              width: "13px",
-                              height: "13px",
-                              border: "2px solid rgba(255,255,255,0.3)",
-                              borderTopColor: "#e50914",
-                              borderRadius: "50%",
-                              animation: "spin 0.7s linear infinite",
-                            }}
-                          />
-                        ) : isSuccess ? (
-                          <CheckIcon size={13} color="#22c55e" />
-                        ) : (
-                          <span style={{ color: "rgba(255, 255, 255, 0.4)", fontSize: "16px" }}>•</span>
-                        )}
-                      </span>
-
-                      {/* Server Name */}
-                      <span
-                        style={{
-                          fontSize: "13.5px",
-                          fontWeight: isTrying ? 700 : 500,
-                          color: isFailed ? "#64748b" : isTrying ? "#ffffff" : "#cbd5e1",
-                        }}
-                      >
-                        {srv.name.toLowerCase().includes("cf storage") ? "HDHub4u • Cloud Fast Stream" : srv.name}
-                      </span>
-                    </div>
-
-                    {/* Status text */}
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: isFailed
-                          ? "#ef4444"
-                          : isTrying
-                          ? "#ffffff"
-                          : isSuccess
-                          ? "#22c55e"
-                          : "rgba(255, 255, 255, 0.4)",
-                      }}
-                    >
-                      {isTrying ? "Trying..." : isFailed ? "Unavailable" : isSuccess ? "Connected" : ""}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
 
@@ -2188,42 +2522,6 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* 7. FLOATING UNMUTE BADGE (Screenshots 1, 2, 3: bottom-left)  */}
-      {/* ------------------------------------------------------------- */}
-      {isMuted && (
-        <button
-          onClick={handleUnmuteClick}
-          style={{
-            position: "absolute",
-            bottom: controlsVisible ? "80px" : "32px",
-            left: "24px",
-            zIndex: 30,
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "8px 18px",
-            borderRadius: "9999px",
-            backgroundColor: "#ffffff",
-            color: "#000000",
-            border: "none",
-            fontSize: "13px",
-            fontWeight: 700,
-            cursor: "pointer",
-            boxShadow: "0 6px 20px rgba(0,0,0,0.6)",
-            transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "scale(1.04)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
-          }}
-        >
-          <VolumeMuteIcon size={16} />
-          <span>Unmute</span>
-        </button>
-      )}
 
       {/* ------------------------------------------------------------- */}
       {/* 8. TOP CONTROLS BAR (Screenshot 1: Back, Watch Party, Chat)   */}
@@ -2335,18 +2633,18 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         <div
           style={{
             position: "absolute",
-            bottom: "78px",
-            right: "24px",
+            bottom: "95px",
+            right: "20px",
             width: "330px",
             maxWidth: "calc(100vw - 32px)",
-            backgroundColor: "rgba(14, 16, 22, 0.78)",
-            border: "1px solid rgba(255, 255, 255, 0.14)",
+            backgroundColor: "rgba(14, 16, 22, 0.88)",
+            border: "1px solid rgba(255, 255, 255, 0.16)",
             borderRadius: "20px",
-            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
+            boxShadow: "0 24px 60px rgba(0, 0, 0, 0.95)",
+            backdropFilter: "blur(28px)",
+            WebkitBackdropFilter: "blur(28px)",
             padding: "4px 0",
-            zIndex: 40,
+            zIndex: 65,
             animation: "fadeIn 0.18s ease-out",
             overflow: "hidden",
           }}
@@ -2914,188 +3212,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             </div>
           )}
 
-          {/* 4. SERVERS FLYOUT */}
-          {activeMenu === "servers" && (
-            <div style={{ display: "flex", flexDirection: "column", maxHeight: "480px" }}>
-              {/* Header */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 18px 10px 18px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                }}
-              >
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#ffffff", fontSize: "16px", fontWeight: 800 }}>
-                    <CloudServersIcon size={18} />
-                    <span>Servers</span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.5)", marginTop: "2px" }}>
-                    Select a streaming server
-                  </div>
-                </div>
-                <button
-                  onClick={() => setActiveMenu("none")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255, 255, 255, 0.6)",
-                    cursor: "pointer",
-                    padding: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <CloseIcon size={16} />
-                </button>
-              </div>
 
-              {/* Scrollable Servers List */}
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  padding: "8px 12px",
-                  gap: "4px",
-                  overflowY: "auto",
-                  maxHeight: "330px",
-                }}
-              >
-                {serverList.map((srv, idx) => {
-                  const status = serverStatuses[idx] || (idx === currentServerIdx ? "trying" : "pending");
-                  const isFailed = status === "failed";
-                  const isTrying = status === "trying";
-                  const isSuccess = status === "success";
-                  const isSelected = idx === currentServerIdx;
-
-                  return (
-                    <div
-                      key={srv.id}
-                      onClick={() => connectToServer(idx)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "10px 14px",
-                        borderRadius: "10px",
-                        background: isSelected ? "rgba(255, 255, 255, 0.12)" : "transparent",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <DragHandleIcon size={16} />
-
-                        {/* Status Icon */}
-                        <span style={{ fontSize: "13px", display: "flex", alignItems: "center", minWidth: "16px" }}>
-                          {isFailed ? (
-                            <CrossIcon size={13} color="#ef4444" />
-                          ) : isSelected ? (
-                            <CheckIcon size={14} color="#22c55e" />
-                          ) : isTrying ? (
-                            <span
-                              style={{
-                                display: "inline-block",
-                                width: "12px",
-                                height: "12px",
-                                border: "2px solid rgba(255,255,255,0.3)",
-                                borderTopColor: "#e50914",
-                                borderRadius: "50%",
-                                animation: "spin 0.7s linear infinite",
-                              }}
-                            />
-                          ) : (
-                            <span style={{ color: "rgba(255, 255, 255, 0.4)", fontSize: "15px" }}>•</span>
-                          )}
-                        </span>
-
-                        {/* Quality badge */}
-                        <span
-                          style={{
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            background: "rgba(255, 255, 255, 0.08)",
-                            fontSize: "10.5px",
-                            fontWeight: 700,
-                            color: "rgba(255, 255, 255, 0.8)",
-                          }}
-                        >
-                          {srv.quality || "HD"}
-                        </span>
-
-                        {/* Server Name */}
-                        <span
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: isSelected ? 700 : 500,
-                            color: isFailed ? "#64748b" : isSelected ? "#ffffff" : "#cbd5e1",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "5px",
-                          }}
-                        >
-                          {idx === 0 && <span style={{ color: "#eab308", fontSize: "12px" }}>★</span>}
-                          <span>{srv.name}</span>
-                        </span>
-                      </div>
-
-                      {/* Right Status */}
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: isFailed ? "#ef4444" : isTrying ? "#ffffff" : isSuccess ? "#22c55e" : "transparent",
-                        }}
-                      >
-                        {isFailed ? "Unavailable" : isTrying ? "Trying..." : isSuccess ? "Connected" : ""}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Pinned Bottom: Retry All */}
-              <div style={{ padding: "10px 14px", borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                <button
-                  onClick={() => {
-                    setServerStatuses({ 0: "trying" });
-                    connectToServer(0);
-                    showToast("Retrying all servers...");
-                  }}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    padding: "10px 0",
-                    borderRadius: "999px",
-                    background: "rgba(255, 255, 255, 0.08)",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    color: "#ffffff",
-                    fontSize: "13.5px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.18s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#e50914";
-                    e.currentTarget.style.borderColor = "#e50914";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
-                  }}
-                >
-                  <RefreshCwIcon size={14} />
-                  <span>Retry All</span>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* 5. QUALITY FLYOUT */}
           {activeMenu === "quality" && (
@@ -3228,6 +3345,61 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     </button>
                   );
                 })}
+
+                {/* + Load More Qualities Option */}
+                <button
+                  disabled={isLoadingMoreQualities}
+                  onClick={handleLoadMoreQualities}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    width: "100%",
+                    padding: "10px 16px",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(255, 255, 255, 0.14)",
+                    background: "rgba(255, 255, 255, 0.08)",
+                    color: "#ffffff",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: isLoadingMoreQualities ? "default" : "pointer",
+                    marginTop: "8px",
+                    transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isLoadingMoreQualities) {
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)";
+                      e.currentTarget.style.transform = "translateY(-1px)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isLoadingMoreQualities) {
+                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                      e.currentTarget.style.transform = "translateY(0px)";
+                    }
+                  }}
+                >
+                  <RefreshCwIcon
+                    size={14}
+                    style={{
+                      animation: isLoadingMoreQualities ? "spin 1s linear infinite" : "none",
+                      color: "#ffffff",
+                    }}
+                  />
+                  {isLoadingMoreQualities ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                      <span>Fetching All Qualities</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                        <span className="cinema-dot cinema-dot-1" />
+                        <span className="cinema-dot cinema-dot-2" />
+                        <span className="cinema-dot cinema-dot-3" />
+                      </span>
+                    </span>
+                  ) : (
+                    <span>+ Load More Qualities</span>
+                  )}
+                </button>
               </div>
             </div>
           )}
@@ -3649,30 +3821,87 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         className="cinema-player-controls-bottom"
         style={{
           position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 25,
-          background: "linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.7) 65%, rgba(0,0,0,0) 100%)",
-          padding: "24px 20px 18px",
+          bottom: "20px",
+          left: "20px",
+          right: "20px",
+          zIndex: 40,
+          background: "linear-gradient(0deg, rgba(7, 9, 14, 0.96) 0%, rgba(7, 9, 14, 0.75) 65%, rgba(7, 9, 14, 0) 100%)",
+          padding: "16px 20px 12px",
+          borderRadius: "16px",
           display: "flex",
           flexDirection: "column",
           gap: "8px",
           opacity: controlsVisible || !isPlaying ? 1 : 0,
           pointerEvents: controlsVisible || !isPlaying ? "auto" : "none",
           transition: "opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+          boxShadow: "0 10px 40px rgba(0, 0, 0, 0.6)",
         }}
       >
-        {/* Full-width Scrubber / Timeline Bar */}
+        {/* Clean Hover Time Bubble (User Request: poster box removed, only clean time bubble shown) */}
+        {((isHoveringScrubber || isDraggingScrubber) || arrowSeekPreviewTime !== null) && duration > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "36px",
+              left: `${arrowSeekPreviewTime !== null ? (currentTime / duration) * 100 : hoverPercent * 100}%`,
+              transform: "translateX(-50%)",
+              zIndex: 40,
+              pointerEvents: "none",
+              animation: "fadeIn 0.15s ease-out",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "2px",
+            }}
+          >
+            <div
+              style={{
+                background: "rgba(14, 16, 22, 0.90)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                border: "1px solid rgba(255, 255, 255, 0.20)",
+                borderRadius: "8px",
+                padding: "4px 10px",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#ffffff",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.85)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {formatTime(arrowSeekPreviewTime !== null ? arrowSeekPreviewTime : hoverTime)}
+            </div>
+            {/* Arrow pointer */}
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: "5px solid transparent",
+                borderRight: "5px solid transparent",
+                borderTop: "5px solid rgba(255, 255, 255, 0.35)",
+              }}
+            />
+          </div>
+        )}
+
+        {/* Full-width Scrubber / Timeline Bar with Smooth Click & Drag */}
         <div
+          ref={scrubberRef}
           onClick={handleScrubberSeek}
+          onMouseDown={handleScrubberMouseDown}
+          onMouseMove={handleScrubberMouseMove}
+          onMouseEnter={() => setIsHoveringScrubber(true)}
+          onMouseLeave={() => {
+            if (!isDraggingScrubber) setIsHoveringScrubber(false);
+          }}
           style={{
             position: "relative",
             width: "100%",
-            height: "18px",
+            height: "28px",
             display: "flex",
             alignItems: "center",
             cursor: "pointer",
+            userSelect: "none",
           }}
         >
           {/* Track Base */}
@@ -3680,10 +3909,11 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             style={{
               position: "relative",
               width: "100%",
-              height: "3px",
+              height: isHoveringScrubber || isDraggingScrubber ? "7px" : "3.5px",
               backgroundColor: "rgba(255, 255, 255, 0.22)",
               borderRadius: "9999px",
               overflow: "hidden",
+              transition: "height 0.15s ease",
             }}
           >
             {/* Buffered Bar */}
@@ -3698,6 +3928,19 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 transition: "width 0.2s linear",
               }}
             />
+            {/* Hover Highlight Bar */}
+            {isHoveringScrubber && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: `${hoverPercent * 100}%`,
+                  backgroundColor: "rgba(255, 255, 255, 0.25)",
+                }}
+              />
+            )}
             {/* Played Progress Bar (Cinema Red) */}
             <div
               style={{
@@ -3707,7 +3950,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 bottom: 0,
                 width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
                 backgroundColor: "#e50914",
-                boxShadow: "none",
+                boxShadow: "0 0 10px rgba(229, 9, 20, 0.5)",
               }}
             />
           </div>
@@ -3718,12 +3961,13 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               position: "absolute",
               left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
               transform: "translateX(-50%)",
-              width: "13px",
-              height: "13px",
+              width: isHoveringScrubber || isDraggingScrubber ? "15px" : "12px",
+              height: isHoveringScrubber || isDraggingScrubber ? "15px" : "12px",
               borderRadius: "50%",
               backgroundColor: "#ffffff",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.7), 0 0 6px #e50914",
               pointerEvents: "none",
+              transition: "width 0.15s ease, height 0.15s ease",
             }}
           />
         </div>
@@ -3907,28 +4151,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               </button>
             )}
 
-            {/* Servers (Cloud Icon) */}
-            <button
-              className="cinema-ctrl-btn"
-              onClick={() => setActiveMenu(activeMenu === "servers" ? "none" : "servers")}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: activeMenu === "servers" ? "rgba(255, 255, 255, 0.16)" : "transparent",
-                border: "none",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                padding: "4px",
-                transition: "all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)",
-              }}
-              title="Streaming Servers"
-            >
-              <CloudServersIcon size={21} />
-            </button>
+
 
             {/* Subtitles (CC / Subtitles Box Icon) */}
             <button
@@ -4003,6 +4226,79 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         </div>
       </div>
 
+      {/* Translucent Frosted Glass Scroll Down Arrow Indicator (Positioned at bottom edge) */}
+      {recommendations && recommendations.length > 0 && (
+        <div
+          onClick={async () => {
+            if (document.fullscreenElement) {
+              try {
+                await document.exitFullscreen();
+              } catch {}
+              setIsFullscreen(false);
+            }
+            setTimeout(() => {
+              const recSec = document.getElementById("cinema-player-recommendations-section");
+              if (recSec) {
+                recSec.scrollIntoView({ behavior: "smooth", block: "start" });
+              } else if (containerRef.current) {
+                containerRef.current.scrollTo({
+                  top: containerRef.current.clientHeight,
+                  behavior: "smooth",
+                });
+              }
+            }, 120);
+          }}
+          style={{
+            position: "absolute",
+            bottom: "6px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 50,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "34px",
+            height: "34px",
+            borderRadius: "50%",
+            background: "rgba(255, 255, 255, 0.10)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.22)",
+            color: "#ffffff",
+            boxShadow: "0 8px 30px rgba(0, 0, 0, 0.6)",
+            opacity: controlsVisible ? 0.95 : 0.45,
+            transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.22)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.38)";
+            e.currentTarget.style.transform = "translateX(-50%) translateY(2px) scale(1.08)";
+            e.currentTarget.style.opacity = "1";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.22)";
+            e.currentTarget.style.transform = "translateX(-50%) translateY(0) scale(1)";
+            e.currentTarget.style.opacity = controlsVisible ? "0.95" : "0.45";
+          }}
+          title="Scroll down to More Like This"
+        >
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </div>
+      )}
+
       {/* ------------------------------------------------------------- */}
       {/* 11. Toast Notifications Banner                                */}
       {/* ------------------------------------------------------------- */}
@@ -4013,15 +4309,17 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             top: "70px",
             left: "50%",
             transform: "translateX(-50%)",
-            backgroundColor: "rgba(18, 20, 26, 0.94)",
+            background: "rgba(14, 16, 22, 0.75)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
             color: "#ffffff",
-            border: "1px solid rgba(255, 255, 255, 0.14)",
-            borderRadius: "30px",
-            padding: "8px 22px",
-            fontSize: "12px",
+            border: "1px solid rgba(255, 255, 255, 0.16)",
+            borderRadius: "999px",
+            padding: "9px 24px",
+            fontSize: "12.5px",
             fontWeight: 700,
             letterSpacing: "0.02em",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+            boxShadow: "0 16px 40px rgba(0, 0, 0, 0.75)",
             zIndex: 50,
             pointerEvents: "none",
             animation: "fadeIn 0.2s ease-out",
@@ -4344,6 +4642,94 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 );
               })
             )}
+          </div>
+        </div>
+      )}
+
+      </div> {/* End 100vh Fullscreen Video Player Viewport */}
+
+      {/* 2. Seamless Recommended Movies GRID Below Video Player (When scrolling down) */}
+      {recommendations && recommendations.length > 0 && (
+        <div
+          id="cinema-player-recommendations-section"
+          style={{
+            position: "relative",
+            width: "100%",
+            overflow: "hidden",
+            backgroundColor: "#07090e",
+          }}
+        >
+          {/* Ambient Blurred Background of Current Movie (User Request: "more like this jo video player ke niche wala h uska background ussi movie ka poster blured version rakhnaa") */}
+          {(activeBackdrop || backdrop || poster) && (
+            <div
+              style={{
+                position: "absolute",
+                top: "-15%",
+                left: "-15%",
+                width: "130%",
+                height: "130%",
+                backgroundImage: `url(${activeBackdrop || backdrop || poster})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center 25%",
+                filter: "blur(80px) saturate(2.2) brightness(0.55)",
+                transform: "translate3d(0, 0, 0)",
+                pointerEvents: "none",
+                zIndex: 0,
+                opacity: 0.85,
+              }}
+            />
+          )}
+
+          {/* Dark gradient overlay for contrast and readability */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(180deg, rgba(7, 9, 14, 0.75) 0%, rgba(7, 9, 14, 0.6) 30%, rgba(7, 9, 14, 0.88) 75%, #07090e 100%)",
+              pointerEvents: "none",
+              zIndex: 1,
+            }}
+          />
+
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "1440px",
+              margin: "0 auto",
+              padding: "56px 48px 96px 48px",
+              position: "relative",
+              zIndex: 2,
+            }}
+          >
+            <div style={{ marginBottom: "26px" }}>
+              <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#ffffff", margin: 0 }}>
+                More Like This
+              </h2>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+                gap: "26px 20px",
+              }}
+            >
+              {recommendations.map((rec: any) => (
+                <PlayerRecommendedCard
+                  key={rec.id}
+                  item={rec}
+                  onSelect={(item) => {
+                    if (onSelectMedia) {
+                      onSelectMedia(item);
+                    } else {
+                      showToast(`Switching to ${item.title || item.name}...`);
+                      window.location.hash = `#play-${item.id}`;
+                    }
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}

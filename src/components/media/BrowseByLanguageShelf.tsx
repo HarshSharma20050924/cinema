@@ -47,7 +47,7 @@ const LanguageCard: React.FC<LanguageCardProps> = ({
         style={{
           position: "relative",
           width: "330px",
-          height: "185px",
+          height: "205px",
           borderRadius: "16px",
           overflow: "hidden",
           cursor: "pointer",
@@ -80,9 +80,9 @@ const LanguageCard: React.FC<LanguageCardProps> = ({
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            objectPosition: "center 25%",
+            objectPosition: language.objectPosition || "center center",
             transform: isHovered
-              ? `scale(1.12) translate3d(${tilt.y * -0.6}px, ${tilt.x * 0.6}px, 0px)`
+              ? `scale(1.10) translate3d(${tilt.y * -0.5}px, ${tilt.x * 0.5}px, 0px)`
               : "scale(1.0) translate3d(0px, 0px, 0px)",
             transition: isHovered
               ? "transform 0.08s ease-out"
@@ -95,7 +95,7 @@ const LanguageCard: React.FC<LanguageCardProps> = ({
           style={{
             position: "absolute",
             inset: 0,
-            background: `linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.4) 100%), linear-gradient(135deg, ${language.color} 0%, transparent 65%)`,
+            background: `linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.18) 45%, rgba(0,0,0,0.35) 100%), linear-gradient(135deg, ${language.color} 0%, transparent 65%)`,
             pointerEvents: "none",
           }}
         />

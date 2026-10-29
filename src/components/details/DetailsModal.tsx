@@ -266,6 +266,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     setHeroPosterLoaded(false);
     setBackdropLoaded(false);
     setLetterboxd(null);
+    setTmdb(null);
   }, [post?.link, post?.title]);
 
   // Fetch TMDB metadata on post/details change
@@ -528,7 +529,60 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   const handleDownloadDirectUrl = (url: string, serverName: string, label?: string, headers?: Record<string, string>) => {
     if (!url) return;
 
-    // 0. Intermediate hosters & shortlink protectors (e.g. OlaMovies links.ol-am.top, katdrive, send.cm)
+    // 0. Intermediate hosters & cloud resolvers (e.g. HDHub4u HubDrive / HubCloud / KatDrive / GDrive)
+    // STRICT MANDATE: Never redirect user to HubDrive website. Resolve direct download link asynchronously!
+    if (
+      url.includes("hubdrive") ||
+      url.includes("hubcloud") ||
+      url.includes("katdrive") ||
+      url.includes("drive.google") ||
+      url.includes("/drive/") ||
+      url.includes("/archives/") ||
+      (isLandingPageUrl(url) && !url.includes("links.ol-am.top"))
+    ) {
+      const backendUrl = getBackendUrl();
+      const cleanFileName = `${displayTitle} - ${label || serverName}`.replace(/[^a-zA-Z0-9._-]/g, "_") + ".mp4";
+      const prov = url.includes("4khd") ? "4khdhub" : "hdhub4u";
+      
+      // Attempt backend stream extractor with download=true to obtain direct Pixeldrain, FastDL, or CF Storage link
+      fetch(`${backendUrl}/api/streams?provider=${prov}&link=${encodeURIComponent(url)}&type=${isSeries ? "series" : "movie"}&download=true`)
+        .then((r) => (r.ok ? r.json() : []))
+        .then((directList) => {
+          if (Array.isArray(directList) && directList.length > 0) {
+            const cand =
+              directList.find(
+                (s: any) =>
+                  s.link &&
+                  (s.link.includes("pixeldrain") ||
+                    s.link.includes("fastdl") ||
+                    s.link.includes("cloudflarestorage") ||
+                    s.link.includes("gofile") ||
+                    s.link.includes("r2.dev"))
+              ) || directList[0];
+
+            if (cand && cand.link && !cand.link.includes("hubdrive") && !cand.link.includes("hubcloud")) {
+              handleDownloadDirectUrl(cand.link, cand.server || serverName, label, cand.headers || headers);
+              return;
+            }
+          }
+          // Direct backend download proxy fallback (zero redirect!)
+          const proxyUrl = `${backendUrl}/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFileName)}`;
+          downloadManager.startDownload(proxyUrl, displayTitle, cleanFileName);
+          if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
+            setIsDownloadManagerOpen(true);
+          }
+        })
+        .catch(() => {
+          const proxyUrl = `${backendUrl}/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFileName)}`;
+          downloadManager.startDownload(proxyUrl, displayTitle, cleanFileName);
+          if (typeof window !== "undefined" && (window as any).CinemaDesktop?.isDesktop) {
+            setIsDownloadManagerOpen(true);
+          }
+        });
+      return;
+    }
+
+    // 0.1 Shortlink protectors (e.g. OlaMovies locked pages)
     if (isLandingPageUrl(url) || url.includes("links.ol-am.top") || url.includes("links.olamovies") || url.includes("ol-am.top") || url.includes("/locked?")) {
       window.open(url, "_blank", "noopener,noreferrer");
       return;
@@ -1025,8 +1079,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
             transform: "translate3d(0, 0, 0)",
             pointerEvents: "none",
             zIndex: 0,
-            opacity: heroIntroStage === "fullscreen" ? 0 : 1,
-            transition: "opacity 0.4s ease",
+            opacity: (!backdropLoaded || heroIntroStage === "fullscreen") ? 0 : 1,
+            transition: "opacity 0.5s ease",
           }}
         />
       )}

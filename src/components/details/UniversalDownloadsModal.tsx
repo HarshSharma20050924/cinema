@@ -570,7 +570,7 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
             </div>
           ) : (
             <>
-              {visibleLinks.map((link) => {
+              {visibleLinks.map((link, idx) => {
                 const isCopied = copiedId === link.id;
                 const isMovieBox = link.isMovieBox || link.provider.toLowerCase().includes("moviebox");
                 return (
@@ -602,7 +602,7 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px", flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                         <span style={{ fontWeight: 800, fontSize: "14px", color: "#ffffff" }}>
-                          {link.serverName && link.serverName.startsWith("Server ") ? link.serverName : `Server ${index + 1}`}
+                          {link.serverName || `Server ${idx + 1}`}
                         </span>
                         <span style={{ color: "rgba(255, 255, 255, 0.4)", fontSize: "12px" }}>•</span>
                         <span

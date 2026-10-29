@@ -87,6 +87,7 @@ export interface TMDBDetails {
 const TMDB_API_KEY = "cfe422613b250f702980a3bbf9e90716";
 const BASE_URL = "https://api.themoviedb.org/3";
 const IMG_BASE_W500 = "https://image.tmdb.org/t/p/w500";
+const IMG_BASE_W1280 = "https://image.tmdb.org/t/p/w1280";
 const IMG_BASE_ORIGINAL = "https://image.tmdb.org/t/p/original";
 const IMG_BASE_W185 = "https://image.tmdb.org/t/p/w185";
 
@@ -346,7 +347,7 @@ export async function fetchTMDBDetails(
     const rawBackdrops = data.images?.backdrops || [];
     const screenshots: string[] = rawBackdrops
       .slice(0, 15)
-      .map((b: any) => `${IMG_BASE_ORIGINAL}${b.file_path}`)
+      .map((b: any) => `${IMG_BASE_W1280}${b.file_path}`)
       .filter(Boolean);
 
     // Parse posters
@@ -386,7 +387,7 @@ export async function fetchTMDBDetails(
         rawLogos.find((l: any) => !l.iso_639_1) ||
         rawLogos[0];
       if (enLogo && enLogo.file_path) {
-        logoUrl = `${IMG_BASE_ORIGINAL}${enLogo.file_path}`;
+        logoUrl = `${IMG_BASE_W500}${enLogo.file_path}`;
       }
     }
 
@@ -405,7 +406,7 @@ export async function fetchTMDBDetails(
       id: r.id,
       title: r.title || r.name,
       poster_path: r.poster_path ? `${IMG_BASE_W500}${r.poster_path}` : null,
-      backdrop_path: r.backdrop_path ? `${IMG_BASE_ORIGINAL}${r.backdrop_path}` : null,
+      backdrop_path: r.backdrop_path ? `${IMG_BASE_W1280}${r.backdrop_path}` : null,
       vote_average: r.vote_average,
       release_date: r.release_date || r.first_air_date,
     }));
@@ -416,7 +417,7 @@ export async function fetchTMDBDetails(
       id: s.id,
       title: s.title || s.name,
       poster_path: s.poster_path ? `${IMG_BASE_W500}${s.poster_path}` : null,
-      backdrop_path: s.backdrop_path ? `${IMG_BASE_ORIGINAL}${s.backdrop_path}` : null,
+      backdrop_path: s.backdrop_path ? `${IMG_BASE_W1280}${s.backdrop_path}` : null,
       vote_average: s.vote_average,
       release_date: s.release_date || s.first_air_date,
     }));
@@ -491,7 +492,7 @@ export async function fetchTMDBDetails(
     return {
       id: data.id,
       title: data.title || data.name,
-      backdropUrl: data.backdrop_path ? `${IMG_BASE_ORIGINAL}${data.backdrop_path}` : null,
+      backdropUrl: data.backdrop_path ? `${IMG_BASE_W1280}${data.backdrop_path}` : null,
       posterUrl: data.poster_path ? `${IMG_BASE_W500}${data.poster_path}` : null,
       logoUrl,
       rating,
@@ -539,6 +540,20 @@ export async function fetchTMDBDetails(
   }
 }
 
+export interface TMDBPersonCreditItem {
+  id: number;
+  credit_id?: string;
+  title: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  vote_average?: number;
+  release_date?: string;
+  character?: string;
+  media_type: "movie" | "tv";
+  popularity?: number;
+  vote_count?: number;
+}
+
 export interface TMDBPersonDetails {
   id: number;
   name: string;
@@ -547,8 +562,13 @@ export interface TMDBPersonDetails {
   place_of_birth: string | null;
   biography: string;
   profile_path: string | null;
+  known_for_department?: string;
+  imdb_id?: string | null;
   movies: TMDBMediaItem[];
   tvShows: TMDBMediaItem[];
+  knownFor: TMDBPersonCreditItem[];
+  allCredits: TMDBPersonCreditItem[];
+  heroBackdrop?: string | null;
 }
 
 export async function fetchTMDBPersonDetails(personId: number): Promise<TMDBPersonDetails | null> {
@@ -561,33 +581,99 @@ export async function fetchTMDBPersonDetails(personId: number): Promise<TMDBPers
 
     const rawCredits = data.combined_credits?.cast || [];
 
-    // Sort by popularity / vote_count desc
-    const sortedCredits = [...rawCredits].sort(
-      (a: any, b: any) => (b.vote_count || 0) - (a.vote_count || 0)
+    // Filter valid credits with poster_path and title/name
+    const validCredits = rawCredits.filter(
+      (c: any) => (c.poster_path || c.backdrop_path) && (c.title || c.name)
     );
 
-    const movies: TMDBMediaItem[] = sortedCredits
-      .filter((c: any) => c.media_type === "movie" && c.poster_path)
-      .slice(0, 36)
-      .map((m: any) => ({
+    // 1. KNOWN FOR: Sort by popularity & vote_count descending, deduplicate by ID
+    const sortedByPopularity = [...validCredits].sort(
+      (a: any, b: any) =>
+        ((b.vote_count || 0) * (b.vote_average || 1)) -
+        ((a.vote_count || 0) * (a.vote_average || 1))
+    );
+
+    const seenKnownForIds = new Set<number>();
+    const knownFor: TMDBPersonCreditItem[] = [];
+    for (const item of sortedByPopularity) {
+      if (!seenKnownForIds.has(item.id)) {
+        seenKnownForIds.add(item.id);
+        knownFor.push({
+          id: item.id,
+          credit_id: item.credit_id || String(item.id),
+          title: item.title || item.name || "Untitled",
+          poster_path: item.poster_path ? `${IMG_BASE_W500}${item.poster_path}` : null,
+          backdrop_path: item.backdrop_path ? `${IMG_BASE_W1280}${item.backdrop_path}` : null,
+          vote_average: item.vote_average,
+          release_date: item.release_date || item.first_air_date,
+          character: item.character || "",
+          media_type: item.media_type === "tv" ? "tv" : "movie",
+          popularity: item.popularity,
+          vote_count: item.vote_count,
+        });
+        if (knownFor.length >= 8) break;
+      }
+    }
+
+    // Hero backdrop: top known-for movie's backdrop, or poster
+    const heroBackdrop =
+      knownFor[0]?.backdrop_path ||
+      (knownFor[0]?.poster_path ? knownFor[0].poster_path : null) ||
+      null;
+
+    // 2. ALL FILMOGRAPHY CREDITS: Sorted by release date descending (newest first)
+    const sortedByDate = [...validCredits].sort((a: any, b: any) => {
+      const dateA = a.release_date || a.first_air_date || "";
+      const dateB = b.release_date || b.first_air_date || "";
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateB.localeCompare(dateA);
+    });
+
+    const seenCreditIds = new Set<string>();
+    const allCredits: TMDBPersonCreditItem[] = [];
+    for (let idx = 0; idx < sortedByDate.length; idx++) {
+      const c = sortedByDate[idx];
+      const uniqueKey = `${c.media_type || "m"}-${c.id}-${c.credit_id || idx}`;
+      if (!seenCreditIds.has(uniqueKey)) {
+        seenCreditIds.add(uniqueKey);
+        allCredits.push({
+          id: c.id,
+          credit_id: uniqueKey,
+          title: c.title || c.name || "Untitled",
+          poster_path: c.poster_path ? `${IMG_BASE_W500}${c.poster_path}` : null,
+          backdrop_path: c.backdrop_path ? `${IMG_BASE_W1280}${c.backdrop_path}` : null,
+          vote_average: c.vote_average,
+          release_date: c.release_date || c.first_air_date,
+          character: c.character || "",
+          media_type: c.media_type === "tv" ? "tv" : "movie",
+          popularity: c.popularity,
+          vote_count: c.vote_count,
+        });
+      }
+    }
+
+    // Backwards compatibility for movies and tvShows
+    const movies: TMDBMediaItem[] = allCredits
+      .filter((c) => c.media_type === "movie")
+      .map((m) => ({
         id: m.id,
-        title: m.title || m.name,
-        poster_path: m.poster_path ? `${IMG_BASE_W500}${m.poster_path}` : null,
-        backdrop_path: m.backdrop_path ? `${IMG_BASE_ORIGINAL}${m.backdrop_path}` : null,
+        title: m.title,
+        poster_path: m.poster_path,
+        backdrop_path: m.backdrop_path,
         vote_average: m.vote_average,
         release_date: m.release_date,
       }));
 
-    const tvShows: TMDBMediaItem[] = sortedCredits
-      .filter((c: any) => c.media_type === "tv" && c.poster_path)
-      .slice(0, 36)
-      .map((t: any) => ({
+    const tvShows: TMDBMediaItem[] = allCredits
+      .filter((c) => c.media_type === "tv")
+      .map((t) => ({
         id: t.id,
-        title: t.name || t.title,
-        poster_path: t.poster_path ? `${IMG_BASE_W500}${t.poster_path}` : null,
-        backdrop_path: t.backdrop_path ? `${IMG_BASE_ORIGINAL}${t.backdrop_path}` : null,
+        title: t.title,
+        poster_path: t.poster_path,
+        backdrop_path: t.backdrop_path,
         vote_average: t.vote_average,
-        release_date: t.first_air_date,
+        release_date: t.release_date,
       }));
 
     return {
@@ -598,8 +684,13 @@ export async function fetchTMDBPersonDetails(personId: number): Promise<TMDBPers
       place_of_birth: data.place_of_birth,
       biography: data.biography || "",
       profile_path: data.profile_path ? `${IMG_BASE_W500}${data.profile_path}` : null,
+      known_for_department: data.known_for_department || "Acting",
+      imdb_id: data.imdb_id || null,
       movies,
       tvShows,
+      knownFor,
+      allCredits,
+      heroBackdrop,
     };
   } catch (err) {
     console.error("fetchTMDBPersonDetails error:", err);
