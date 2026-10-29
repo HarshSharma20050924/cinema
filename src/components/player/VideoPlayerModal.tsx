@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import Hls from "hls.js";
 import { launchExternalPlayer } from "../../hooks/useSettings";
 import { fetchTMDBDetails, fetchTMDBSeasonDetails } from "../../api/tmdb";
+import { saveContinueWatching } from "../../utils/continueWatchingService";
 
 const cleanAudioName = (raw: string): string => {
   if (!raw) return "Original Audio";
@@ -81,6 +82,8 @@ export interface VideoPlayerModalProps {
   episodes?: Array<{ episodeNumber: number; title: string; image?: string; link?: string; overview?: string }>;
   seasonsCount?: number;
   tmdbId?: number;
+  initialTime?: number;
+  post?: any;
   onSelectEpisode?: (seasonNum: number, episodeNum: number) => void;
   onSelectMedia?: (media: any) => void;
   onClose: () => void;
@@ -524,6 +527,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   episodes: initialEpisodes,
   seasonsCount: initialSeasonsCount,
   tmdbId,
+  initialTime,
+  post,
   onSelectEpisode,
   onSelectMedia,
   onClose,
@@ -532,6 +537,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const scrubberRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingScrubberRef = useRef<boolean>(false);
   const arrowTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -724,6 +730,38 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   serverListRef.current = serverList;
   const hasConnectedRef = useRef(false);
   const userPausedRef = useRef(false);
+  const hasResumedRef = useRef(false);
+  const lastSavedTimeRef = useRef(0);
+  const pendingSeekTimeRef = useRef<number | null>(null);
+
+  // Automatic progress persistence to Continue Watching Service
+  const saveCurrentProgress = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const curr = video.currentTime;
+    const dur = (video.duration && !isNaN(video.duration) && video.duration > 0) ? video.duration : (duration || 0);
+    if (curr < 4 || isNaN(curr)) return;
+    if (Math.abs(curr - lastSavedTimeRef.current) < 2) return;
+    lastSavedTimeRef.current = curr;
+
+    const itemId = String(post?.id || post?.link || tmdbId || title || "video");
+    saveContinueWatching({
+      id: itemId,
+      title: title || "Movie",
+      cleanTitle: title,
+      poster: poster || backdrop || post?.image || "",
+      backdrop: backdrop || poster || post?.image || "",
+      currentTime: curr,
+      duration: dur,
+      playbackUrl: playbackUrl || "",
+      servers: serverListRef.current,
+      isSeries: !!(season || episode || (initialEpisodes && initialEpisodes.length > 0)),
+      season,
+      episode,
+      tmdbId,
+      post,
+    });
+  }, [title, poster, backdrop, playbackUrl, season, episode, tmdbId, post, duration, initialEpisodes]);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -790,6 +828,8 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
+    const previousTime = video.currentTime > 2 ? video.currentTime : 0;
+
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -826,8 +866,16 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     if (isM3u8 && Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
+        lowLatencyMode: false, // VoD movies must use deep buffer ahead, not low-latency live mode
         backBufferLength: 90,
+        maxBufferLength: 60, // 60 seconds buffer ahead
+        maxMaxBufferLength: 600, // up to 10 minutes cache
+        maxBufferSize: 60 * 1000 * 1000, // 60MB max buffer
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        nudgeOffset: 0.1,
+        nudgeMaxRetry: 5,
+        maxFragLookUpTolerance: 0.25,
       });
 
       hls.loadSource(safeUrl);
@@ -874,6 +922,22 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
         // Transition from "Fetching Media" -> "Starting" state
         setPlayerStatus("starting");
+
+        const targetResume = (initialTime && initialTime > 4 && !hasResumedRef.current)
+          ? initialTime
+          : (previousTime > 2 ? previousTime : 0);
+
+        if (targetResume > 0) {
+          try {
+            video.currentTime = targetResume;
+            setCurrentTime(targetResume);
+            hasResumedRef.current = true;
+            if (initialTime && initialTime > 4) {
+              showToast(`Resumed from ${formatTime(targetResume)}`);
+            }
+          } catch {}
+        }
+
         if (!userPausedRef.current || forcePlay) {
           video.play().catch(() => {});
         }
@@ -919,10 +983,35 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     } else {
       // Direct MP4 / Native video tag
       video.src = safeUrl;
+
+      const cleanupDirectListeners = () => {
+        video.removeEventListener("loadedmetadata", onLoaded);
+        video.removeEventListener("loadeddata", onLoaded);
+        video.removeEventListener("canplay", onLoaded);
+        video.removeEventListener("error", onError);
+      };
+
       const onLoaded = () => {
+        cleanupDirectListeners();
         if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
         setServerStatuses((prev) => ({ ...prev, [serverIdx]: "success" }));
         setPlayerStatus("starting");
+
+        const targetResume = (initialTime && initialTime > 4 && !hasResumedRef.current)
+          ? initialTime
+          : (previousTime > 2 ? previousTime : 0);
+
+        if (targetResume > 0) {
+          try {
+            video.currentTime = targetResume;
+            setCurrentTime(targetResume);
+            hasResumedRef.current = true;
+            if (initialTime && initialTime > 4) {
+              showToast(`Resumed from ${formatTime(targetResume)}`);
+            }
+          } catch {}
+        }
+
         if (!userPausedRef.current || forcePlay) {
           video.play().catch(() => {});
         }
@@ -933,6 +1022,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       };
 
       const onError = () => {
+        cleanupDirectListeners();
         handleServerFail(serverIdx, "Format/Network Error");
       };
 
@@ -945,7 +1035,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         video.addEventListener("error", onError, { once: true });
       }
     }
-  }, [getPlayableUrl, showToast]);
+  }, [getPlayableUrl, showToast, initialTime]);
 
   // Smooth audio track switching between MovieBox dubs and HLS tracks
   const switchAudioTrack = useCallback(async (track: {
@@ -1619,11 +1709,15 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                           };
 
                           setServerList([movieBoxServer]);
-
-                          hasConnectedRef.current = false;
-                          connectToServer(0, true);
+                          serverListRef.current = [movieBoxServer];
                           movieBoxSuccess = true;
                           setFetchingStatusText("Server 1 stream ready");
+
+                          const curPlaying = videoRef.current ? videoRef.current.currentTime : 0;
+                          if (curPlaying < 2 || playerStatus === "fetching" || playerStatus === "error") {
+                            hasConnectedRef.current = false;
+                            connectToServer(0, true);
+                          }
                         }
                       }
                     } catch (_) {}
@@ -1887,13 +1981,14 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       connectToServer(0);
     }
     return () => {
+      saveCurrentProgress();
       if (serverProbeTimeoutRef.current) clearTimeout(serverProbeTimeoutRef.current);
       if (hlsRef.current) hlsRef.current.destroy();
       if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
         audioCtxRef.current.close().catch(() => {});
       }
     };
-  }, [connectToServer]);
+  }, [connectToServer, saveCurrentProgress]);
 
   // Connect first playable server ONLY if waiting in fetching state and user has not paused
   useEffect(() => {
@@ -1998,7 +2093,35 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     showToast(`Audio Boost: ${newVal}%`);
   };
 
-  // Keyboard Shortcuts (Space, Arrow keys, F, M, C, Esc)
+  // Robust duration resolution: checks video.duration, state duration, and runtime prop (e.g. 138m = 8280s)
+  const parsedRuntimeSeconds = useMemo(() => {
+    if (!runtime) return 0;
+    if (typeof runtime === "number") return runtime > 300 ? runtime : runtime * 60;
+    const matchH = String(runtime).match(/(\d+)\s*h/i);
+    const matchM = String(runtime).match(/(\d+)\s*m/i);
+    let s = 0;
+    if (matchH) s += parseInt(matchH[1], 10) * 3600;
+    if (matchM) s += parseInt(matchM[1], 10) * 60;
+    if (s > 0) return s;
+    const directNum = parseInt(String(runtime), 10);
+    return !isNaN(directNum) && directNum > 0 ? (directNum > 300 ? directNum : directNum * 60) : 0;
+  }, [runtime]);
+
+  const getSafeDuration = useCallback(() => {
+    const video = videoRef.current;
+    if (video && video.duration && !isNaN(video.duration) && isFinite(video.duration) && video.duration > 0) {
+      return video.duration;
+    }
+    if (duration && !isNaN(duration) && isFinite(duration) && duration > 0) {
+      return duration;
+    }
+    if (parsedRuntimeSeconds > 0) {
+      return parsedRuntimeSeconds;
+    }
+    return 0;
+  }, [duration, parsedRuntimeSeconds]);
+
+  // Keyboard Shortcuts (Space, Arrow keys, F, M, C, Z, Esc)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const video = videoRef.current;
@@ -2017,6 +2140,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           e.preventDefault();
           const targetT = Math.max(0, video.currentTime - 10);
           video.currentTime = targetT;
+          setCurrentTime(targetT);
           setArrowSeekPreviewTime(targetT);
           if (previewVideoRef.current) previewVideoRef.current.currentTime = targetT;
           if (arrowTimerRef.current) clearTimeout(arrowTimerRef.current);
@@ -2027,13 +2151,17 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         case "arrowright":
         case "l": {
           e.preventDefault();
-          const targetT = Math.min(video.duration || 0, video.currentTime + 10);
-          video.currentTime = targetT;
-          setArrowSeekPreviewTime(targetT);
-          if (previewVideoRef.current) previewVideoRef.current.currentTime = targetT;
-          if (arrowTimerRef.current) clearTimeout(arrowTimerRef.current);
-          arrowTimerRef.current = setTimeout(() => setArrowSeekPreviewTime(null), 1400);
-          showToast(`+10s (${formatTime(targetT)})`);
+          const safeDur = getSafeDuration();
+          const targetT = safeDur > 0 ? Math.min(safeDur, video.currentTime + 10) : video.currentTime + 10;
+          if (!isNaN(targetT) && targetT >= 0) {
+            video.currentTime = targetT;
+            setCurrentTime(targetT);
+            setArrowSeekPreviewTime(targetT);
+            if (previewVideoRef.current) previewVideoRef.current.currentTime = targetT;
+            if (arrowTimerRef.current) clearTimeout(arrowTimerRef.current);
+            arrowTimerRef.current = setTimeout(() => setArrowSeekPreviewTime(null), 1400);
+            showToast(`+10s (${formatTime(targetT)})`);
+          }
           break;
         }
         case "arrowup":
@@ -2049,6 +2177,22 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           setVolume(video.volume);
           showToast(`Volume ${Math.round(video.volume * 100)}%`);
           break;
+        case "z":
+        case "a": {
+          e.preventDefault();
+          setVideoFit((prev) => {
+            const next = prev === "fit" ? "fill" : prev === "fill" ? "stretch" : "fit";
+            showToast(
+              next === "fit"
+                ? "Fit to Screen (Original Ratio)"
+                : next === "fill"
+                ? "Crop Black Bars (Zoom to Fill)"
+                : "Stretch to Fill (16:9)"
+            );
+            return next;
+          });
+          break;
+        }
         case "m":
           e.preventDefault();
           video.muted = !video.muted;
@@ -2069,6 +2213,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           if (activeMenu !== "none") {
             setActiveMenu("none");
           } else {
+            saveCurrentProgress();
             onClose();
           }
           break;
@@ -2077,7 +2222,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeMenu, onClose, showToast, subtitlesEnabled]);
+  }, [activeMenu, onClose, showToast, subtitlesEnabled, duration, saveCurrentProgress, getSafeDuration]);
 
   const toggleFullscreen = () => {
     const container = containerRef.current;
@@ -2107,30 +2252,42 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       const rect = el.getBoundingClientRect();
       const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       setHoverPercent(percent);
-      const time = percent * (duration || 0);
+      const safeDur = getSafeDuration();
+      const time = safeDur > 0 ? percent * safeDur : 0;
       setHoverTime(time);
-      if (previewVideoRef.current && duration > 0) {
-        previewVideoRef.current.currentTime = time;
+      pendingSeekTimeRef.current = time;
+      if (previewVideoRef.current && safeDur > 0) {
+        try {
+          previewVideoRef.current.currentTime = time;
+        } catch (_) {}
       }
-      return { percent, time };
+      return { percent, time, safeDur };
     },
-    [duration]
+    [getSafeDuration]
   );
 
   const handleScrubberSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    isDraggingScrubberRef.current = false;
     const res = updateScrubberPosition(e.clientX);
     const video = videoRef.current;
-    if (res && video && video.duration) {
-      video.currentTime = res.time;
+    if (res && video && res.time >= 0) {
+      try {
+        video.currentTime = res.time;
+        setCurrentTime(res.time);
+      } catch (_) {}
+      pendingSeekTimeRef.current = null;
     }
   };
 
   const handleScrubberMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    isDraggingScrubberRef.current = true;
     setIsDraggingScrubber(true);
     const res = updateScrubberPosition(e.clientX);
-    const video = videoRef.current;
-    if (res && video && video.duration) {
-      video.currentTime = res.time;
+    if (res && res.time >= 0) {
+      setCurrentTime(res.time);
+      pendingSeekTimeRef.current = res.time;
     }
   };
 
@@ -2138,18 +2295,28 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     updateScrubberPosition(e.clientX);
   };
 
-  // Global drag listener so dragging outside the line remains butter-smooth
+  // Global drag listener so dragging outside the line remains butter-smooth and doesn't choke decoder
   useEffect(() => {
     if (!isDraggingScrubber) return;
     const handleGlobalMove = (e: MouseEvent) => {
       const res = updateScrubberPosition(e.clientX);
-      const video = videoRef.current;
-      if (res && video && video.duration) {
-        video.currentTime = res.time;
+      if (res && res.time >= 0) {
+        setCurrentTime(res.time);
+        pendingSeekTimeRef.current = res.time;
       }
     };
     const handleGlobalUp = () => {
+      isDraggingScrubberRef.current = false;
       setIsDraggingScrubber(false);
+      const video = videoRef.current;
+      const targetT = pendingSeekTimeRef.current;
+      if (video && targetT !== null && !isNaN(targetT) && targetT >= 0) {
+        try {
+          video.currentTime = targetT;
+          setCurrentTime(targetT);
+        } catch (_) {}
+        pendingSeekTimeRef.current = null;
+      }
     };
     window.addEventListener("mousemove", handleGlobalMove);
     window.addEventListener("mouseup", handleGlobalUp);
@@ -2288,6 +2455,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       <video
         ref={videoRef}
         playsInline
+        preload="auto"
         muted={isMuted}
         onPlay={() => {
           setIsPlaying(true);
@@ -2297,20 +2465,30 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           setIsPlaying(true);
           setPlayerStatus("ready");
         }}
+        onPause={() => {
+          setIsPlaying(false);
+          saveCurrentProgress();
+        }}
         onTimeUpdate={() => {
+          if (isDraggingScrubberRef.current) return;
           if (videoRef.current) {
-            setCurrentTime(videoRef.current.currentTime);
+            const cur = videoRef.current.currentTime;
+            setCurrentTime(cur);
             if (videoRef.current.duration) setDuration(videoRef.current.duration);
-            if (videoRef.current.currentTime > 0 && playerStatus !== "ready") {
+            if (cur > 0 && playerStatus !== "ready") {
               setPlayerStatus("ready");
+            }
+            if (Math.abs(cur - lastSavedTimeRef.current) >= 3) {
+              saveCurrentProgress();
             }
           }
         }}
         style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
           width: "100%",
-          height: "calc(100% - 90px)",
-          maxHeight: "calc(100% - 90px)",
-          marginBottom: "90px",
+          height: "100%",
           display: "block",
           objectFit: videoFit === "fill" ? "cover" : videoFit === "stretch" ? "fill" : "contain",
           filter: getFilterStyle(),
@@ -2545,7 +2723,10 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       >
         {/* Back Button */}
         <button
-          onClick={onClose}
+          onClick={() => {
+            saveCurrentProgress();
+            onClose();
+          }}
           style={{
             width: "40px",
             height: "40px",
@@ -3948,7 +4129,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 left: 0,
                 top: 0,
                 bottom: 0,
-                width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
+                width: `${getSafeDuration() > 0 ? Math.min(100, Math.max(0, (currentTime / getSafeDuration()) * 100)) : 0}%`,
                 backgroundColor: "#e50914",
                 boxShadow: "0 0 10px rgba(229, 9, 20, 0.5)",
               }}
@@ -3959,7 +4140,7 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           <div
             style={{
               position: "absolute",
-              left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
+              left: `${getSafeDuration() > 0 ? Math.min(100, Math.max(0, (currentTime / getSafeDuration()) * 100)) : 0}%`,
               transform: "translateX(-50%)",
               width: isHoveringScrubber || isDraggingScrubber ? "15px" : "12px",
               height: isHoveringScrubber || isDraggingScrubber ? "15px" : "12px",
@@ -4016,7 +4197,9 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               className="cinema-ctrl-btn"
               onClick={() => {
                 if (videoRef.current) {
-                  videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+                  const targetT = Math.max(0, videoRef.current.currentTime - 10);
+                  videoRef.current.currentTime = targetT;
+                  setCurrentTime(targetT);
                   showToast("-10s");
                 }
               }}
@@ -4044,7 +4227,10 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               className="cinema-ctrl-btn"
               onClick={() => {
                 if (videoRef.current) {
-                  videoRef.current.currentTime = Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + 10);
+                  const safeDur = getSafeDuration();
+                  const targetT = safeDur > 0 ? Math.min(safeDur, videoRef.current.currentTime + 10) : videoRef.current.currentTime + 10;
+                  videoRef.current.currentTime = targetT;
+                  setCurrentTime(targetT);
                   showToast("+10s");
                 }
               }}

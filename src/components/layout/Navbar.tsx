@@ -117,7 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   const navItems: Array<{
-    id: "home" | "movies" | "tv" | "anime" | "coming-soon";
+    id: "home" | "movies" | "tv" | "anime" | "coming-soon" | "mylist";
     label: string;
     icon?: React.ReactNode;
     onClick: () => void;
@@ -168,6 +168,23 @@ export const Navbar: React.FC<NavbarProps> = ({
       ),
       onClick: () => {
         if (onSelectCategoryNav) onSelectCategoryNav("coming-soon");
+      },
+    },
+    {
+      id: "mylist",
+      label: "My List",
+      icon: (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+      ),
+      onClick: () => {
+        if (onSelectCategoryNav) onSelectCategoryNav("mylist");
       },
     },
   ];

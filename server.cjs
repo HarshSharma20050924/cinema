@@ -665,41 +665,11 @@ app.get('/api/torrent/download', async (req, res) => {
   await torrentService.handleDownload(req, res, hash, name);
 });
 
-// 7. Video Stream / Download Header Proxy
-app.get('/api/proxy', async (req, res) => {
-  try {
-    const { url, referer } = req.query;
-    if (!url) return res.status(400).send('URL required');
-
-    const headers = {
-      'User-Agent': providerContext.commonHeaders['User-Agent'],
-    };
-    if (url.includes('hakunaymatata.com') || url.includes('moviebox') || url.includes('inmoviebox.com')) {
-      headers['Origin'] = 'https://officialmoviebox.com';
-      headers['Referer'] = 'https://officialmoviebox.com/';
-    } else if (referer) {
-      headers['Referer'] = referer;
-    }
-
-    const response = await axios({
-      method: 'get',
-      url,
-      headers,
-      responseType: 'stream',
-      timeout: 15000,
-    });
-
-    if (response.headers['content-type']) res.set('Content-Type', response.headers['content-type']);
-    if (response.headers['content-length']) res.set('Content-Length', response.headers['content-length']);
-
-    response.data.pipe(res);
-  } catch (error) {
-    res.status(500).send(`Proxy failed: ${error.message}`);
-  }
-});
+// 7. Video Stream / Download Header Proxy with full Range & 206 Partial Content support
+const { proxyStream, downloadFile } = require('./server/controllers/proxyController.cjs');
+app.get('/api/proxy', proxyStream);
 
 // 8. Download Route with Full Mirror & HLS Support
-const { downloadFile } = require('./server/controllers/proxyController.cjs');
 app.get('/api/download', downloadFile);
 
 // 9. Cinemeta Poster Proxy (solves browser CORS restrictions)

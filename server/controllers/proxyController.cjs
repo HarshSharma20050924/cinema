@@ -412,16 +412,29 @@ async function proxyStream(req, res) {
       url: targetUrl,
       headers,
       responseType: isHead ? "text" : "stream",
-      timeout: 25000,
+      timeout: isHead ? 10000 : 0, // No timeout for active video streams
       validateStatus: (status) => status < 500,
     });
-    if (response.status !== 404) { console.log('[ProxyStream]', { targetUrl: targetUrl.slice(0, 80), isHead, status: response.status, referer: headers['Referer'] }); }
+    if (response.status !== 404) {
+      console.log('[ProxyStream]', {
+        targetUrl: targetUrl.slice(0, 80),
+        isHead,
+        status: response.status,
+        range: headers['Range'],
+        contentRange: response.headers['content-range'],
+        contentLength: response.headers['content-length']
+      });
+    }
     res.status(response.status);
 
     if (response.headers["content-type"]) res.set("Content-Type", response.headers["content-type"]);
     if (response.headers["content-length"]) res.set("Content-Length", response.headers["content-length"]);
     if (response.headers["content-range"]) res.set("Content-Range", response.headers["content-range"]);
-    if (response.headers["accept-ranges"]) res.set("Accept-Ranges", response.headers["accept-ranges"]);
+    res.set("Accept-Ranges", response.headers["accept-ranges"] || "bytes");
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Range, Content-Type, Authorization, X-Requested-With");
+    res.set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
 
     if (isHead) {
       return res.end();

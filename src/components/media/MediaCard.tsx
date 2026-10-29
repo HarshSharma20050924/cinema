@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Globe } from "lucide-react";
 import { StarIcon, FilmIcon } from "../../icons";
 import { fetchTMDBDetails } from "../../api/tmdb";
+import { MediaContextMenu } from "./MediaContextMenu";
 import type { Post } from "../../types";
 
 export const posterCache = new Map<string, string>();
@@ -139,6 +140,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const [reloadKey, setReloadKey] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | undefined>(undefined);
   const rafRef = React.useRef<number | null>(null);
   const hoverTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const hasAttemptedFallbackRef = React.useRef(false);
@@ -627,7 +630,12 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         {/* Top-Right 3-Dots Button on Hover matching Reference Image */}
         {isHovered && (
           <button
-            onClick={handleCardClick}
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuPos({ x: rect.right, y: rect.bottom + 6 });
+              setContextMenuOpen(true);
+            }}
             title="Options"
             style={{
               position: "absolute",
@@ -1106,6 +1114,23 @@ export const MediaCard: React.FC<MediaCardProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {contextMenuOpen && (
+        <MediaContextMenu
+          post={augmented}
+          isOpen={contextMenuOpen}
+          onClose={() => setContextMenuOpen(false)}
+          onPlay={() => {
+            setContextMenuOpen(false);
+            onClick(augmented);
+          }}
+          onOpenDetails={() => {
+            setContextMenuOpen(false);
+            onClick(augmented);
+          }}
+          position={menuPos}
+        />
       )}
     </div>
   );

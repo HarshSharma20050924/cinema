@@ -273,9 +273,11 @@ export async function onRequest(context) {
         const timeoutMs = isLongReq ? 25000 : (isRender ? 2500 : (isTunnel ? 10000 : 6000));
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+        const incomingRange = request.headers.get("Range");
         const reqHeaders = {
           "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
           Accept: request.headers.get("Accept") || "*/*",
+          ...(incomingRange ? { "Range": incomingRange } : {}),
         };
         const incomingContentType = request.headers.get("Content-Type");
         if (incomingContentType) reqHeaders["Content-Type"] = incomingContentType;
@@ -299,10 +301,14 @@ export async function onRequest(context) {
           const respHeaders = new Headers(upstreamResp.headers);
           // Delete compression headers to avoid Worker decompression mismatches
           respHeaders.delete("content-encoding");
-          respHeaders.delete("content-length");
+          if (upstreamResp.status !== 206) {
+            respHeaders.delete("content-length");
+          }
           respHeaders.delete("transfer-encoding");
+          respHeaders.set("Accept-Ranges", "bytes");
           respHeaders.set("Access-Control-Allow-Origin", "*");
           respHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+          respHeaders.set("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length");
           respHeaders.set("X-Cinema-Server-Node", candidateUrl);
 
           const status = upstreamResp.status;

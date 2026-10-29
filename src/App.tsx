@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Fragment } from "react";
+import React, { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useProviders, matchProvider } from "./hooks/useProviders";
 import { useCatalog } from "./hooks/useCatalog";
 import { useMediaPosts } from "./hooks/useMediaPosts";
@@ -37,7 +37,12 @@ import { GenreShowcasePage } from "./components/catalog/GenreShowcasePage";
 import { CatalogFilterBrowsePage } from "./components/catalog/CatalogFilterBrowsePage";
 import { DedicatedSearchPage } from "./components/search/DedicatedSearchPage";
 import { ComingSoonPage } from "./components/catalog/ComingSoonPage";
+import { MyListPage } from "./components/watchlist/MyListPage";
+import { SettingsPage } from "./components/settings/SettingsPage";
 import { HomeCinematicBanner } from "./components/home/HomeCinematicBanner";
+import { ContinueWatchingShelf } from "./components/media/ContinueWatchingShelf";
+import { ContinueWatchingModal } from "./components/media/ContinueWatchingModal";
+import type { ContinueWatchingItem } from "./utils/continueWatchingService";
 import { ServerIcon, DownloadIcon, RefreshIcon } from "./icons";
 import { TopProgressBar } from "./components/common/TopProgressBar";
 import {
@@ -420,9 +425,11 @@ export default function App() {
     if (initialRoute.tab === "tv") return "tv";
     if (initialRoute.tab === "anime") return "anime";
     if (initialRoute.tab === "coming-soon") return "coming-soon";
+    if (initialRoute.tab === "mylist") return "mylist";
     return "home";
   });
   const [isComingSoonPageOpen, setIsComingSoonPageOpen] = useState(initialRoute.tab === "coming-soon");
+  const [isMyListPageOpen, setIsMyListPageOpen] = useState(initialRoute.tab === "mylist");
 
   // Dynamic Home, Movies & TV Spotlight State (Populated live from TMDB trending)
   const [homeSpotlightItems, setHomeSpotlightItems] = useState<Post[]>(HOME_SPOTLIGHT_ITEMS);
@@ -596,6 +603,8 @@ export default function App() {
       ? "categories"
       : isComingSoonPageOpen || selectedNavTab === "coming-soon"
       ? "coming-soon"
+      : isMyListPageOpen || selectedNavTab === "mylist"
+      ? "mylist"
       : searchQuery
       ? "home"
       : viewAllCategory
@@ -747,25 +756,50 @@ export default function App() {
     episodes?: any[];
     seasonsCount?: number;
     tmdbId?: number;
+    initialTime?: number;
+    post?: any;
   } | null>(() => {
     if (typeof window !== "undefined") {
       const p = new URLSearchParams(window.location.search).get("play");
       const t = new URLSearchParams(window.location.search).get("title") || "Cinema Stream";
       const b = new URLSearchParams(window.location.search).get("backdrop") || new URLSearchParams(window.location.search).get("poster");
+      const timeStr = new URLSearchParams(window.location.search).get("t");
+      const parsedTime = timeStr ? parseInt(timeStr, 10) : undefined;
       if (p) {
         return {
           url: p,
           title: t,
           backdrop: b || undefined,
           poster: b || undefined,
+          initialTime: !isNaN(parsedTime as number) ? parsedTime : undefined,
         };
       }
     }
     return null;
   });
   const [downloadManagerOpen, setDownloadManagerOpen] = useState(false);
+  const [continueWatchingModalOpen, setContinueWatchingModalOpen] = useState(false);
   const [detailsInitialTab, setDetailsInitialTab] = useState<"stream" | "download" | null>(null);
 
+  // Resume playback from exact position saved in Continue Watching
+  const handleResumeContinueWatching = useCallback((item: ContinueWatchingItem) => {
+    if (item.post) {
+      setSelectedPost(item.post);
+    }
+    setPlayerModalState({
+      url: item.playbackUrl || "",
+      title: item.title,
+      backdrop: item.backdrop || item.poster,
+      poster: item.poster || item.backdrop,
+      servers: (item.servers as any) || [],
+      season: item.season,
+      episode: item.episode,
+      tmdbId: item.tmdbId,
+      initialTime: item.currentTime,
+      post: item.post,
+    });
+    setPlaybackUrl(item.playbackUrl || "");
+  }, []);
 
   // Cast / Person Details State & URL Hash Synchronization (e.g. #!/person/3223)
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
@@ -913,6 +947,7 @@ export default function App() {
     viewAllCategory: { filter: string; title: string } | null;
     selectedGenreShowcase: string | null;
     isComingSoonPageOpen: boolean;
+    isMyListPageOpen: boolean;
     isBrowsingCategories: boolean;
     selectedCategoryId: string | null;
     selectedGenreCategory: any | null;
@@ -970,6 +1005,7 @@ export default function App() {
         setViewAllCategory(prev.viewAllCategory);
         setSelectedGenreShowcase(prev.selectedGenreShowcase);
         setIsComingSoonPageOpen(prev.isComingSoonPageOpen);
+        setIsMyListPageOpen(prev.isMyListPageOpen);
         setIsBrowsingCategories(prev.isBrowsingCategories);
         setSelectedCategoryId(prev.selectedCategoryId);
         setSelectedGenreCategory(prev.selectedGenreCategory);
@@ -1298,7 +1334,7 @@ export default function App() {
 
   // Keep ambient wallpaper smoothly changing across all pages (Coming Soon, Categories, etc.)
   // using slides from the section the user came from (Home, Movies, TV, or Genre)
-  const isHeroMounted = (!activeCustomPage && !searchQuery && !isBrowsingCategories && !viewAllCategory && !isDedicatedSearchOpen && !isComingSoonPageOpen && selectedNavTab !== "coming-soon" && !selectedGenreShowcase && !!heroPost);
+  const isHeroMounted = (!activeCustomPage && !searchQuery && !isBrowsingCategories && !viewAllCategory && !isDedicatedSearchOpen && !isComingSoonPageOpen && selectedNavTab !== "coming-soon" && !isMyListPageOpen && selectedNavTab !== "mylist" && !selectedGenreShowcase && !!heroPost);
 
   useEffect(() => {
     if (isHeroMounted || selectedGenreShowcase) return;
@@ -1328,6 +1364,7 @@ export default function App() {
         viewAllCategory,
         selectedGenreShowcase,
         isComingSoonPageOpen,
+        isMyListPageOpen,
         isBrowsingCategories,
         selectedCategoryId,
         selectedGenreCategory,
@@ -1358,6 +1395,7 @@ export default function App() {
     setViewAllCategory(null);
     setSelectedGenreShowcase(null);
     setIsComingSoonPageOpen(false);
+    setIsMyListPageOpen(false);
     setIsDedicatedSearchOpen(false);
     setIsBrowsingCategories(false);
     setSelectedCategoryId(null);
@@ -1405,6 +1443,7 @@ export default function App() {
       setViewAllCategory(prev.viewAllCategory);
       setSelectedGenreShowcase(prev.selectedGenreShowcase);
       setIsComingSoonPageOpen(prev.isComingSoonPageOpen);
+      setIsMyListPageOpen(prev.isMyListPageOpen);
       setIsBrowsingCategories(prev.isBrowsingCategories);
       setSelectedCategoryId(prev.selectedCategoryId);
       setSelectedGenreCategory(prev.selectedGenreCategory);
@@ -1709,6 +1748,31 @@ export default function App() {
       return;
     }
 
+    if (type === "mylist") {
+      detailsHistoryStackRef.current = [];
+      setSelectedPost(null);
+      setDetails(null);
+      setStreams([]);
+      clearOverlayState();
+      document.body.style.overflow = "";
+
+      setIsComingSoonPageOpen(false);
+      setSelectedGenreShowcase(null);
+      setIsBrowsingCategories(false);
+      setViewAllCategory(null);
+      setIsDedicatedSearchOpen(false);
+      setSelectedCategoryId(null);
+      setSelectedGenreCategory(null);
+      setSelectedProviderGenre(null);
+      setIsMergedFilter(false);
+      setIsMyListPageOpen(true);
+      setSelectedNavTab("mylist");
+      setSearchQuery("");
+      setPage(1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     if (type === "movies") {
       detailsHistoryStackRef.current = [];
       setSelectedPost(null);
@@ -1718,6 +1782,7 @@ export default function App() {
       document.body.style.overflow = "";
 
       setIsComingSoonPageOpen(false);
+      setIsMyListPageOpen(false);
       setSelectedGenreShowcase(null);
       setIsBrowsingCategories(false);
       setSelectedCategoryId(null);
@@ -2034,6 +2099,25 @@ export default function App() {
         <ComingSoonPage
           onBack={handleGoBack}
           onSelectPost={handleSelectPost}
+        />
+      ) : isMyListPageOpen || selectedNavTab === "mylist" ? (
+        /* Dedicated My List Page (Matches CNO.TO reference with Continue Watching, Custom Lists, Stats) */
+        <MyListPage
+          onSelectPost={handleSelectPost}
+          onResumeContinueWatching={(item) => {
+            handlePlayFromHero({
+              id: item.id,
+              title: item.title,
+              image: item.poster || item.backdrop,
+              link: item.streamUrl || item.playbackUrl || "",
+              type: item.type || (item.season ? "tv" : "movie"),
+              provider: item.provider || "movieBoxWeb",
+              tmdbId: item.tmdbId,
+              backdropUrl: item.backdrop,
+            } as any);
+          }}
+          onOpenDownloads={() => setDownloadManagerOpen(true)}
+          onBrowseMore={handleBackToHome}
         />
       ) : selectedGenreShowcase ? (
         /* C2. GENRE SHOWCASE PAGE (Matching Cno.to Screenshot 2) */
@@ -2366,6 +2450,12 @@ export default function App() {
             ) : activeNavTab === "home" ? (
               /* Multi-Row Home Showcase (All uniform media cards, no disruptive banners) */
               <div style={{ display: "flex", flexDirection: "column", gap: "56px", width: "100%" }}>
+                {/* 3D Landscape Continue Watching Shelf with Red Progress Bar & Time Remaining */}
+                <ContinueWatchingShelf
+                  onResume={handleResumeContinueWatching}
+                  onOpenModal={() => setContinueWatchingModalOpen(true)}
+                />
+
                 {homeShelves.map((shelf, idx) => (
                   <React.Fragment key={shelf.id}>
                     {/* Explore Horror Category Banner rendered BEFORE the shelf so media cards appear directly below it */}
@@ -2882,17 +2972,9 @@ export default function App() {
         onClose={() => setDownloadManagerOpen(false)}
       />
 
-      {/* 7. Settings Modal */}
+      {/* 7. Settings Full-Page View (Frosted Glass UI & Sliding Backdrop) */}
       {settingsModalOpen && (
-        <SettingsModal
-          settings={settings}
-          availableProviders={allProviders}
-          onSave={saveSettings}
-          onToggleExtension={toggleExtension}
-          onResetSetup={() => {
-            saveSettings({ isConfigured: false, installedExtensions: ["hdhub4u"] });
-            setSettingsModalOpen(false);
-          }}
+        <SettingsPage
           onClose={() => setSettingsModalOpen(false)}
         />
       )}
@@ -2915,6 +2997,8 @@ export default function App() {
           episodes={playerModalState?.episodes}
           seasonsCount={playerModalState?.seasonsCount}
           tmdbId={playerModalState?.tmdbId || (selectedPost as any)?.tmdbId || (details as any)?.id}
+          initialTime={playerModalState?.initialTime}
+          post={playerModalState?.post || selectedPost}
           onSelectEpisode={(seasonNum, episodeNum) => {
             setPlayerModalState((prev) =>
               prev ? { ...prev, season: seasonNum, episode: episodeNum } : null
@@ -2935,6 +3019,13 @@ export default function App() {
           onClose={handleClosePlayer}
         />
       )}
+
+      {/* 10. Frosted Glass Continue Watching Full Modal */}
+      <ContinueWatchingModal
+        isOpen={continueWatchingModalOpen}
+        onClose={() => setContinueWatchingModalOpen(false)}
+        onResume={handleResumeContinueWatching}
+      />
     </div>
   );
 }

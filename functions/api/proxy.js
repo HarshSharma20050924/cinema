@@ -180,7 +180,7 @@ export async function onRequest(context) {
           const cleanNode = nodeUrl.replace(/\/+$/, '');
           const tunnelUrl = `${cleanNode}/api/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(refererHeader)}`;
           const controller = new AbortController();
-          const timerId = setTimeout(() => controller.abort(), 6000);
+          const timerId = setTimeout(() => controller.abort(), 25000);
           const tunnelResp = await fetch(tunnelUrl, {
             method: request.method,
             headers: forwardHeaders,
@@ -194,6 +194,7 @@ export async function onRequest(context) {
               const val = tunnelResp.headers.get(key);
               if (val) respHeaders.set(key, val);
             }
+            respHeaders.set('Accept-Ranges', 'bytes');
             respHeaders.set('Access-Control-Allow-Origin', '*');
             respHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
             respHeaders.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
@@ -236,6 +237,7 @@ export async function onRequest(context) {
         const val = upstream.headers.get(key);
         if (val) responseHeaders.set(key, val);
       }
+      responseHeaders.set('Accept-Ranges', 'bytes');
       responseHeaders.set('Access-Control-Allow-Origin', '*');
       responseHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
       responseHeaders.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
