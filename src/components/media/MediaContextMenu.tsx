@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { MediaPost } from "../../types";
 import {
   isItemSaved,
@@ -63,7 +64,7 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !post) return null;
+  if (!isOpen || !post || typeof document === "undefined") return null;
 
   const handleToggleSaved = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -120,8 +121,10 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
 
   if (position) {
     const maxX = typeof window !== "undefined" ? window.innerWidth - 270 : 800;
-    const maxY = typeof window !== "undefined" ? window.innerHeight - 380 : 600;
-    menuStyle.left = `${Math.max(16, Math.min(position.x, maxX))}px`;
+    const maxY = typeof window !== "undefined" ? window.innerHeight - 440 : 600;
+    // Align menu so it opens nicely below and aligned with the button
+    const targetX = position.x - 240;
+    menuStyle.left = `${Math.max(16, Math.min(targetX, maxX))}px`;
     menuStyle.top = `${Math.max(16, Math.min(position.y, maxY))}px`;
   } else {
     menuStyle.top = "50%";
@@ -132,8 +135,27 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
   const rawYear = post.year || (post.releaseDate ? post.releaseDate.slice(0, 4) : "2024");
   const mediaTypeLabel = post.type === "tv" || post.type === "series" ? "TV Series" : "Movie";
 
-  return (
+  return createPortal(
     <>
+      {/* Full-screen click-outside catcher overlay */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 99998,
+          background: "transparent",
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}
+      />
+
       <div ref={menuRef} style={menuStyle} onClick={(e) => e.stopPropagation()}>
         {/* Header: Title & Subtitle */}
         <div style={{ padding: "6px 8px 10px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
@@ -494,7 +516,8 @@ export const MediaContextMenu: React.FC<MediaContextMenuProps> = ({
           </div>
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 };
 

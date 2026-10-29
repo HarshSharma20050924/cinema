@@ -629,34 +629,34 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         {/* Landscape card: pure artwork with no text overlay */}
 
         {/* Top-Right 3-Dots Button on Hover matching Reference Image */}
-        {isHovered && (
+        {(isHovered || contextMenuOpen) && (
           <button
             onClick={(e) => {
               e.stopPropagation();
               const rect = e.currentTarget.getBoundingClientRect();
               setMenuPos({ x: rect.right, y: rect.bottom + 6 });
-              setContextMenuOpen(true);
+              setContextMenuOpen((prev) => !prev);
             }}
             title="Options"
             style={{
               position: "absolute",
               top: "12px",
               right: "12px",
-              zIndex: 4,
+              zIndex: 10,
               width: "32px",
               height: "32px",
               borderRadius: "50%",
-              background: "rgba(28, 30, 36, 0.8)",
+              background: contextMenuOpen ? "#e50914" : "rgba(28, 30, 36, 0.85)",
               backdropFilter: "blur(12px)",
               WebkitBackdropFilter: "blur(12px)",
-              border: "1px solid rgba(255, 255, 255, 0.18)",
+              border: contextMenuOpen ? "1px solid #e50914" : "1px solid rgba(255, 255, 255, 0.18)",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.5)",
-              transition: "transform 0.2s ease, background 0.2s ease",
+              boxShadow: contextMenuOpen ? "0 4px 14px rgba(229, 9, 20, 0.55)" : "0 4px 14px rgba(0, 0, 0, 0.5)",
+              transition: "transform 0.2s ease, background 0.2s ease, border-color 0.2s ease",
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
