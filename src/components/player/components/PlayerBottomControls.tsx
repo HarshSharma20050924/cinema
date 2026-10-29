@@ -128,6 +128,23 @@ export const PlayerBottomControls: React.FC<PlayerBottomControlsProps> = ({
         userSelect: "none",
       }}
     >
+      <style>{`
+        @media (max-width: 640px) {
+          .cinema-volume-slider {
+            display: none !important;
+          }
+          .cinema-player-desktop-meta {
+            display: none !important;
+          }
+          .cinema-player-controls-bottom {
+            padding: 0 10px 8px 10px !important;
+          }
+          .cinema-ctrl-btn {
+            width: 32px !important;
+            height: 32px !important;
+          }
+        }
+      `}</style>
       {/* Clean Hover Time Bubble */}
       {((isHoveringScrubber || isDraggingScrubber) || arrowSeekPreviewTime !== null) && duration > 0 && (
         <div
@@ -369,6 +386,7 @@ export const PlayerBottomControls: React.FC<PlayerBottomControlsProps> = ({
             </button>
             <input
               type="range"
+              className="cinema-volume-slider"
               min="0"
               max="1"
               step="0.05"
@@ -403,7 +421,7 @@ export const PlayerBottomControls: React.FC<PlayerBottomControlsProps> = ({
 
             {/* Ending estimation */}
             {estimatedEndTime && (
-              <span style={{ color: "rgba(255, 255, 255, 0.6)", fontSize: "12px", marginLeft: "4px" }}>
+              <span className="cinema-player-desktop-meta" style={{ color: "rgba(255, 255, 255, 0.6)", fontSize: "12px", marginLeft: "4px" }}>
                 {estimatedEndTime}
               </span>
             )}
@@ -411,6 +429,7 @@ export const PlayerBottomControls: React.FC<PlayerBottomControlsProps> = ({
             {/* Bullet and Title */}
             {title && (
               <span
+                className="cinema-player-desktop-meta"
                 style={{
                   color: "rgba(255, 255, 255, 0.8)",
                   fontSize: "12.5px",

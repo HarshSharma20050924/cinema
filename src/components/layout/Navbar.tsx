@@ -918,84 +918,141 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Dropdown */}
         {mobileDropdownOpen && (
-          <div
-            className="glass-panel"
-            style={{
-              position: "absolute",
-              top: "46px",
-              left: "14px",
-              right: "14px",
-              maxHeight: "300px",
-              overflowY: "auto",
-              borderRadius: "16px",
-              padding: "8px",
-              boxShadow: "0 16px 40px rgba(0, 0, 0, 0.95)",
-              zIndex: 60,
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              background: "rgba(10, 14, 22, 0.96)",
-              backdropFilter: "blur(24px)",
-            }}
-          >
+          <>
             <div
+              onClick={() => setMobileDropdownOpen(false)}
               style={{
-                padding: "4px 8px 6px 8px",
-                fontSize: "10px",
-                fontWeight: 700,
-                color: "rgba(255, 255, 255, 0.5)",
-                textTransform: "uppercase",
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0, 0, 0, 0.70)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                zIndex: 100040,
+                animation: "cinemaFadeIn 0.2s ease",
+              }}
+            />
+            <div
+              className="cinema-no-scrollbar"
+              style={{
+                position: "fixed",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                maxHeight: "75vh",
+                overflowY: "auto",
+                WebkitOverflowScrolling: "touch",
+                borderTopLeftRadius: "24px",
+                borderTopRightRadius: "24px",
+                padding: "10px 0 24px 0",
+                boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
+                zIndex: 100050,
+                borderTop: "1px solid rgba(255, 255, 255, 0.16)",
+                background: "rgba(16, 18, 24, 0.98)",
+                backdropFilter: "blur(32px) saturate(200%)",
+                WebkitBackdropFilter: "blur(32px) saturate(200%)",
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                flexDirection: "column",
+                animation: "cinemaSlideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
               }}
             >
-              <span>Sources ({providers.length})</span>
-              <button onClick={() => setMobileDropdownOpen(false)} style={{ color: "rgba(255, 255, 255, 0.6)", background: "none", border: "none", cursor: "pointer" }}>
-                <XIcon size={13} />
-              </button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-              {providers.map((p) => (
+              {/* Drag Handle Pill */}
+              <div
+                style={{
+                  width: "36px",
+                  height: "4px",
+                  borderRadius: "999px",
+                  background: "rgba(255, 255, 255, 0.28)",
+                  margin: "2px auto 14px auto",
+                  flexShrink: 0,
+                }}
+              />
+              <div
+                style={{
+                  padding: "0 22px 10px 22px",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "1.5px",
+                  color: "rgba(255, 255, 255, 0.5)",
+                  textTransform: "uppercase",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                  marginBottom: "4px",
+                  flexShrink: 0,
+                }}
+              >
+                <span>SOURCES ({providers.length})</span>
                 <button
-                  key={p.value}
-                  onClick={() => {
-                    onSelectProvider(p);
-                    setMobileDropdownOpen(false);
-                    onSearchChange("");
-                  }}
+                  onClick={() => setMobileDropdownOpen(false)}
                   style={{
+                    color: "rgba(255, 255, 255, 0.6)",
+                    background: "rgba(255, 255, 255, 0.08)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "24px",
+                    height: "24px",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "8px 10px",
-                    borderRadius: "9px",
-                    background:
-                      activeProvider?.value === p.value
-                        ? "rgba(255, 255, 255, 0.12)"
-                        : "transparent",
-                    color: activeProvider?.value === p.value ? "#ffffff" : "rgba(255, 255, 255, 0.85)",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    textAlign: "left",
-                    border: "none",
+                    justifyContent: "center",
                     cursor: "pointer",
                   }}
                 >
-                  <span>{p.name}</span>
-                  <span
-                    style={{
-                      fontSize: "9px",
-                      padding: "2px 6px",
-                      borderRadius: "999px",
-                      background: "rgba(255, 255, 255, 0.08)",
-                      color: "rgba(255, 255, 255, 0.5)",
-                    }}
-                  >
-                    {p.type}
-                  </span>
+                  <XIcon size={12} />
                 </button>
-              ))}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {providers.map((p) => {
+                  const isSelected = activeProvider?.value === p.value;
+                  return (
+                    <button
+                      key={p.value}
+                      onClick={() => {
+                        onSelectProvider(p);
+                        setMobileDropdownOpen(false);
+                        onSearchChange("");
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        height: "48px",
+                        padding: "0 22px",
+                        background: isSelected ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                        color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.85)",
+                        fontSize: "15px",
+                        fontWeight: isSelected ? 700 : 500,
+                        textAlign: "left",
+                        border: "none",
+                        borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+                        cursor: "pointer",
+                        WebkitTapHighlightColor: "transparent",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span>{p.name}</span>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            background: "rgba(255, 255, 255, 0.08)",
+                            color: "rgba(255, 255, 255, 0.6)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {p.type}
+                        </span>
+                      </div>
+                      {isSelected && (
+                        <span style={{ color: "#e50914", fontSize: "16px", fontWeight: 800 }}>✓</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {/* Mobile Search Row with Clear / Cancel Button */}

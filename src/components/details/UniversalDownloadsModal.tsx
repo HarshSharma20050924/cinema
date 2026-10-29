@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { DownloadIcon, PlayIcon, CopyIcon, CheckIcon, XIcon } from "../../icons";
 import type { NormalizedServerLink } from "../../utils/universalSourcesEngine";
 
@@ -31,6 +31,16 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
   onPlayLink,
   onDownloadLink,
 }) => {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const [selectedQuality, setSelectedQuality] = useState<string>("All");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("All");
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -156,13 +166,13 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        background: "rgba(0, 0, 0, 0.45)",
+        background: "rgba(0, 0, 0, 0.65)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         display: "flex",
-        alignItems: "center",
+        alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
-        padding: "20px",
+        padding: isMobile ? 0 : "20px",
       }}
       onClick={onClose}
     >
@@ -170,22 +180,41 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
-          maxWidth: "680px",
-          background: "rgba(14, 16, 22, 0.60)",
+          maxWidth: isMobile ? "100%" : "680px",
+          background: "rgba(14, 16, 22, 0.95)",
           backdropFilter: "blur(28px) saturate(190%)",
           WebkitBackdropFilter: "blur(28px) saturate(190%)",
-          border: "1px solid rgba(255, 255, 255, 0.12)",
-          borderRadius: "22px",
-          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.60), inset 0 1px 0 rgba(255, 255, 255, 0.10)",
-          padding: "24px 28px",
+          border: isMobile ? "none" : "1px solid rgba(255, 255, 255, 0.12)",
+          borderTop: isMobile ? "1px solid rgba(255, 255, 255, 0.18)" : undefined,
+          borderTopLeftRadius: "24px",
+          borderTopRightRadius: "24px",
+          borderBottomLeftRadius: isMobile ? "0px" : "22px",
+          borderBottomRightRadius: isMobile ? "0px" : "22px",
+          boxShadow: isMobile
+            ? "0 -10px 40px rgba(0, 0, 0, 0.8)"
+            : "0 24px 60px rgba(0, 0, 0, 0.60), inset 0 1px 0 rgba(255, 255, 255, 0.10)",
+          padding: isMobile ? "14px 20px 28px 20px" : "24px 28px",
           display: "flex",
           flexDirection: "column",
           gap: "16px",
           position: "relative",
-          animation: "scaleInModal 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-          maxHeight: "85vh",
+          animation: isMobile ? "cinemaSlideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1)" : "scaleInModal 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+          maxHeight: isMobile ? "88vh" : "85vh",
+          overflowY: "auto",
         }}
       >
+        {isMobile && (
+          <div
+            style={{
+              width: "36px",
+              height: "4px",
+              borderRadius: "999px",
+              background: "rgba(255, 255, 255, 0.28)",
+              margin: "0 auto 4px auto",
+              flexShrink: 0,
+            }}
+          />
+        )}
         {/* Top Header Row */}
         <div
           style={{
@@ -359,60 +388,162 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
                 </span>
               </button>
 
-              {seasonDropdownOpen && (
-                <div
-                  className="cinema-no-scrollbar"
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 6px)",
-                    left: 0,
-                    zIndex: 130,
-                    minWidth: "150px",
-                    maxHeight: "260px",
-                    overflowY: "auto",
-                    background: "rgba(14, 16, 22, 0.78)",
-                    backdropFilter: "blur(24px) saturate(180%)",
-                    WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                    border: "1px solid rgba(255, 255, 255, 0.16)",
-                    borderRadius: "14px",
-                    padding: "4px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "2px",
-                    boxShadow: "0 18px 45px rgba(0, 0, 0, 0.8)",
-                  }}
-                >
-                  {Array.from({ length: Math.max(seasonsCount || 1, 1) }).map((_, i) => {
-                    const sNum = i + 1;
-                    const isSelected = selectedSeason === sNum;
-                    return (
-                      <button
-                        key={sNum}
-                        onClick={() => {
-                          setSelectedSeason(sNum);
-                          setSeasonDropdownOpen(false);
-                        }}
+              {seasonDropdownOpen &&
+                (isMobile ? (
+                  <>
+                    <div
+                      onClick={() => setSeasonDropdownOpen(false)}
+                      style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0, 0, 0, 0.70)",
+                        backdropFilter: "blur(8px)",
+                        WebkitBackdropFilter: "blur(8px)",
+                        zIndex: 100060,
+                        animation: "cinemaFadeIn 0.2s ease",
+                      }}
+                    />
+                    <div
+                      className="cinema-no-scrollbar"
+                      style={{
+                        position: "fixed",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        maxHeight: "75vh",
+                        zIndex: 100070,
+                        background: "rgba(16, 18, 24, 0.98)",
+                        backdropFilter: "blur(32px) saturate(200%)",
+                        WebkitBackdropFilter: "blur(32px) saturate(200%)",
+                        borderTop: "1px solid rgba(255, 255, 255, 0.18)",
+                        borderTopLeftRadius: "24px",
+                        borderTopRightRadius: "24px",
+                        boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+                        padding: "10px 0 24px 0",
+                        display: "flex",
+                        flexDirection: "column",
+                        animation: "cinemaSlideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                        overflowY: "auto",
+                        WebkitOverflowScrolling: "touch",
+                      }}
+                    >
+                      <div
                         style={{
-                          padding: "8px 12px",
-                          borderRadius: "8px",
-                          background: isSelected ? "rgba(255, 255, 255, 0.12)" : "transparent",
-                          border: "none",
-                          color: "#ffffff",
-                          fontSize: "13px",
-                          textAlign: "left",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
+                          width: "36px",
+                          height: "4px",
+                          borderRadius: "999px",
+                          background: "rgba(255, 255, 255, 0.28)",
+                          margin: "2px auto 14px auto",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div
+                        style={{
+                          padding: "0 22px 10px 22px",
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          letterSpacing: "1.5px",
+                          textTransform: "uppercase",
+                          color: "rgba(255, 255, 255, 0.5)",
+                          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                          marginBottom: "4px",
+                          flexShrink: 0,
                         }}
                       >
-                        <span>Season {sNum}</span>
-                        {isSelected && <CheckIcon size={13} color="#ffffff" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                        SELECT SEASON
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {Array.from({ length: Math.max(seasonsCount || 1, 1) }).map((_, i) => {
+                          const sNum = i + 1;
+                          const isSelected = selectedSeason === sNum;
+                          return (
+                            <button
+                              key={sNum}
+                              onClick={() => {
+                                setSelectedSeason(sNum);
+                                setSeasonDropdownOpen(false);
+                              }}
+                              style={{
+                                height: "48px",
+                                padding: "0 22px",
+                                background: isSelected ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                                border: "none",
+                                color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.85)",
+                                fontSize: "15px",
+                                fontWeight: isSelected ? 700 : 500,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                cursor: "pointer",
+                                textAlign: "left",
+                                borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+                                WebkitTapHighlightColor: "transparent",
+                              }}
+                            >
+                              <span>Season {sNum}</span>
+                              {isSelected && (
+                                <span style={{ color: "#e50914", fontSize: "16px", fontWeight: 800 }}>✓</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    className="cinema-no-scrollbar"
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      left: 0,
+                      zIndex: 130,
+                      minWidth: "150px",
+                      maxHeight: "260px",
+                      overflowY: "auto",
+                      background: "rgba(14, 16, 22, 0.78)",
+                      backdropFilter: "blur(24px) saturate(180%)",
+                      WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                      border: "1px solid rgba(255, 255, 255, 0.16)",
+                      borderRadius: "14px",
+                      padding: "4px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "2px",
+                      boxShadow: "0 18px 45px rgba(0, 0, 0, 0.8)",
+                    }}
+                  >
+                    {Array.from({ length: Math.max(seasonsCount || 1, 1) }).map((_, i) => {
+                      const sNum = i + 1;
+                      const isSelected = selectedSeason === sNum;
+                      return (
+                        <button
+                          key={sNum}
+                          onClick={() => {
+                            setSelectedSeason(sNum);
+                            setSeasonDropdownOpen(false);
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            background: isSelected ? "rgba(255, 255, 255, 0.12)" : "transparent",
+                            border: "none",
+                            color: "#ffffff",
+                            fontSize: "13px",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>Season {sNum}</span>
+                          {isSelected && <CheckIcon size={13} color="#ffffff" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
             </div>
 
             {/* Episode Dropdown */}
@@ -442,60 +573,162 @@ export const UniversalDownloadsModal: React.FC<UniversalDownloadsModalProps> = (
                 </span>
               </button>
 
-              {episodeDropdownOpen && (
-                <div
-                  className="cinema-no-scrollbar"
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 6px)",
-                    left: 0,
-                    zIndex: 130,
-                    minWidth: "150px",
-                    maxHeight: "260px",
-                    overflowY: "auto",
-                    background: "rgba(14, 16, 22, 0.78)",
-                    backdropFilter: "blur(24px) saturate(180%)",
-                    WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                    border: "1px solid rgba(255, 255, 255, 0.16)",
-                    borderRadius: "14px",
-                    padding: "4px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "2px",
-                    boxShadow: "0 18px 45px rgba(0, 0, 0, 0.8)",
-                  }}
-                >
-                  {Array.from({ length: Math.max(episodesCount || 12, 1) }).map((_, i) => {
-                    const epNum = i + 1;
-                    const isSelected = selectedEpisode === epNum;
-                    return (
-                      <button
-                        key={epNum}
-                        onClick={() => {
-                          setSelectedEpisode(epNum);
-                          setEpisodeDropdownOpen(false);
-                        }}
+              {episodeDropdownOpen &&
+                (isMobile ? (
+                  <>
+                    <div
+                      onClick={() => setEpisodeDropdownOpen(false)}
+                      style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0, 0, 0, 0.70)",
+                        backdropFilter: "blur(8px)",
+                        WebkitBackdropFilter: "blur(8px)",
+                        zIndex: 100060,
+                        animation: "cinemaFadeIn 0.2s ease",
+                      }}
+                    />
+                    <div
+                      className="cinema-no-scrollbar"
+                      style={{
+                        position: "fixed",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        maxHeight: "75vh",
+                        zIndex: 100070,
+                        background: "rgba(16, 18, 24, 0.98)",
+                        backdropFilter: "blur(32px) saturate(200%)",
+                        WebkitBackdropFilter: "blur(32px) saturate(200%)",
+                        borderTop: "1px solid rgba(255, 255, 255, 0.18)",
+                        borderTopLeftRadius: "24px",
+                        borderTopRightRadius: "24px",
+                        boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+                        padding: "10px 0 24px 0",
+                        display: "flex",
+                        flexDirection: "column",
+                        animation: "cinemaSlideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                        overflowY: "auto",
+                        WebkitOverflowScrolling: "touch",
+                      }}
+                    >
+                      <div
                         style={{
-                          padding: "8px 12px",
-                          borderRadius: "8px",
-                          background: isSelected ? "rgba(255, 255, 255, 0.12)" : "transparent",
-                          border: "none",
-                          color: "#ffffff",
-                          fontSize: "13px",
-                          textAlign: "left",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
+                          width: "36px",
+                          height: "4px",
+                          borderRadius: "999px",
+                          background: "rgba(255, 255, 255, 0.28)",
+                          margin: "2px auto 14px auto",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div
+                        style={{
+                          padding: "0 22px 10px 22px",
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          letterSpacing: "1.5px",
+                          textTransform: "uppercase",
+                          color: "rgba(255, 255, 255, 0.5)",
+                          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                          marginBottom: "4px",
+                          flexShrink: 0,
                         }}
                       >
-                        <span>Episode {epNum}</span>
-                        {isSelected && <CheckIcon size={13} color="#ffffff" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                        SELECT EPISODE
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {Array.from({ length: Math.max(episodesCount || 12, 1) }).map((_, i) => {
+                          const epNum = i + 1;
+                          const isSelected = selectedEpisode === epNum;
+                          return (
+                            <button
+                              key={epNum}
+                              onClick={() => {
+                                setSelectedEpisode(epNum);
+                                setEpisodeDropdownOpen(false);
+                              }}
+                              style={{
+                                height: "48px",
+                                padding: "0 22px",
+                                background: isSelected ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                                border: "none",
+                                color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.85)",
+                                fontSize: "15px",
+                                fontWeight: isSelected ? 700 : 500,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                cursor: "pointer",
+                                textAlign: "left",
+                                borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+                                WebkitTapHighlightColor: "transparent",
+                              }}
+                            >
+                              <span>Episode {epNum}</span>
+                              {isSelected && (
+                                <span style={{ color: "#e50914", fontSize: "16px", fontWeight: 800 }}>✓</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    className="cinema-no-scrollbar"
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      left: 0,
+                      zIndex: 130,
+                      minWidth: "150px",
+                      maxHeight: "260px",
+                      overflowY: "auto",
+                      background: "rgba(14, 16, 22, 0.78)",
+                      backdropFilter: "blur(24px) saturate(180%)",
+                      WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                      border: "1px solid rgba(255, 255, 255, 0.16)",
+                      borderRadius: "14px",
+                      padding: "4px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "2px",
+                      boxShadow: "0 18px 45px rgba(0, 0, 0, 0.8)",
+                    }}
+                  >
+                    {Array.from({ length: Math.max(episodesCount || 12, 1) }).map((_, i) => {
+                      const epNum = i + 1;
+                      const isSelected = selectedEpisode === epNum;
+                      return (
+                        <button
+                          key={epNum}
+                          onClick={() => {
+                            setSelectedEpisode(epNum);
+                            setEpisodeDropdownOpen(false);
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            background: isSelected ? "rgba(255, 255, 255, 0.12)" : "transparent",
+                            border: "none",
+                            color: "#ffffff",
+                            fontSize: "13px",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>Episode {epNum}</span>
+                          {isSelected && <CheckIcon size={13} color="#ffffff" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
             </div>
           </div>
         )}

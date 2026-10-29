@@ -277,7 +277,13 @@ export async function initAuthSession(): Promise<boolean> {
     });
 
     if (res.ok) {
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
       if (data.authenticated && data.user) {
         localStorage.setItem(USER_ACCOUNT_KEY, JSON.stringify(data.user));
         if (Array.isArray(data.profiles)) {
@@ -297,10 +303,13 @@ export async function initAuthSession(): Promise<boolean> {
   return false;
 }
 
-/**
- * Register account with Cloudflare D1 database
- */
+let lastAuthError: string | null = null;
+export function getLastAuthError(): string | null {
+  return lastAuthError;
+}
+
 export async function registerAccount(email: string, password: string, name: string): Promise<boolean> {
+  lastAuthError = null;
   const base = getBackendUrl();
   try {
     const res = await fetch(`${base}/api/auth/register`, {
@@ -309,9 +318,17 @@ export async function registerAccount(email: string, password: string, name: str
       body: JSON.stringify({ email, password, name }),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data: any = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { error: text || "Invalid response from server" };
+    }
+
     if (!res.ok) {
-      showToast(data.error || "Failed to create account", "error");
+      lastAuthError = data.error || "Failed to create account";
+      showToast(lastAuthError, "error");
       return false;
     }
 
@@ -327,7 +344,8 @@ export async function registerAccount(email: string, password: string, name: str
       return true;
     }
   } catch (err: any) {
-    showToast(err.message || "Network error registering account", "error");
+    lastAuthError = err.message || "Network error registering account";
+    showToast(lastAuthError, "error");
   }
   return false;
 }
@@ -344,7 +362,14 @@ export async function signInAccountWithPassword(email: string, password: string)
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data: any = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { error: text || "Invalid response from server" };
+    }
+
     if (!res.ok) {
       showToast(data.error || "Incorrect email or password", "error");
       return false;
@@ -454,7 +479,13 @@ export async function createProfile(
         }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { error: text || "Invalid response from server" };
+      }
       if (res.ok && data.profile) {
         const currentProfiles = getProfiles();
         const updated = [...currentProfiles, data.profile];

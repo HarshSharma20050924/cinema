@@ -200,13 +200,140 @@ const LANGUAGE_OPTIONS = [
   { label: "Turkish", value: "tr" },
 ];
 
-// Translucent Frosted Glass Dropdown component matching Navbar UI
+// Translucent Frosted Glass Dropdown on desktop, Bottom Sheet Drawer on mobile (Screenshot from 2026-10-29 23-21-37.png)
 const CnoDropdownMenu: React.FC<{
+  title?: string;
   items: Array<{ label: string; value: string }>;
   selected: string;
   onSelect: (val: string) => void;
+  onClose?: () => void;
   minWidth?: string;
-}> = ({ items, selected, onSelect, minWidth = "190px" }) => {
+}> = ({ title, items, selected, onSelect, onClose, minWidth = "190px" }) => {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  if (isMobile) {
+    return (
+      <>
+        {/* Dimmed Backdrop */}
+        <div
+          onClick={onClose}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.70)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            zIndex: 100040,
+            animation: "cinemaFadeIn 0.2s ease",
+          }}
+        />
+
+        {/* Mobile Bottom Sheet Drawer matching Screenshot from 2026-10-29 23-21-37.png */}
+        <div
+          className="cinema-no-scrollbar"
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            maxHeight: "75vh",
+            zIndex: 100050,
+            background: "rgba(16, 18, 24, 0.96)",
+            backdropFilter: "blur(32px) saturate(200%)",
+            WebkitBackdropFilter: "blur(32px) saturate(200%)",
+            borderTop: "1px solid rgba(255, 255, 255, 0.16)",
+            borderTopLeftRadius: "24px",
+            borderTopRightRadius: "24px",
+            boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+            padding: "10px 0 24px 0",
+            display: "flex",
+            flexDirection: "column",
+            animation: "cinemaSlideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+            overflowY: "auto",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {/* Drag Handle Pill */}
+          <div
+            style={{
+              width: "36px",
+              height: "4px",
+              borderRadius: "999px",
+              background: "rgba(255, 255, 255, 0.28)",
+              margin: "2px auto 14px auto",
+              flexShrink: 0,
+            }}
+          />
+
+          {/* Uppercase Category Header */}
+          {title && (
+            <div
+              style={{
+                padding: "0 22px 10px 22px",
+                fontSize: "12px",
+                fontWeight: 800,
+                letterSpacing: "1.5px",
+                textTransform: "uppercase",
+                color: "rgba(255, 255, 255, 0.5)",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                marginBottom: "4px",
+                flexShrink: 0,
+              }}
+            >
+              {title}
+            </div>
+          )}
+
+          {/* Touch-friendly Row Items */}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {items.map((item) => {
+              const isSelected = selected === item.value || selected === item.label;
+              return (
+                <button
+                  key={item.value}
+                  onClick={() => {
+                    onSelect(item.value);
+                    onClose?.();
+                  }}
+                  style={{
+                    height: "48px",
+                    padding: "0 22px",
+                    background: isSelected ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                    border: "none",
+                    color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.85)",
+                    fontSize: "15px",
+                    fontWeight: isSelected ? 700 : 500,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  <span>{item.label}</span>
+                  {isSelected && (
+                    <span style={{ color: "#e50914", fontSize: "16px", fontWeight: 800 }}>✓</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Desktop dropdown
   return (
     <div
       className="cinema-no-scrollbar"
@@ -237,7 +364,10 @@ const CnoDropdownMenu: React.FC<{
         return (
           <button
             key={item.value}
-            onClick={() => onSelect(item.value)}
+            onClick={() => {
+              onSelect(item.value);
+              onClose?.();
+            }}
             style={{
               padding: "8px 12px",
               borderRadius: "10px",
@@ -1273,12 +1403,14 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
 
           {openDropdown === "genre" && (
             <CnoDropdownMenu
+              title="GENRE"
               items={GENRE_OPTIONS.map((g) => ({ label: g, value: g }))}
               selected={selectedGenre}
               onSelect={(val) => {
                 setSelectedGenre(val);
                 setOpenDropdown("none");
               }}
+              onClose={() => setOpenDropdown("none")}
               minWidth="190px"
             />
           )}
@@ -1298,12 +1430,14 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
 
           {openDropdown === "sort" && (
             <CnoDropdownMenu
+              title="SORT BY"
               items={SORT_OPTIONS}
               selected={selectedSort}
               onSelect={(val) => {
                 setSelectedSort(val);
                 setOpenDropdown("none");
               }}
+              onClose={() => setOpenDropdown("none")}
               minWidth="160px"
             />
           )}
@@ -1323,12 +1457,14 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
 
           {openDropdown === "service" && (
             <CnoDropdownMenu
+              title="SERVICE"
               items={dynamicServices.map((s) => ({ label: s.label, value: s.value }))}
               selected={selectedService}
               onSelect={(val) => {
                 setSelectedService(val);
                 setOpenDropdown("none");
               }}
+              onClose={() => setOpenDropdown("none")}
               minWidth="230px"
             />
           )}
@@ -1348,12 +1484,14 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
 
           {openDropdown === "year" && (
             <CnoDropdownMenu
+              title="RELEASE YEAR"
               items={YEAR_OPTIONS.map((y) => ({ label: y, value: y }))}
               selected={selectedYear}
               onSelect={(val) => {
                 setSelectedYear(val);
                 setOpenDropdown("none");
               }}
+              onClose={() => setOpenDropdown("none")}
               minWidth="160px"
             />
           )}
@@ -1373,12 +1511,14 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
 
           {openDropdown === "length" && (
             <CnoDropdownMenu
+              title="LENGTH"
               items={LENGTH_OPTIONS.map((l) => ({ label: l, value: l }))}
               selected={selectedLength}
               onSelect={(val) => {
                 setSelectedLength(val);
                 setOpenDropdown("none");
               }}
+              onClose={() => setOpenDropdown("none")}
               minWidth="160px"
             />
           )}
@@ -1398,12 +1538,14 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
 
           {openDropdown === "rating" && (
             <CnoDropdownMenu
+              title="RATING"
               items={RATING_OPTIONS.map((r) => ({ label: r, value: r }))}
               selected={selectedRating}
               onSelect={(val) => {
                 setSelectedRating(val);
                 setOpenDropdown("none");
               }}
+              onClose={() => setOpenDropdown("none")}
               minWidth="150px"
             />
           )}
@@ -1423,12 +1565,14 @@ export const CatalogFilterBrowsePage: React.FC<CatalogFilterBrowsePageProps> = (
 
           {openDropdown === "language" && (
             <CnoDropdownMenu
+              title="LANGUAGE"
               items={LANGUAGE_OPTIONS.map((l) => ({ label: l.label, value: l.value }))}
               selected={selectedLanguage}
               onSelect={(val) => {
                 setSelectedLanguage(val);
                 setOpenDropdown("none");
               }}
+              onClose={() => setOpenDropdown("none")}
               minWidth="170px"
             />
           )}

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { registerAccount, getActiveProfile, type UserProfile } from "../../utils/profileService";
+import { registerAccount, getActiveProfile, getLastAuthError, type UserProfile } from "../../utils/profileService";
 
 interface CreateAccountModalProps {
   isOpen: boolean;
@@ -48,7 +48,7 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
       onClose();
       onSuccess(active);
     } else {
-      setError("Failed to create account. Please check your details.");
+      setError(getLastAuthError() || "Failed to create account. Please check your details.");
     }
   };
 
