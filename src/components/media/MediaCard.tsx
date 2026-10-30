@@ -157,6 +157,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const [showHoverTrailer, setShowHoverTrailer] = useState(false);
 
   const handleMouseEnter = () => {
+    if (typeof window !== "undefined" && (window.innerWidth <= 768 || window.matchMedia("(pointer: coarse)").matches)) {
+      return;
+    }
     setIsHovered(true);
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     if (isLandscape) {
@@ -167,6 +170,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (typeof window !== "undefined" && (window.innerWidth <= 768 || window.matchMedia("(pointer: coarse)").matches)) {
+      return;
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -1007,63 +1013,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           </div>
         )}
 
-        {/* Top 10 Rank Number if present */}
-        {typeof rank === "number" && (
-          <div
-            style={{
-              position: "absolute",
-              top: "8px",
-              left: "10px",
-              zIndex: 4,
-              minWidth: "26px",
-              height: "26px",
-              padding: "0 6px",
-              borderRadius: "7px",
-              background: "rgba(8, 10, 16, 0.82)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "12.5px",
-              fontWeight: 900,
-              lineHeight: 1,
-              color: "#ffffff",
-              fontFamily: "var(--font-display, 'Space Grotesk', -apple-system, sans-serif)",
-              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.7)",
-              pointerEvents: "none",
-            }}
-          >
-            {rank}
-          </div>
-        )}
-
-        {/* Badge tag (e.g. Diwali 2026, Dec 2025 in Coming Soon) */}
-        {badge && (
-          <div
-            style={{
-              position: "absolute",
-              top: "10px",
-              left: "10px",
-              padding: "4px 10px",
-              borderRadius: "6px",
-              background: "rgba(12, 14, 20, 0.8)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              border: "1px solid rgba(255, 255, 255, 0.25)",
-              color: "#ffffff",
-              fontSize: "11px",
-              fontWeight: 800,
-              letterSpacing: "0.02em",
-              zIndex: 4,
-              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.6)",
-            }}
-          >
-            {badge}
-          </div>
-        )}
-
         {/* Quality or custom tag if present (e.g. CAM, 4K) */}
         {badgeTag && (
           <div
@@ -1088,9 +1037,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
       </div>
 
-      {/* Title & Metadata below card - only shown for vertical portrait cards (hidden on landscape) */}
+      {/* Title & Metadata below card - only shown on desktop (hidden on mobile) */}
       {!isLandscape && (
-        <div className="media-card-static-info" style={{ marginTop: "8px", padding: "0 2px" }}>
+        <div className="media-card-static-info desktop-only" style={{ marginTop: "8px", padding: "0 2px" }}>
           <div
             title={cleanTitle || post.title}
             style={{

@@ -61,14 +61,18 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         bottom: 0,
         left: 0,
         right: 0,
-        height: 'calc(60px + env(safe-area-inset-bottom, 0px))',
+        width: '100%',
+        maxWidth: '100vw',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        height: 'calc(56px + env(safe-area-inset-bottom, 0px))',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         zIndex: 90,
         display: 'flex',
         alignItems: 'stretch',
         justifyContent: 'space-around',
         borderTop: '1px solid rgba(255, 255, 255, 0.14)',
-        background: 'rgba(10, 12, 16, 0.84)',
+        background: 'rgba(10, 12, 16, 0.88)',
         backdropFilter: 'blur(30px) saturate(200%)',
         WebkitBackdropFilter: 'blur(30px) saturate(200%)',
         boxShadow: '0 -4px 30px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
@@ -81,13 +85,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             style={{
-              flex: 1,
+              flex: '1 1 0',
+              minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '3px',
-              padding: '6px 0',
+              gap: '2px',
+              padding: '4px 0',
               background: 'transparent',
               border: 'none',
               outline: 'none',
@@ -97,6 +102,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               position: 'relative',
               userSelect: 'none',
               WebkitTapHighlightColor: 'transparent',
+              overflow: 'hidden',
             }}
           >
             {/* Active top subtle glowing indicator bar */}
@@ -105,9 +111,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 style={{
                   position: 'absolute',
                   top: 0,
-                  width: '24px',
-                  height: '2.5px',
-                  borderRadius: '0 0 3px 3px',
+                  width: '20px',
+                  height: '2px',
+                  borderRadius: '0 0 2px 2px',
                   background: 'linear-gradient(90deg, #e50914 0%, #ff4d4d 100%)',
                   boxShadow: '0 1px 8px rgba(229, 9, 20, 0.8)',
                 }}
@@ -128,12 +134,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
             <span
               style={{
-                fontSize: '10.5px',
+                fontSize: '10px',
                 fontWeight: isActive ? 700 : 500,
-                letterSpacing: isActive ? '0.1px' : '0px',
                 lineHeight: 1.1,
                 color: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.65)',
                 transition: 'color 0.2s ease',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
+                padding: '0 2px',
               }}
             >
               {tab.label}

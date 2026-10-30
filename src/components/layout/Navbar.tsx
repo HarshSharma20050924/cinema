@@ -757,7 +757,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             justifyContent: "space-between",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
             {onClose ? (
               <button
                 onClick={onClose}
@@ -765,19 +765,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "4px",
-                  padding: "5px 10px",
-                  borderRadius: "8px",
+                  justifyContent: "center",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "50%",
                   background: "rgba(255, 255, 255, 0.1)",
-                  border: "1px solid rgba(255, 255, 255, 0.14)",
+                  border: "1px solid rgba(255, 255, 255, 0.18)",
                   color: "#fff",
-                  fontSize: "12px",
-                  fontWeight: 600,
                   cursor: "pointer",
+                  flexShrink: 0,
                 }}
               >
-                <ArrowLeftIcon size={14} />
-                <span>Back</span>
+                <ArrowLeftIcon size={16} />
               </button>
             ) : searchQuery ? (
               <button
@@ -786,19 +785,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "4px",
-                  padding: "5px 10px",
-                  borderRadius: "8px",
+                  justifyContent: "center",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "50%",
                   background: "rgba(255, 255, 255, 0.1)",
-                  border: "1px solid rgba(255, 255, 255, 0.14)",
+                  border: "1px solid rgba(255, 255, 255, 0.18)",
                   color: "#fff",
-                  fontSize: "12px",
-                  fontWeight: 600,
                   cursor: "pointer",
+                  flexShrink: 0,
                 }}
               >
-                <ArrowLeftIcon size={14} />
-                <span>Back</span>
+                <ArrowLeftIcon size={16} />
               </button>
             ) : null}
 
@@ -807,25 +805,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                 if (onGoHome) onGoHome();
                 onSearchChange("");
               }}
-              style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
+              style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", flexShrink: 0 }}
             >
               <img
                 src="/logo.png"
                 alt="Cinema Logo"
                 style={{
-                  height: "30px",
-                  width: "30px",
+                  height: "28px",
+                  width: "28px",
                   borderRadius: "7px",
                   objectFit: "cover",
                 }}
               />
-              <span style={{ fontSize: "18px", fontWeight: 900, letterSpacing: "0.03em" }}>
+              <span style={{ fontSize: "17px", fontWeight: 900, letterSpacing: "0.03em" }}>
                 <span style={{ color: "#e50914" }}>CINEMA</span>
               </span>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
             {/* 1. Notifications Button */}
             <div style={{ position: "relative" }}>
               <button
@@ -835,8 +833,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 title="Notifications"
                 style={{
-                  width: "36px",
-                  height: "36px",
+                  width: "34px",
+                  height: "34px",
                   borderRadius: "50%",
                   background: notificationsOpen ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)",
                   border: "1px solid rgba(255, 255, 255, 0.18)",
@@ -850,7 +848,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
                 }}
               >
-                <BellIcon size={17} />
+                <BellIcon size={16} />
               </button>
               <NotificationsPopover
                 isOpen={notificationsOpen}
@@ -867,8 +865,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               title="Settings"
               style={{
-                width: "36px",
-                height: "36px",
+                width: "34px",
+                height: "34px",
                 borderRadius: "50%",
                 background: "rgba(255, 255, 255, 0.08)",
                 border: "1px solid rgba(255, 255, 255, 0.18)",
@@ -882,7 +880,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
               }}
             >
-              <SettingsIcon size={16} />
+              <SettingsIcon size={15} />
             </button>
 
             {/* 3. Sign In or Profile Avatar */}
@@ -907,7 +905,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <ProfileAvatar
                     avatarKey={profile.avatar}
-                    size={36}
+                    size={34}
                     gradient={profile.avatarColor}
                   />
                 </button>
@@ -918,23 +916,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }}
                   title="Sign In"
                   style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "50%",
-                    background: "linear-gradient(135deg, rgba(140, 100, 250, 0.85) 0%, rgba(90, 60, 220, 0.95) 100%)",
-                    border: "1px solid rgba(255, 255, 255, 0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    padding: "6px 12px",
+                    borderRadius: "999px",
+                    background: "rgba(255, 255, 255, 0.12)",
+                    border: "1px solid rgba(255, 255, 255, 0.22)",
                     color: "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: 700,
                     cursor: "pointer",
-                    boxShadow: "0 4px 16px rgba(120, 80, 240, 0.4)",
+                    backdropFilter: "blur(20px)",
+                    WebkitBackdropFilter: "blur(20px)",
+                    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
                   }}
                 >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
+                  Sign In
                 </button>
               )}
 

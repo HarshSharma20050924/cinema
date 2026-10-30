@@ -291,14 +291,6 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
             <div
               key={`${post.provider || ""}:${post.link}-${idx}`}
               className={`catalog-row-item ${isLandscape ? "catalog-row-item-landscape" : ""}`}
-              style={{
-                flex: isLandscape
-                  ? "0 0 clamp(320px, 26vw, 400px)"
-                  : "0 0 clamp(180px, 14vw, 210px)",
-                width: isLandscape
-                  ? "clamp(320px, 26vw, 400px)"
-                  : "clamp(180px, 14vw, 210px)",
-              }}
             >
               <MediaCard
                 key={`${post.provider || ""}:${post.link}-${idx}`}

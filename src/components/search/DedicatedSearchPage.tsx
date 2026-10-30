@@ -282,8 +282,9 @@ export const DedicatedSearchPage: React.FC<DedicatedSearchPageProps> = ({
         zIndex: 1,
       }}
     >
-      {/* Top Bar with Clean Pill Back Button */}
+      {/* Top Bar with Clean Pill Back Button (Desktop only, mobile has top bar) */}
       <div
+        className="desktop-only"
         style={{
           padding: "16px 48px",
           display: "flex",
